@@ -64,8 +64,9 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 - 只要本步骤要断言 `excpt.triggered/cause/tval`（包括预期 `triggered == false`），都先调用 `TEST_SETUP_EXCEPT()` 初始化状态。
 - 测试注册统一在 `test_register.c` 管理，不在 case 文件中注册。
 - 对 PMA/PBMT/cache/uncache 强相关场景，不要强行以 Spike 作为唯一准入条件。
-- 写回 `test_point_file` 的测试点正文时，默认使用固定三段式结构：`怀疑点：`、`对应场景：`、`已实现 case：`；不要只回填 case 名而缺少源码怀疑点和场景描述。
-- 新增 case 必须与测试点逐项对齐，显式构造该测试点描述的 bug 场景；禁止用“相邻近似场景”替代“目标测试点场景”来充数。
+- 写回 `test_point_file` 的测试点正文时，默认使用“标题 + 简版三段式”：`测试点：`、`构建场景：`、`已实现 case：`。
+- 仅当本轮需要从 RTL/源码反推可疑点时，再扩展为“标题 + 扩展模板”：`测试点：`、`怀疑点：`、`对应场景：`、`已实现 case：`。
+- 新增 case 或复用已有 case 都必须与测试点逐项对齐；若构建场景已有对应用例，可直接复用，但需在回填中写明“复用依据”，且必须固定为两行字段：`顺序一致性`、`断言一致性`；禁止用“相邻近似场景”替代“目标测试点场景”来充数。
 - 当目标源文件已经过长、可读性明显下降，或用户已明确指出“不希望继续堆到旧大文件”时，必须新建 `ai_test_cases/*.c` 文件承载新 case，而不是继续往超大历史文件中追加。
 
 ## 口径优先级（冲突时）
@@ -108,9 +109,40 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 
 ### 测试点回填正文格式（默认执行）
 
-写回 `test_point_file` 的测试点条目时，优先按以下三段式组织正文：
+写回 `test_point_file` 的测试点条目时，默认按“标题 + 双模板”组织正文：
+
+- 默认模板（不需要从 RTL/源码定位可疑点）：
 
 ```text
+### Pxx. <测试点标题（包含关键 fault/repair/success/switch 顺序）>
+
+测试点：
+
+- ...
+
+构建场景：
+
+- ...
+
+已实现 case：
+
+- `case_name`
+
+复用依据（仅复用已有 case 时填写）：
+
+顺序一致性：一致/不一致；测试点顺序=...；复用 case 顺序=...；差异=...
+断言一致性：一致/不一致；测试点断言=...；复用 case 断言=...；差异=...
+```
+
+- 扩展模板（需要从 RTL/源码定位可疑点）：
+
+```text
+### Pxx. <测试点标题（包含关键 fault/repair/success/switch 顺序）>
+
+测试点：
+
+- ...
+
 怀疑点：
 
 - ...
@@ -124,13 +156,23 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 已实现 case：
 
 - `case_name`
+
+复用依据（仅复用已有 case 时填写）：
+
+顺序一致性：一致/不一致；测试点顺序=...；复用 case 顺序=...；差异=...
+断言一致性：一致/不一致；测试点断言=...；复用 case 断言=...；差异=...
 ```
 
 要求：
 
-- `怀疑点` 段优先引用 RTL/源码位置，并说明为什么这里可能出 bug。
-- `对应场景` 段必须把 fault/repair/success/producer-switch/template-switch 等关键顺序写清楚，确保能从文本直接映射到 case 构造。
-- `已实现 case` 段只列真正对应该测试点的 case；若尚未新增成功，不得拿相邻 case 顶替。
+- 每个测试点条目必须先写三级标题（`### Pxx. ...`），再写正文；禁止只有正文而缺少标题。
+- 标题必须能唯一指向该测试点，建议在标题中包含关键顺序（fault -> repair -> success -> producer/template switch）。
+- 默认优先使用“测试点 + 构建场景 + 已实现 case”简版模板。
+- 满足以下任一条件时，必须使用扩展模板：本轮新增/修改了源码怀疑点；需要引用 RTL/源码位置解释判定；分层结论需要依赖模块实现细节说明。
+- `构建场景` 段必须把 fault/repair/success/producer-switch/template-switch 等关键顺序写清楚，确保能从文本直接映射到 case 构造。
+- 使用扩展模板时，`怀疑点` 段优先引用 RTL/源码位置，并说明为什么这里可能出 bug；`对应场景` 段保持可直接映射到 case 构造。
+- `已实现 case` 段只列真正对应该测试点的 case；若当前无新增且无可复用 case，写 `暂无（原因：...）`。
+- 若复用已有 case，必须补“复用依据”，且严格使用两行字段，不得增删：`顺序一致性`（比较 fault/repair/success/switch 顺序）与 `断言一致性`（比较 cause/tval/数据副作用等关键断言覆盖）。
 
 ### 失败分叉（强制执行）
 
