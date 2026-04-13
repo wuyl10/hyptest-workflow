@@ -25,13 +25,12 @@
 1. 先读 `SKILL.md` 了解分层策略（default/manual/compile-only）。
 2. 选择执行模式：快速执行优先看 `quick_execution.md`，复杂问题走完整执行版。
 3. 按 `writing_cases.md` 在 `ai_test_cases/` 新建或修改 case。
-4. 先核对 `test_point/ai_exclude_*.txt` 与 `test_point/human_exclude_*.list` 是否命中目标 case。
-5. 用 `build_run_debug.md` 的命令做单 case 编译；非 `compile-only` 再做单 case 运行。
-6. 依据 `rules_and_pitfalls.md` 判断是否进入 default。
-7. 用 `quality_gate.md` 做最终验收。
-8. 用 `tiering_decision.md` 生成分层结论与原因码。
-9. 用 `submission_card.md` 做提交前勾选确认。
-10. 更新 `test_register.c` 与 `test_point` 映射，完成闭环。
+4. 用 `build_run_debug.md` 的命令做单 case 编译；非 `compile-only` 再做单 case 运行。
+5. 依据 `rules_and_pitfalls.md` 判断是否进入 default。
+6. 用 `quality_gate.md` 做最终验收。
+7. 用 `tiering_decision.md` 生成分层结论与原因码。
+8. 用 `submission_card.md` 做提交前勾选确认。
+9. 更新 `test_register.c` 与 `test_point` 映射，完成闭环。
 
 ## 推荐阅读顺序（避免漏细节）
 

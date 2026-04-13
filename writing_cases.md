@@ -20,6 +20,16 @@
 - `ai_micro_hs_load_cross_page_high_half_page_fault`
 - `ai_micro_m_store_cross_16b_second_split_access_fault_then_same_address_valid_store_recovers_corner`
 
+### 1.1 大文件拆分规则
+
+- 若目标文件已经明显过长，或用户已明确指出该文件“不应继续追加”，应优先新建 `ai_test_cases/*.c` 文件承载新 case。
+- 对已经成为“历史大文件”的目标，例如 `ai_micro_mmode_memblock_cases.c`，不要默认继续往里堆新 case。
+- 新文件命名应反映主题或子场景，例如：
+  - `ai_micro_mmode_memblock_followup_cases.c`
+  - `ai_micro_mmode_memblock_mab_flush_cases.c`
+  - `ai_micro_mmode_memblock_p4_cases.c`
+- 新建文件后，仍需按现有仓库规则确认它会被编译系统自动收集。
+
 ## 2. 基础函数结构
 
 推荐骨架：
@@ -146,6 +156,39 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 已闭环：`(case_name)`
 - 依赖 PMA/PBMT 且未走 Spike gate：`(case_name, 依赖PMA CSR, 未跑Spike)`
 - 仅保留编译：`(case_name, compile-only/manual)`
+
+### 7.1 测试点正文三段式
+
+当本轮不只是“追加映射”，而是新增/改写 `test_point_file` 的正文描述时，默认使用以下三段式：
+
+```text
+怀疑点：
+
+- `源码位置` + 为什么这里可能有 bug
+- `源码位置` + 为什么这里可能保留 stale state
+
+对应场景：
+
+- 明确 fault/repair/success 的顺序
+- 明确模板、producer、地址布局、guard 检查和期望结果
+
+已实现 case：
+
+- `case_name`
+```
+
+建议：
+
+- `怀疑点` 段尽量锚到 RTL/源码行或模块。
+- `对应场景` 段要能直接指导 case 构造，避免只写抽象结论。
+- `已实现 case` 段只放与该测试点一一对应的 case。
+
+### 7.2 测试点与 case 必须一一映射
+
+- 新 case 必须严格符合测试点要求构造出对应 bug 场景。
+- 不允许用“很像但不完全相同”的路径替代测试点要求的路径。
+- 若测试点要求包含特定模板、producer 切换、fault 次序、地址布局、guard 检查或期望 `tval/cause`，case 必须逐项落到断言里。
+- 若最终发现无法构造出测试点要求的场景，应在结论里明确 `blocked`，而不是拿邻近 case 顶替。
 
 ## 8. 高质量 case 的最小标准
 

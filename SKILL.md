@@ -56,8 +56,6 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 - 批跑脚本：`get_result.py`
 - 人工规则中心：`test_point/Manual_Reference.md`
 - 历史坑点沉淀：`test_point/CRITICAL_ISSUES_LOG.md`
-- AI 排除清单：`test_point/ai_exclude_pma.txt`、`test_point/ai_exclude_cache_consistency.txt`、`test_point/ai_exclude_tlb.txt`
-- 人工排除清单：`test_point/human_exclude_pma.list`、`test_point/human_exclude_cache.list`、`test_point/human_exclude_tlb.list`
 
 ## 强约束
 
@@ -66,6 +64,9 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 - 只要本步骤要断言 `excpt.triggered/cause/tval`（包括预期 `triggered == false`），都先调用 `TEST_SETUP_EXCEPT()` 初始化状态。
 - 测试注册统一在 `test_register.c` 管理，不在 case 文件中注册。
 - 对 PMA/PBMT/cache/uncache 强相关场景，不要强行以 Spike 作为唯一准入条件。
+- 写回 `test_point_file` 的测试点正文时，默认使用固定三段式结构：`怀疑点：`、`对应场景：`、`已实现 case：`；不要只回填 case 名而缺少源码怀疑点和场景描述。
+- 新增 case 必须与测试点逐项对齐，显式构造该测试点描述的 bug 场景；禁止用“相邻近似场景”替代“目标测试点场景”来充数。
+- 当目标源文件已经过长、可读性明显下降，或用户已明确指出“不希望继续堆到旧大文件”时，必须新建 `ai_test_cases/*.c` 文件承载新 case，而不是继续往超大历史文件中追加。
 
 ## 口径优先级（冲突时）
 
@@ -98,13 +99,38 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 
 1. 读取测试点与规则：先看 `test_point/*` 和 `Manual_Reference.md`。
 2. 归类测试目标：判断是 default、manual 还是 compile-only 候选。
-3. 排除清单预判：核对 `ai_exclude_*.txt` 与 `human_exclude_*.list`，命中时优先按 manual/compile-only 处理并记录依据。
-4. 编写/修改 case：放入 `ai_test_cases/*.c`，遵循命名与模板。
-5. 注册策略：在 `test_register.c` 中控制是否开启注册。
-6. 编译验证：优先用 `compile_elf.py` 做单 case 或小批量编译。
-7. 运行验证：非 `compile-only` 用 `get_result.py` 或直接 Spike 运行 ELF；`compile-only` 在结论中标注 Gate D=`N/A` 与不运行原因。
-8. 日志归档：读取 `result_log/spike/*.log` 判定失败类型。
-9. 回填闭环：更新 `test_point` 对应用例名及状态说明。
+3. 编写/修改 case：放入 `ai_test_cases/*.c`，遵循命名与模板。
+4. 注册策略：在 `test_register.c` 中控制是否开启注册。
+5. 编译验证：优先用 `compile_elf.py` 做单 case 或小批量编译。
+6. 运行验证：非 `compile-only` 用 `get_result.py` 或直接 Spike 运行 ELF；`compile-only` 在结论中标注 Gate D=`N/A` 与不运行原因。
+7. 日志归档：读取 `result_log/spike/*.log` 判定失败类型。
+8. 回填闭环：更新 `test_point` 对应用例名及状态说明。
+
+### 测试点回填正文格式（默认执行）
+
+写回 `test_point_file` 的测试点条目时，优先按以下三段式组织正文：
+
+```text
+怀疑点：
+
+- ...
+- ...
+
+对应场景：
+
+- ...
+- ...
+
+已实现 case：
+
+- `case_name`
+```
+
+要求：
+
+- `怀疑点` 段优先引用 RTL/源码位置，并说明为什么这里可能出 bug。
+- `对应场景` 段必须把 fault/repair/success/producer-switch/template-switch 等关键顺序写清楚，确保能从文本直接映射到 case 构造。
+- `已实现 case` 段只列真正对应该测试点的 case；若尚未新增成功，不得拿相邻 case 顶替。
 
 ### 失败分叉（强制执行）
 
@@ -129,7 +155,6 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 - 运行结果（非 compile-only：pass/fail/timeout/missing；compile-only：Gate D=N/A + 不运行原因）
 - 自动裁决（`decision_prelim` / `decision_final`）
 - 分层原因码（`reason_code`，建议参考 `tiering_decision.md`）
-- 排除清单核对结果（命中/未命中 + 清单名）
 - 后续建议动作（若有）
 
 ### 输出模板（建议直接复用）
@@ -148,7 +173,6 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 - 编译: x pass / y fail
 - 运行: x pass / y fail / z untested / 或 Gate D=N/A(compile-only, reason=...)
 - 关键日志: result_log/spike/...（compile-only 可填 N/A，并给出分层依据）
-- exclude_check: hit/miss（file: ...）
 
 [结论]
 - decision_prelim:

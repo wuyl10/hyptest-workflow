@@ -29,13 +29,11 @@ Gate 对照（便于与 `quality_gate.md` 对齐）：
 - case 名
 - 平台（通常 `spike`）
 - 分层目标（default/manual/compile-only）
-- 是否命中 `test_point/ai_exclude_*.txt` 或 `test_point/human_exclude_*.list`
 
 通过标准：
 
 - 关键输入项都明确且可追踪。
 - 仓库与分支检查通过。
-- 若命中排除清单：目标分层不设为 default，且原因可追溯。
 
 不通过动作：
 
@@ -46,7 +44,6 @@ Gate 对照（便于与 `quality_gate.md` 对齐）：
 ```bash
 git remote -v
 git branch --show-current
-rg -n "^<case_name>$" test_point/ai_exclude_*.txt test_point/human_exclude_*.list
 ```
 
 ## 2. 用例落地（Gate-1）
@@ -148,7 +145,6 @@ python3 get_result.py --platform spike --case <case_name>
 - `(case_name, manual)`
 - `(case_name, compile-only)`
 - `(case_name, 依赖PMA CSR/TLB一致性/cache一致性, 未跑Spike)`
-- 若命中排除清单，备注中附命中清单名与 `reason_code`
 
 通过标准：
 
@@ -165,7 +161,6 @@ python3 get_result.py --platform spike --case <case_name>
 - 日志路径
 - 分层结论（`decision_prelim` / `decision_final`）与依据
 - `reason_code`
-- 排除清单命中情况（若命中）
 
 通过标准：
 

@@ -26,6 +26,12 @@
 
 说明：Spike 是重要参考，但不是所有场景的最终真值。
 
+补充硬规则：
+
+- 测试点写了什么 bug 场景，case 就必须构造什么 bug 场景；不要用“近似场景”替代“目标场景”。
+- 若测试点要求 specific fault order / producer order / template switch / address layout / guard-preserved 检查，case 中必须保留这些关键维度。
+- 若文本要求与现实可构造性冲突，先在结论里标 `blocked` 或降级分层，不要偷换成更容易通过 Spike 的相邻场景。
+
 ## 2. 关键策略（必须遵守）
 
 ### 2.1 no-H 默认策略
@@ -167,6 +173,15 @@ case 注释必须写清“Device 属性来源”。
 - 文件名在 `ai_test_cases/` 下
 - 后缀是 `.c`
 
+### 7.1.1 大文件不要继续硬塞
+
+- 若现有目标文件已经过长，新增 case 应优先拆到新的 `ai_test_cases/*.c` 文件。
+- 典型场景：`ai_micro_mmode_memblock_cases.c` 这类历史大文件，后续新增用例不应默认继续追加。
+- 新文件拆分的目标是：
+  - 让 case 与测试点分组更清晰
+  - 降低 merge conflict
+  - 降低后续检索和代码审阅成本
+
 ### 7.2 compile_elf 并发污染风险
 
 历史经验：并发改写/恢复 `test_register.c` 会引入不稳定。
@@ -186,7 +201,6 @@ case 注释必须写清“Device 属性来源”。
 
 - 是否明确了测试点语义来源（PMA 还是 PBMT）
 - 是否存在 TLB 一致性或 cache 一致性依赖
-- 是否命中 `test_point/ai_exclude_*.txt` 或 `test_point/human_exclude_*.list`
 - 是否判断过 default/manual/compile-only 候选层级
 - 是否选择了正确特权态与地址环境
 - 是否写了可观测断言（cause/tval/data）
@@ -198,7 +212,7 @@ case 注释必须写清“Device 属性来源”。
 - 非 compile-only：单 case 运行结果可解释；compile-only：Gate D=N/A 原因明确
 - `test_register.c` 注册状态符合预期
 - `test_point` 已回填 case 名和状态标签
-- 若命中排除清单，分层、回填备注与 `reason_code` 已一致
+- `test_point` 正文新增/改写时，已按 `怀疑点 / 对应场景 / 已实现 case` 三段式组织
 - 日志已归档，失败有定位说明
 
 ## 10. 推荐决策语句模板
