@@ -163,59 +163,63 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 ### 7.1 测试点正文模板（默认简版 + RTL扩展）
 
-当本轮不只是“追加映射”，而是新增/改写 `test_point_file` 的正文描述时，默认使用“标题 + 双模板”：
+当本轮不只是“追加映射”，而是新增/改写 `test_point_file` 的正文描述时，默认使用“标题 + 双模板”。下面给出按当前推荐口径整理后的常用示例：
 
-- 默认模板（不需要从 RTL/源码定位可疑点）：
+- 默认模板（不需要从 RTL/源码定位可疑点；`new-case-only` 最常用）：
 
 ```text
-### Pxx. <测试点标题>
+### P6X. same-page cross-16B translated scalar store 的 refault repair 后再次同模板 success store 是否仍无 stale state
 
 测试点：
 
-- 目标测试点摘要
+- 在 same-page scalar cross-16B `sd(1B+7B)` 的 repeated fault/retry 路径里，refault repair 后再次发起同地址同模板 success store，应该继续 trap-free，且最终 boundary image 只保留最新 overlay。
 
 构建场景：
 
-- 明确 fault/repair/success 的顺序
-- 明确模板、producer、地址布局、guard 检查和期望结果
+- `sd(1B+7B)` repeated `SAF` -> repair -> upper-half aligned `sd(8B)` success x4 -> refault `SAF` -> repair -> retried original-template `sd(1B+7B)` success -> immediate same-address same-template `sd(1B+7B)` success
+- 使用 `guard_before[8B] | boundary[16B] | guard_after[8B]` 布局。
+- 最终要求 `excpt.triggered == false`，boundary image 正确，guard 区不变。
 
 已实现 case：
 
-- `case_name`
-
-复用依据（仅复用已有 case 时填写）：
-
-顺序一致性：一致/不一致；测试点顺序=...；复用 case 顺序=...；差异=...
-断言一致性：一致/不一致；测试点断言=...；复用 case 断言=...；差异=...
+- `ai_micro_xxx_case_name`（default，已启用）
 ```
 
 - 扩展模板（需要从 RTL/源码定位可疑点）：
 
 ```text
-### Pxx. <测试点标题>
+### P6Y. same-page cross-16B translated scalar store 的 retry 后 width-switch store 是否会误复用旧模板
 
 测试点：
 
-- 目标测试点摘要
+- retry 成功后立刻切到同地址不同模板 `sw(1B+3B)`，应该只刷新当前窄模板，不应把旧 `sd` 模板残留一起带出来。
 
 怀疑点：
 
-- `源码位置` + 为什么这里可能有 bug
-- `源码位置` + 为什么这里可能保留 stale state
+- `src/main/scala/xiangshan/mem/lsqueue/StoreQueue.scala:807-820` 把 same-page scalar cross-16B store 固定送进 fake-crosspage 路径，可能导致模板退场不干净。
+- `src/main/scala/xiangshan/mem/lsqueue/StoreMisalignBuffer.scala:257-258` 可能让 retry 结束后的 owner/template 状态被下一条 width-switch store 继续复用。
 
 对应场景：
 
-- 明确 fault/repair/success 的顺序
-- 明确模板、producer、地址布局、guard 检查和期望结果
+- `sd(1B+7B)` repeated `SAF` -> repair -> upper-half aligned `sd(8B)` success x4 -> refault `SAF` -> repair -> retried `sd(1B+7B)` success -> immediate `sw(1B+3B)` success
+- 最终要求 `sw` trap-free，只覆盖 bytes7-10，不破坏其余 boundary image。
 
 已实现 case：
 
-- `case_name`
+- `ai_micro_xxx_width_switch_case`（default，已启用）
+```
+
+- 复用已有 case 时，才追加固定两行 `复用依据`：
+
+```text
+已实现 case：
+
+- `ai_micro_existing_case`
 
 复用依据（仅复用已有 case 时填写）：
 
-顺序一致性：一致/不一致；测试点顺序=...；复用 case 顺序=...；差异=...
-断言一致性：一致/不一致；测试点断言=...；复用 case 断言=...；差异=...
+顺序一致性：一致；测试点顺序=fault -> repair -> success；复用 case 顺序=fault -> repair -> success；差异=无
+断言一致性：一致；测试点断言=检查 `excpt.triggered/cause/tval` 与 boundary image；复用 case 断言=检查 `excpt.triggered/cause/tval` 与 boundary image；差异=无
 ```
 
 建议：
@@ -223,6 +227,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 每个测试点条目都先写标题，再选默认模板或扩展模板。
 - 默认优先简版模板；满足以下任一条件时启用扩展模板：新增/修改了源码怀疑点、需要引用 RTL/源码位置解释判定、分层结论依赖模块实现细节。
 - 简版模板中的 `构建场景` 与扩展模板中的 `对应场景` 都应可直接指导 case 构造，避免只写抽象结论。
+- `new-case-only` 场景通常只写到 `已实现 case` 即可；只有复用已有 case 时才出现 `复用依据` 两行。
 - `已实现 case` 段只放与该测试点一一对应的 case；默认只写 `case_name`，只有确有必要时才附短状态说明；不要在这里写文件名、函数签名、日志、Gate 结果或分层块。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
 - 若复用已有 case，必须补“复用依据”，且固定为两行字段：`顺序一致性`（关键顺序一致性对比）与 `断言一致性`（关键断言覆盖一致性对比）。
 - `test_point` 回填到 `已实现 case` / `复用依据` 即结束；除非用户明确要求，不再追加 `[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等块。
