@@ -153,9 +153,13 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 回填建议格式：
 
-- 已闭环：`(case_name)`
-- 依赖 PMA/PBMT 且未走 Spike gate：`(case_name, 依赖PMA CSR, 未跑Spike)`
-- 仅保留编译：`(case_name, compile-only/manual)`
+- 已闭环：`case_name`
+- 已闭环且希望显式说明注册状态：`case_name（default，已启用）`
+- manual：`case_name（已注释，manual）`
+- compile-only：`case_name（compile-only，未跑Spike）`
+- 依赖 PMA/PBMT 且未走 Spike gate：`case_name（依赖PMA CSR/TLB一致性/cache一致性，未跑Spike）`
+
+不要在 `test_point` 正文后追加 workflow 回填块或审计式证据块。
 
 ### 7.1 测试点正文模板（默认简版 + RTL扩展）
 
@@ -219,8 +223,9 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 每个测试点条目都先写标题，再选默认模板或扩展模板。
 - 默认优先简版模板；满足以下任一条件时启用扩展模板：新增/修改了源码怀疑点、需要引用 RTL/源码位置解释判定、分层结论依赖模块实现细节。
 - 简版模板中的 `构建场景` 与扩展模板中的 `对应场景` 都应可直接指导 case 构造，避免只写抽象结论。
-- `已实现 case` 段只放与该测试点一一对应的 case；若当前无新增且无可复用 case，写 `暂无（原因：...）`。
+- `已实现 case` 段只放与该测试点一一对应的 case；默认只写 `case_name`，只有确有必要时才附短状态说明；不要在这里写文件名、函数签名、日志、Gate 结果或分层块。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
 - 若复用已有 case，必须补“复用依据”，且固定为两行字段：`顺序一致性`（关键顺序一致性对比）与 `断言一致性`（关键断言覆盖一致性对比）。
+- `test_point` 回填到 `已实现 case` / `复用依据` 即结束；除非用户明确要求，不再追加 `[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等块。
 
 ### 7.2 测试点与 case 必须一一映射
 
@@ -313,5 +318,5 @@ TEST_ASSERT("adjacent word remains unchanged", adjacent_val == expected_adjacent
 - 已完成单 case 编译
 - 非 compile-only：已完成单 case 运行且日志中失败类型已归因（不是只给 `FAILED`）
 - compile-only：已注明 Gate D=N/A、不运行原因与分层依据
-- 已完成 `test_point` 回填（包含分层说明）
+- 已完成 `test_point` 轻量回填（case 名 + 必要短状态；非 default 结论可在交付摘要中说明）
 - `test_register.c` 注册状态与分层策略一致

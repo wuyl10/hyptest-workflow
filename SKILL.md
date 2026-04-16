@@ -15,31 +15,17 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 
 ## 适用场景
 
-当用户提出以下需求时，优先使用本技能：
+当任务涉及以下任一动作时，优先使用本技能：
 
-- 基于 `test_point/*` 生成或完善用例
-- 让某个测试点变成可编译、可运行、可回归的 case
-- 只编译某批 case 或单 case（不影响默认回归）
-- 批量跑 Spike 并汇总日志
+- 基于 `test_point/*` 生成/修改 `ai_test_cases/*`
+- 更新 `test_register.c` 与测试点映射
+- 执行单 case / 小批量编译与 Spike 运行
 - 对 `untested exception`、`FAILED`、`TIMEOUT` 做定位
-- 决定 case 应进入 default、manual 还是 compile-only
+- 决定 case 应进入 `default` / `manual` / `compile-only`
 
-## 必要输入
+## 输入与范围
 
-执行前尽量明确：
-
-- 目标测试点来源文件（例如 `test_point/architectural_test_point`）
-- 目标平台（通常 `spike`）
-- 是否要求进入 default 回归
-- 是否允许以 `manual/compile-only` 形式先落地
-
-## 仓库来源与分支要求
-
-- 仓库来源统一为：https://github.com/wuyl10/riscv-hyp-tests-nhv5.git
-- 使用范围为该仓库的 `nhv5.1` 分支工作目录。
-- 只要当前工作目录来自该仓库且分支为 `nhv5.1`，即可直接应用本 skill。
-
-### 输入检查清单（执行前逐项确认）
+执行前尽量确认以下关键信息；若当前工作目录来自 `https://github.com/wuyl10/riscv-hyp-tests-nhv5.git` 的 `nhv5.1` 分支，可直接应用本 skill。
 
 - 测试点是否已明确到具体条目（不是仅给目录）。
 - 目标 case 名是否已唯一（避免与 `ai_test_cases/` 现有函数重名）。
@@ -67,6 +53,8 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 - 写回 `test_point_file` 的测试点正文时，默认使用“标题 + 简版三段式”：`测试点：`、`构建场景：`、`已实现 case：`。
 - 仅当本轮需要从 RTL/源码反推可疑点时，再扩展为“标题 + 扩展模板”：`测试点：`、`怀疑点：`、`对应场景：`、`已实现 case：`。
 - 新增 case 或复用已有 case 都必须与测试点逐项对齐；若构建场景已有对应用例，可直接复用，但需在回填中写明“复用依据”，且必须固定为两行字段：`顺序一致性`、`断言一致性`；禁止用“相邻近似场景”替代“目标测试点场景”来充数。
+- `test_point` 回填默认只保留正文与 `已实现 case` 列表；`已实现 case` 默认只写 `case_name`，仅在确有必要时追加短状态说明，如 `（default，已启用）`、`（已注释，manual）`、`（compile-only，未跑Spike）`。
+- 禁止在 `test_point` 条目正文后追加审计式“后半段”回填块，例如 `## ...workflow 回填`、`[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]`、`[编译/运行统计]`、`[关键日志路径]`、`[修改文件清单]`、`[回填结果与注册一致性]`。
 - 当目标源文件已经过长、可读性明显下降，或用户已明确指出“不希望继续堆到旧大文件”时，必须新建 `ai_test_cases/*.c` 文件承载新 case，而不是继续往超大历史文件中追加。
 
 ## 口径优先级（冲突时）
@@ -109,59 +97,22 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 
 ### 测试点回填正文格式（默认执行）
 
-写回 `test_point_file` 的测试点条目时，默认按“标题 + 双模板”组织正文：
+写回 `test_point_file` 的测试点条目时，默认按“标题 + 双模板”组织正文；精确示例与回填样式见 `writing_cases.md` 的“测试点回填”章节。
 
-- 默认模板（不需要从 RTL/源码定位可疑点）：
-
-```text
-### Pxx. <测试点标题（包含关键 fault/repair/success/switch 顺序）>
-
-测试点：
-
-- ...
-
-构建场景：
-
-- ...
-
-已实现 case：
-
-- `case_name`
-
-复用依据（仅复用已有 case 时填写）：
-
-顺序一致性：一致/不一致；测试点顺序=...；复用 case 顺序=...；差异=...
-断言一致性：一致/不一致；测试点断言=...；复用 case 断言=...；差异=...
-```
-
+- 默认模板：
+  - `### Pxx. ...`
+  - `测试点`
+  - `构建场景`
+  - `已实现 case`
 - 扩展模板（需要从 RTL/源码定位可疑点）：
-
-```text
-### Pxx. <测试点标题（包含关键 fault/repair/success/switch 顺序）>
-
-测试点：
-
-- ...
-
-怀疑点：
-
-- ...
-- ...
-
-对应场景：
-
-- ...
-- ...
-
-已实现 case：
-
-- `case_name`
-
-复用依据（仅复用已有 case 时填写）：
-
-顺序一致性：一致/不一致；测试点顺序=...；复用 case 顺序=...；差异=...
-断言一致性：一致/不一致；测试点断言=...；复用 case 断言=...；差异=...
-```
+  - `### Pxx. ...`
+  - `测试点`
+  - `怀疑点`
+  - `对应场景`
+  - `已实现 case`
+- 复用已有 case 时，必须追加固定两行 `复用依据`：
+  - `顺序一致性`
+  - `断言一致性`
 
 要求：
 
@@ -171,17 +122,18 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 - 满足以下任一条件时，必须使用扩展模板：本轮新增/修改了源码怀疑点；需要引用 RTL/源码位置解释判定；分层结论需要依赖模块实现细节说明。
 - `构建场景` 段必须把 fault/repair/success/producer-switch/template-switch 等关键顺序写清楚，确保能从文本直接映射到 case 构造。
 - 使用扩展模板时，`怀疑点` 段优先引用 RTL/源码位置，并说明为什么这里可能出 bug；`对应场景` 段保持可直接映射到 case 构造。
-- `已实现 case` 段只列真正对应该测试点的 case；若当前无新增且无可复用 case，写 `暂无（原因：...）`。
-- 若复用已有 case，必须补“复用依据”，且严格使用两行字段，不得增删：`顺序一致性`（比较 fault/repair/success/switch 顺序）与 `断言一致性`（比较 cause/tval/数据副作用等关键断言覆盖）。
+- `已实现 case` 段只列真正对应该测试点的 case；默认只写 `case_name`，必要时才附一个短状态说明；不要在这里写文件路径、函数签名、日志路径或审计信息。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
+- 若复用已有 case，必须补“复用依据”，且严格使用固定两行字段，不得增删；字段含义与示例见 `writing_cases.md`。
+- `test_point` 回填到此为止；除非用户明确要求，否则不要继续在该文件里追加 workflow 摘要或证据块。
 
 ### 失败分叉（强制执行）
 
 - 编译失败：先修复语法/宏/链接，再进入运行阶段。
 - 运行失败且出现 `untested exception`：先核查异常准备与特权态，不直接改预期。
 - 运行失败且语义与规则冲突：先对照 `Manual_Reference.md`，再决定是修用例还是改分层。
-- 语义合理但 Spike 不稳定：转 `manual` 或 `compile-only`，并在回填中显式标注原因。
+- 语义合理但 Spike 不稳定：转 `manual` 或 `compile-only`，并在 `已实现 case` 的短状态说明中简洁标注原因/状态。
 
-## 结果分层标准
+## 分层标准
 
 - default：Spike 语义稳定、结果可重复、行为与项目规则一致。
 - manual：场景合理但 Spike 行为不稳定或需人工确认语义。
@@ -189,45 +141,24 @@ description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（
 
 ## 输出要求
 
-执行本技能后，结论至少应包含：
+执行本技能后，默认结论至少应包含以下信息；精确结论模板见 `quality_gate.md` 的“最终结论模板（按需输出）”：
 
 - 修改了哪些文件
-- 新增/修改了哪些 case
+- 新增/修改了哪些 case（默认只列 `case_name`；必要时附短状态）
 - 编译结果（成功/失败数量）
 - 运行结果（非 compile-only：pass/fail/timeout/missing；compile-only：Gate D=N/A + 不运行原因）
-- 自动裁决（`decision_prelim` / `decision_final`）
-- 分层原因码（`reason_code`，建议参考 `tiering_decision.md`）
+- 若存在非 pass Gate 或用户明确要求：质量门禁问题项
+- 若最终不是 `default`，或用户明确要求：自动裁决（`decision_prelim` / `decision_final`）
+- 若最终不是 `default`，或用户明确要求：分层原因码（`reason_code`，建议参考 `tiering_decision.md`）
 - 后续建议动作（若有）
-
-### 输出模板（建议直接复用）
-
-```text
-[范围]
-- 测试点:
-- 平台:
-- 分层目标:
-
-[改动]
-- 文件:
-- case:
-
-[验证]
-- 编译: x pass / y fail
-- 运行: x pass / y fail / z untested / 或 Gate D=N/A(compile-only, reason=...)
-- 关键日志: result_log/spike/...（compile-only 可填 N/A，并给出分层依据）
-
-[结论]
-- decision_prelim:
-- decision_final:
-- reason_code:
-- 判定依据:
-- 下一步:
-```
 
 ## 默认禁止事项
 
 - 禁止在未完成单 case 编译前直接全量批跑。
 - 禁止未核对 `test_register.c` 注册状态就宣称“可回归”。
+- 禁止输出 `exclude_check` 字段、`[exclude_check]` 小节，或“exclude list 未命中/已核对”这类模板化表述；如需说明覆盖边界，仅在 Gate E 中简洁描述测试范围即可。
+- 禁止默认输出全量 `Gate A-H`；只有存在非 pass Gate 或用户明确要求时，才输出 `[质量门禁结果]`。
+- 禁止默认输出 `default` case 的独立 `[分层结论]`；只有 `manual` / `compile-only` / `blocked`，或用户明确要求时，才输出分层结论与 `reason_code`。
 - 禁止把“可编译”直接等价为“default 可准入”。
 - 禁止删减已有规则细节来换取表面通过率。
 

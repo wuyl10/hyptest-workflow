@@ -141,10 +141,15 @@ python3 get_result.py --platform spike --case <case_name>
 
 建议标注：
 
-- `(case_name)`
-- `(case_name, manual)`
-- `(case_name, compile-only)`
-- `(case_name, 依赖PMA CSR/TLB一致性/cache一致性, 未跑Spike)`
+- `case_name`
+- `case_name（default，已启用）`
+- `case_name（已注释，manual）`
+- `case_name（compile-only，未跑Spike）`
+- `case_name（依赖PMA CSR/TLB一致性/cache一致性，未跑Spike）`
+
+补充约束：
+
+- `test_point` 里只回填映射与短状态，不追加 `## ...workflow 回填`、`[质量门禁结果]`、`[分层结论]` 等后半段证据块。
 
 通过标准：
 
@@ -155,12 +160,13 @@ python3 get_result.py --platform spike --case <case_name>
 最小交付内容：
 
 - 改动文件列表
-- case 列表
+- case 列表（默认只列 `case_name`；必要时附短状态）
 - 编译结果
 - 运行结果
 - 日志路径
-- 分层结论（`decision_prelim` / `decision_final`）与依据
-- `reason_code`
+- 若有非 pass Gate：列出对应 Gate 与问题
+- 若最终不是 `default`：分层结论（`decision_prelim` / `decision_final`）与依据
+- 若最终不是 `default`：`reason_code`
 
 通过标准：
 

@@ -5,8 +5,9 @@
 实操建议：
 
 - 门禁判定完成后，再使用 `submission_card.md` 做提交前最后勾选确认。
-- 分层结论建议按 `tiering_decision.md` 统一输出 `decision_prelim` + `decision_final` + `reason_code`。
+- 分层结论建议按 `tiering_decision.md` 统一生成 `decision_prelim` + `decision_final` + `reason_code`；默认只在 `manual` / `compile-only` / `blocked` 或用户明确要求时外显。
 - reason_code 必须来自 `reason_code_catalog.md`，禁止临时自造。
+- Gate A-H 必须完整检查，但默认不把全量 Gate 结果写回 `test_point`；只有存在非 pass Gate 或用户明确要求时，才额外输出 `[质量门禁结果]`。
 
 与 `quick_execution.md` 的 Gate 对照：
 
@@ -116,6 +117,8 @@
   - RTL/源码排查模板：`测试点 / 怀疑点 / 对应场景 / 已实现 case`
 - 若本轮未新增 case 而复用了已有 case，已按固定两行字段提供“复用依据”：`顺序一致性`、`断言一致性`
 - 特殊约束（PMA/TLB/cache）已标注
+- `已实现 case` 默认只写 `case_name`；仅在必要时追加短状态说明，如 `（default，已启用）`、`（已注释，manual）`、`（compile-only，未跑Spike）`
+- 没有在 `test_point` 里追加 `## ...workflow 回填`、`[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等审计式后半段块
 
 证据：
 
@@ -133,8 +136,9 @@
 - case 清单
 - 编译/运行结果统计
 - 关键日志路径（compile-only 可标 `N/A`，并附不运行原因）
-- 分层结论（`decision_prelim` / `decision_final`）与依据
-- `reason_code`
+- 若有非 pass Gate：已能指出对应 Gate 与问题
+- 若最终不是 `default`：分层结论（`decision_prelim` / `decision_final`）与依据
+- 若最终不是 `default`：`reason_code`
 
 证据：
 
@@ -162,9 +166,20 @@
 - PMA/TLB/cache 依赖场景未标注却按 default 放行
 - 回填与注册状态不一致
 
-## 最终结论模板
+## 最终结论模板（按需输出）
 
 ```text
+[默认简版]
+[改动]
+- 文件:
+- case:
+
+[验证]
+- 编译:
+- 运行:
+- 关键日志:
+
+[异常/非 default 补充]
 [质量门禁结果]
 - Gate A: pass/fail
 - Gate B: pass/fail
@@ -181,3 +196,8 @@
 - reason_code:
 - 依据:
 ```
+
+说明：
+
+- 所有 Gate 都通过时，默认不输出 `[质量门禁结果]`。
+- `decision_final=default` 时，默认不单独输出 `[分层结论]`；如需说明，可仅在 case 映射旁保留短状态，如 `（default，已启用）`。

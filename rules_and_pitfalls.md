@@ -69,7 +69,7 @@
 
 建议回填标注：
 
-- `(case_name, 依赖PMA CSR/TLB一致性/cache一致性, 未跑Spike)`
+- `case_name（依赖PMA CSR/TLB一致性/cache一致性，未跑Spike）`
 
 ### 3.2 区分 PMA=IO 与 PBMT=IO
 
