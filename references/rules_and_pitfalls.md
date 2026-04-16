@@ -7,8 +7,8 @@
 当文档之间出现冲突时，按以下顺序裁决：
 
 1. `test_point/Manual_Reference.md`
-2. `quality_gate.md` + `tiering_decision.md` + `reason_code_catalog.md` + `submission_card.md`
-3. 本文 + `writing_cases.md` + `build_run_debug.md`
+2. `references/quality_gate.md` + `references/tiering_decision.md` + `references/reason_code_catalog.md` + `references/submission_card.md`
+3. 本文 + `references/writing_cases.md` + `references/build_run_debug.md`
 4. `CRITICAL_ISSUES_LOG.md`（历史问题库，主要用于线索，不直接覆盖当前门禁）
 
 补充：

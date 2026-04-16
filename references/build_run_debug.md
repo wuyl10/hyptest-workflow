@@ -89,7 +89,7 @@ python3 get_result.py --platform spike --case ai_arch_lb_sign_extension
 若需手动跑：
 
 ```bash
-SPIKE_BIN=${SPIKE_BIN:-/nfs/home/wuyuanlong/workspace/riscv-isa-sim/build/spike}
+SPIKE_BIN=${SPIKE_BIN:-<path-to-spike>}
 
 $SPIKE_BIN \
   --misaligned \

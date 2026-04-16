@@ -1,0 +1,75 @@
+[
+  {
+    "id": "ok-default-enabled",
+    "description": "default case with active TEST_REGISTER should pass",
+    "check_register": true,
+    "register_text": "TEST_REGISTER(ai_default_enabled_case)\n",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_default_enabled_case`（default，已启用）\\n",
+    "expected_ok": true
+  },
+  {
+    "id": "ok-legacy-manual-comment",
+    "description": "legacy manual short status should remain accepted",
+    "check_register": true,
+    "register_text": "// TEST_REGISTER(ai_legacy_manual_case)\n",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_legacy_manual_case` 已注释（manual）\\n",
+    "expected_ok": true
+  },
+  {
+    "id": "ok-compile-only-if0",
+    "description": "#if 0 wrapped register should count as commented",
+    "check_register": true,
+    "register_text": "#if 0\nTEST_REGISTER(ai_compile_only_if0_case)\n#endif\n",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_compile_only_if0_case`（compile-only，未跑Spike）\\n",
+    "expected_ok": true
+  },
+  {
+    "id": "ok-default-after-else",
+    "description": "#else branch active register should count as enabled",
+    "check_register": true,
+    "register_text": "#if 0\nTEST_REGISTER(ai_default_after_else_case)\n#else\nTEST_REGISTER(ai_default_after_else_case)\n#endif\n",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_default_after_else_case`（default，已启用）\\n",
+    "expected_ok": true
+  },
+  {
+    "id": "ok-block-comment-manual",
+    "description": "multi-line block-comment register should count as commented",
+    "check_register": true,
+    "register_text": "/*\nTEST_REGISTER(ai_block_comment_manual_case)\n*/\n",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_block_comment_manual_case`（已注释，manual）\\n",
+    "expected_ok": true
+  },
+  {
+    "id": "fail-disallowed-tail-only",
+    "description": "disallowed tail block should not cascade into fake case-line errors",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_tail_block_case`\\n\\n[质量门禁结果]\\n- Gate A: pass\\n",
+    "expected_ok": false,
+    "expected_issue_count": 1,
+    "expected_issue_substrings": [
+      "命中禁止回填块/字段: [质量门禁结果]"
+    ],
+    "unexpected_issue_substrings": [
+      "未包含反引号 case 名"
+    ]
+  },
+  {
+    "id": "fail-custom-status",
+    "description": "custom status suffix should be rejected",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_custom_status_case`（totally-custom-status，whatever）\\n",
+    "expected_ok": false,
+    "expected_issue_substrings": [
+      "状态说明不符合约定"
+    ]
+  },
+  {
+    "id": "fail-default-comment-mismatch",
+    "description": "default enabled status should fail when register is commented out",
+    "check_register": true,
+    "register_text": "// TEST_REGISTER(ai_default_mismatch_case)\n",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_default_mismatch_case`（default，已启用）\\n",
+    "expected_ok": false,
+    "expected_issue_substrings": [
+      "不是 enabled"
+    ]
+  }
+]

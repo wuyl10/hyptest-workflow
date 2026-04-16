@@ -4,12 +4,12 @@
 
 实操建议：
 
-- 门禁判定完成后，再使用 `submission_card.md` 做提交前最后勾选确认。
-- 分层结论建议按 `tiering_decision.md` 统一生成 `decision_prelim` + `decision_final` + `reason_code`；默认只在 `manual` / `compile-only` / `blocked` 或用户明确要求时外显。
-- reason_code 必须来自 `reason_code_catalog.md`，禁止临时自造。
-- Gate A-H 必须完整检查，但默认不把全量 Gate 结果写回 `test_point`；只有存在非 pass Gate 或用户明确要求时，才额外输出 `[质量门禁结果]`。
+- 门禁判定完成后，再使用 `references/submission_card.md` 做提交前最后勾选确认。
+- 分层结论建议按 `references/tiering_decision.md` 统一生成 `decision_prelim` + `decision_final` + `reason_code`；默认只在 `manual` / `compile-only` / `blocked` 或用户明确要求时外显。
+- reason_code 必须来自 `references/reason_code_catalog.md`，禁止临时自造。
+- Gate A-H 必须完整检查，但默认不把全量 Gate 结果写回 `test_point`；只有存在非 pass Gate 或用户明确要求时，才在最终交付摘要里额外输出 `[质量门禁结果]`。
 
-与 `quick_execution.md` 的 Gate 对照：
+与 `references/quick_execution.md` 的 Gate 对照：
 
 - Gate A/B/C/D/E/F/G/H 分别对应 Gate-0/1/2/3/4/5/6/7。
 
@@ -45,7 +45,7 @@
 
 失败处理：
 
-- 回到 `writing_cases.md` 重构
+- 回到 `references/writing_cases.md` 重构
 
 ## Gate C: 编译通过
 
@@ -76,13 +76,13 @@
 
 失败处理：
 
-- 按 `build_run_debug.md` 失败映射定位
+- 按 `references/build_run_debug.md` 失败映射定位
 
 ## Gate E: 语义一致性
 
 必须满足：
 
-- 与 `Manual_Reference.md` 和 `rules_and_pitfalls.md` 一致
+- 与 `Manual_Reference.md` 和 `references/rules_and_pitfalls.md` 一致
 - 或已标注该场景不走 Spike gate
 
 证据：
@@ -123,6 +123,7 @@
 证据：
 
 - `test_point/*` 对应条目
+- 必要时可附 `scripts/check_writeback_format.py` 校验结果
 
 失败处理：
 
@@ -167,6 +168,8 @@
 - 回填与注册状态不一致
 
 ## 最终结论模板（按需输出）
+
+以下模板用于最终交付摘要，不属于 `test_point` 回填内容。
 
 ```text
 [默认简版]

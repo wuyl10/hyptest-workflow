@@ -1,6 +1,6 @@
 # HYPTEST 快速执行版（保质量）
 
-本文是加速执行入口，不是规则简化版。所有质量判定仍以 `rules_and_pitfalls.md`、`writing_cases.md`、`build_run_debug.md` 为准。
+本文是加速执行入口，不是规则简化版。所有质量判定仍以 `references/rules_and_pitfalls.md`、`references/writing_cases.md`、`references/build_run_debug.md` 为准。
 
 ## 0. 使用原则
 
@@ -8,7 +8,7 @@
 - 方法：把完整流程压缩成 8 步，每步都设硬门禁。
 - 约束：任何门禁不通过，立即转详细文档排查，不得跳步。
 
-Gate 对照（便于与 `quality_gate.md` 对齐）：
+Gate 对照（便于与 `references/quality_gate.md` 对齐）：
 
 - Gate-0 -> Gate A（输入清晰度）
 - Gate-1 -> Gate B（代码结构完整性）
@@ -50,18 +50,46 @@ git branch --show-current
 
 执行：
 
-1. 从 `templates/new_case_template.c` 起步。
-2. 在 `ai_test_cases/` 写或改 case。
-3. 保证单函数仅一个 `TEST_END(...)`。
+1. 先检索 2~5 个相似存量 case，优先复用已有写法中的结构、断言和环境构造。
+   如果测试点描述较长、分支较多，优先让脚本先生成 reading pack，再由模型抽象哪些结构值得学、哪些不能照搬。
+2. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
+3. 在 `ai_test_cases/` 写或改 case。
+4. 保证单函数仅一个 `TEST_END(...)`。
+
+建议命令：
+
+```bash
+python3 scripts/find_similar_cases.py \
+  --repo-root <repo_root> \
+  --from-file <test_point_file> \
+  --query cross_16b --query retry --query access_fault \
+  --show-snippet \
+  --limit 5
+```
+
+更适合大模型阅读的检索方式：
+
+```bash
+python3 scripts/find_similar_cases.py \
+  --repo-root <repo_root> \
+  --from-file <test_point_file> \
+  --query cross_16b --query retry --query access_fault \
+  --assert-only \
+  --emit-reading-pack \
+  --limit 3
+```
 
 通过标准：
 
-- 代码结构符合 `writing_cases.md`。
+- 代码结构符合 `references/writing_cases.md`。
 - 断言至少覆盖两类：异常/地址/数据/边界之一。
+- 已查看相似存量 case，并明确哪些写法可复用、哪些不能直接照搬。
+- 若命中的是薄 wrapper case，已继续查看脚本给出的 related helper 片段，而不是只看 wrapper 壳函数。
+- 若使用 reading pack，已从中提炼出“结构/断言/环境顺序”三类可复用点，而不是把整段实现原样搬过去。
 
 不通过动作：
 
-- 回到 `writing_cases.md` 补齐断言与结构。
+- 回到 `references/writing_cases.md` 补齐断言与结构，或重新检索更接近目标测试点的存量 case。
 
 ## 3. 单点编译（Gate-2）
 
@@ -93,7 +121,7 @@ python3 get_result.py --platform spike --case <case_name>
 
 不通过动作：
 
-- 先按 `build_run_debug.md` 的失败类型映射定位。
+- 先按 `references/build_run_debug.md` 的失败类型映射定位。
 
 `compile-only` 特例：
 
@@ -103,7 +131,7 @@ python3 get_result.py --platform spike --case <case_name>
 
 执行：
 
-- 对照 `rules_and_pitfalls.md` 判定语义是否一致。
+- 对照 `references/rules_and_pitfalls.md` 判定语义是否一致。
 
 通过标准：
 
@@ -138,6 +166,7 @@ python3 get_result.py --platform spike --case <case_name>
 执行：
 
 - 更新测试点映射与状态标注。
+- 回填后，执行一次轻量格式检查脚本。
 
 建议标注：
 
@@ -150,6 +179,15 @@ python3 get_result.py --platform spike --case <case_name>
 补充约束：
 
 - `test_point` 里只回填映射与短状态，不追加 `## ...workflow 回填`、`[质量门禁结果]`、`[分层结论]` 等后半段证据块。
+
+建议命令：
+
+```bash
+python3 scripts/check_writeback_format.py \
+  --repo-root <repo_root> \
+  --file <test_point_file> \
+  --check-register
+```
 
 通过标准：
 
@@ -168,13 +206,17 @@ python3 get_result.py --platform spike --case <case_name>
 - 若最终不是 `default`：分层结论（`decision_prelim` / `decision_final`）与依据
 - 若最终不是 `default`：`reason_code`
 
+补充说明：
+
+- 上述内容属于最终交付摘要，不属于 `test_point` 回填块。
+
 通过标准：
 
 - 任意结论都能回溯到日志与规则依据。
 
 提交前动作：
 
-- 用 `submission_card.md` 完成最终勾选；任一关键项未勾选不得提交。
+- 用 `references/submission_card.md` 完成最终勾选；任一关键项未勾选不得提交。
 
 ## 快速执行不降质的三条红线
 

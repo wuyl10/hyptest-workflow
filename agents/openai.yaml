@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hyptest Workflow"
+  short_description: "Hyptest case workflow for riscv-hyp-tests nhv5.1"
+  default_prompt: "Use $hyptest-workflow to turn hyptest test points into ai_test_cases changes, single-case compile/run validation, tiering, and lightweight test_point writeback."

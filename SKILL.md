@@ -3,173 +3,152 @@ name: hyptest-workflow
 description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（nhv5.1 分支目录）的 hyptest 测试点到用例落地工作流。凡是涉及新增/修改 ai_test_cases 用例、更新 test_register.c、根据 test_point 回填映射、执行 compile_elf.py 和 get_result.py 编译批跑、分析 Spike 日志并做 default/manual/compile-only 分层决策时，都应触发此技能。当前默认 no-H 策略：不依赖 H 特有指令/CSR；仓库内 HS 路径按项目约定作为 S 语义别名使用。
 ---
 
-# HYPTEST Workflow Skill
+# HYPTEST Workflow
 
-该技能用于在 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 的 nhv5.1 分支目录内完成完整的 hyptest 研发闭环：
+该 skill 用于 `riscv-hyp-tests-nhv5` 的 hyptest 闭环工作：从 `test_point` 分析，到 `ai_test_cases/*.c` 落地、`test_register.c` 注册、单 case 编译/运行、日志归因、分层决策和轻量回填。
 
-- 测试点分析
-- 用例编写
-- 编译与批量执行
-- 异常/失败定位
-- 回填与分层管理
+## Use This Skill When
 
-## 适用场景
+- 根据 `test_point/*` 新增或修改 `ai_test_cases/*.c`
+- 更新 `test_register.c`
+- 跑 `compile_elf.py` / `get_result.py` 做单 case 或小批量验证
+- 判断 case 应进入 `default` / `manual` / `compile-only`
+- 回填 `test_point` 映射与短状态说明
 
-当任务涉及以下任一动作时，优先使用本技能：
+## Repo Anchors
 
-- 基于 `test_point/*` 生成/修改 `ai_test_cases/*`
-- 更新 `test_register.c` 与测试点映射
-- 执行单 case / 小批量编译与 Spike 运行
-- 对 `untested exception`、`FAILED`、`TIMEOUT` 做定位
-- 决定 case 应进入 `default` / `manual` / `compile-only`
-
-## 输入与范围
-
-执行前尽量确认以下关键信息；若当前工作目录来自 `https://github.com/wuyl10/riscv-hyp-tests-nhv5.git` 的 `nhv5.1` 分支，可直接应用本 skill。
-
-- 测试点是否已明确到具体条目（不是仅给目录）。
-- 目标 case 名是否已唯一（避免与 `ai_test_cases/` 现有函数重名）。
-- 目标平台是否明确（`spike` / 其他）。
-- 是否允许先 `manual/compile-only`（避免被 default gate 阻塞）。
-- 是否存在 PMA/PBMT/TLB/cache 依赖（决定是否走 Spike gate）。
-
-## 仓库关键入口
-
-- 测试框架宏与异常结构：`inc/rvh_test.h`
-- 默认注册表：`test_register.c`
+- 框架宏与异常结构：`inc/rvh_test.h`
+- 注册表：`test_register.c`
 - AI 用例目录：`ai_test_cases/`
 - 编译脚本：`compile_elf.py`
 - 批跑脚本：`get_result.py`
-- 人工规则中心：`test_point/Manual_Reference.md`
-- 历史坑点沉淀：`test_point/CRITICAL_ISSUES_LOG.md`
+- 项目规则：`test_point/Manual_Reference.md`
+- 历史线索：`test_point/CRITICAL_ISSUES_LOG.md`
 
-## 强约束
+## Non-Negotiables
 
-- 默认按 no-H 策略写用例：不引入 H 特有指令/CSR。仓库中的 HS helper 按项目约定视为 S 语义路径别名。允许 runner 使用 ISA 超集运行（例如命令行含 H 位），不代表启用 H 语义断言。
-- 不要在一个函数内写多个 `TEST_END(...)`。
-- 只要本步骤要断言 `excpt.triggered/cause/tval`（包括预期 `triggered == false`），都先调用 `TEST_SETUP_EXCEPT()` 初始化状态。
-- 测试注册统一在 `test_register.c` 管理，不在 case 文件中注册。
-- 对 PMA/PBMT/cache/uncache 强相关场景，不要强行以 Spike 作为唯一准入条件。
-- 写回 `test_point_file` 的测试点正文时，默认使用“标题 + 简版三段式”：`测试点：`、`构建场景：`、`已实现 case：`。
-- 仅当本轮需要从 RTL/源码反推可疑点时，再扩展为“标题 + 扩展模板”：`测试点：`、`怀疑点：`、`对应场景：`、`已实现 case：`。
-- 新增 case 或复用已有 case 都必须与测试点逐项对齐；若构建场景已有对应用例，可直接复用，但需在回填中写明“复用依据”，且必须固定为两行字段：`顺序一致性`、`断言一致性`；禁止用“相邻近似场景”替代“目标测试点场景”来充数。
-- `test_point` 回填默认只保留正文与 `已实现 case` 列表；`已实现 case` 默认只写 `case_name`，仅在确有必要时追加短状态说明，如 `（default，已启用）`、`（已注释，manual）`、`（compile-only，未跑Spike）`。
-- 禁止在 `test_point` 条目正文后追加审计式“后半段”回填块，例如 `## ...workflow 回填`、`[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]`、`[编译/运行统计]`、`[关键日志路径]`、`[修改文件清单]`、`[回填结果与注册一致性]`。
-- 当目标源文件已经过长、可读性明显下降，或用户已明确指出“不希望继续堆到旧大文件”时，必须新建 `ai_test_cases/*.c` 文件承载新 case，而不是继续往超大历史文件中追加。
+- 默认按 no-H 策略写用例：不引入 H 特有指令/CSR；HS helper 按项目约定视为 S 语义别名。
+- 一个 case 函数只能有一个 `TEST_END(...)`。
+- 只要本步骤要断言 `excpt.triggered/cause/tval`，都先调用 `TEST_SETUP_EXCEPT()`。
+- 注册统一放在 `test_register.c`，不在 `ai_test_cases/*.c` 末尾注册。
+- 写新 case 前，先检索 2~5 个相似存量 case；模板只作骨架提醒，不替代存量 case 学习。
+- `test_point` 默认只回填正文和 `已实现 case`；默认只写 `case_name`，必要时才补短状态。
+- 禁止在 `test_point` 条目后追加审计式后半段块，例如 `[新增 case]`、`[质量门禁结果]`、`[分层结论]`、`[编译/运行统计]`。
+- 遇到历史大文件或用户明确不想继续堆叠时，必须新建 `ai_test_cases/*.c` 文件承载新 case。
+- 禁止默认输出 `exclude_check`。
+- 禁止默认输出全量 Gate A-H；只有非 pass Gate 或用户明确要求时，才在最终交付摘要里输出 `[质量门禁结果]`。
+- 禁止为 `default` case 默认单独输出 `[分层结论]`；只有 `manual` / `compile-only` / `blocked`，或用户明确要求时，才在最终交付摘要里输出 `decision_prelim` / `decision_final` / `reason_code`。
 
-## 口径优先级（冲突时）
+## Source Priority
 
-当不同文档表述不一致时，按以下顺序执行：
+冲突时按以下顺序执行：
 
 1. `test_point/Manual_Reference.md`
-2. `quality_gate.md` + `tiering_decision.md` + `reason_code_catalog.md` + `submission_card.md`
-3. `rules_and_pitfalls.md` + `writing_cases.md` + `build_run_debug.md`
-4. `CRITICAL_ISSUES_LOG.md`（历史问题库，主要用于背景和排错线索）
+2. `references/quality_gate.md` + `references/tiering_decision.md` + `references/reason_code_catalog.md` + `references/submission_card.md`
+3. `references/rules_and_pitfalls.md` + `references/writing_cases.md` + `references/build_run_debug.md`
+4. `test_point/CRITICAL_ISSUES_LOG.md`
 
-补充说明：
+补充：
 
-- 调试顺序以日志与最小复现实验为准，不以视觉顺序经验做硬判断。
-- 只要断言 `excpt.triggered/cause/tval`（包括预期 `triggered == false`），都先调用 `TEST_SETUP_EXCEPT()`。
+- 顺序问题一律以日志和最小复现实验为准，不以视觉顺序经验做硬判断。
+- 存量 case 是学习样本，不高于项目规则。
 
-## 执行模式（保质量）
+## What To Read
 
-- 快速执行版：`quick_execution.md`
-	- 用于减少执行路径切换，但不减少质量检查项。
-- 完整执行版：`writing_cases.md` + `build_run_debug.md` + `rules_and_pitfalls.md`
-	- 用于复杂场景、语义冲突、疑难失败定位。
+- 标准新 case 落地：`references/quick_execution.md` + `references/writing_cases.md` + `references/quality_gate.md`
+- 失败定位：`references/build_run_debug.md` + `references/rules_and_pitfalls.md`
+- 非 default 分层：`references/tiering_decision.md` + `references/reason_code_catalog.md`
+- 交付前复核：`references/submission_card.md`
 
-统一门禁：
+## Workflow
 
-- 无论使用哪种执行模式，最终都必须通过 `quality_gate.md`。
-- 快速执行版任一门禁失败时，必须切换到完整执行版排查。
-- 提交前建议再勾选 `submission_card.md`，确保执行动作与证据输出都完整。
+1. 锁定输入：确认 `repo_root`、测试点条目、平台、case 名、目标分层。
+2. 判断 default/manual/compile-only 候选，不要先写完再临时补判定。
+3. 检索存量 case：
+   - 常规检索：
+   ```bash
+   python3 scripts/find_similar_cases.py \
+     --repo-root <repo_root> \
+     --from-file <test_point_file> \
+     --query <axis> --query <axis> \
+     --show-snippet \
+     --limit 5
+   ```
+   - 大文本或复杂场景优先 reading pack：
+   ```bash
+   python3 scripts/find_similar_cases.py \
+     --repo-root <repo_root> \
+     --from-file <test_point_file> \
+     --query <axis> --query <axis> \
+     --assert-only \
+     --emit-reading-pack \
+     --limit 3
+   ```
+   - 若 `test_point_file` 里有多个 `###` 条目，而本轮目标不是最新条目，显式指定 section，避免被最新条目带偏：
+   ```bash
+   python3 scripts/find_similar_cases.py \
+     --repo-root <repo_root> \
+     --from-file <test_point_file> \
+     --heading-pattern "<heading regex>" \
+     --query <axis> --query <axis>
+   ```
+   或：
+   ```bash
+   python3 scripts/find_similar_cases.py \
+     --repo-root <repo_root> \
+     --from-file <test_point_file> \
+     --section-index <1-based or negative index> \
+     --query <axis> --query <axis>
+   ```
+4. 写或改 case：放在 `ai_test_cases/*.c`，结构和断言以 `references/writing_cases.md` 为准。
+5. 调整 `test_register.c` 注册状态，使其与目标分层一致。
+6. 先做单 case 编译：
+   ```bash
+   python3 compile_elf.py --plat spike --name <case_name>
+   ```
+7. 非 `compile-only` 必须做单 case 运行；`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
+8. 更新 `test_point`：
+   - 默认模板：`测试点 / 构建场景 / 已实现 case`
+   - 需要 RTL/源码怀疑点时：`测试点 / 怀疑点 / 对应场景 / 已实现 case`
+   - 若复用已有 case，固定只补两行 `复用依据`：`顺序一致性`、`断言一致性`
+9. 回填后建议执行：
+   ```bash
+   python3 scripts/check_writeback_format.py \
+     --repo-root <repo_root> \
+     --file <test_point_file> \
+     --check-register
+   ```
 
-## 工作流
+## Output Defaults
 
-1. 读取测试点与规则：先看 `test_point/*` 和 `Manual_Reference.md`。
-2. 归类测试目标：判断是 default、manual 还是 compile-only 候选。
-3. 编写/修改 case：放入 `ai_test_cases/*.c`，遵循命名与模板。
-4. 注册策略：在 `test_register.c` 中控制是否开启注册。
-5. 编译验证：优先用 `compile_elf.py` 做单 case 或小批量编译。
-6. 运行验证：非 `compile-only` 用 `get_result.py` 或直接 Spike 运行 ELF；`compile-only` 在结论中标注 Gate D=`N/A` 与不运行原因。
-7. 日志归档：读取 `result_log/spike/*.log` 判定失败类型。
-8. 回填闭环：更新 `test_point` 对应用例名及状态说明。
+- 默认最终摘要至少包含：改动文件、case 名、编译结果、运行结果、关键日志路径。
+- 只有存在非 pass Gate 或用户明确要求时，才在最终摘要里输出 `[质量门禁结果]`。
+- 只有最终不是 `default`，或用户明确要求时，才在最终摘要里输出 `decision_prelim` / `decision_final` / `reason_code`。
+- `compile-only` 必须显式写 Gate D=`N/A` 与不运行原因。
 
-### 测试点回填正文格式（默认执行）
+## Bundled Resources
 
-写回 `test_point_file` 的测试点条目时，默认按“标题 + 双模板”组织正文；精确示例与回填样式见 `writing_cases.md` 的“测试点回填”章节。
-
-- 默认模板：
-  - `### Pxx. ...`
-  - `测试点`
-  - `构建场景`
-  - `已实现 case`
-- 扩展模板（需要从 RTL/源码定位可疑点）：
-  - `### Pxx. ...`
-  - `测试点`
-  - `怀疑点`
-  - `对应场景`
-  - `已实现 case`
-- 复用已有 case 时，必须追加固定两行 `复用依据`：
-  - `顺序一致性`
-  - `断言一致性`
-
-要求：
-
-- 每个测试点条目必须先写三级标题（`### Pxx. ...`），再写正文；禁止只有正文而缺少标题。
-- 标题必须能唯一指向该测试点，建议在标题中包含关键顺序（fault -> repair -> success -> producer/template switch）。
-- 默认优先使用“测试点 + 构建场景 + 已实现 case”简版模板。
-- 满足以下任一条件时，必须使用扩展模板：本轮新增/修改了源码怀疑点；需要引用 RTL/源码位置解释判定；分层结论需要依赖模块实现细节说明。
-- `构建场景` 段必须把 fault/repair/success/producer-switch/template-switch 等关键顺序写清楚，确保能从文本直接映射到 case 构造。
-- 使用扩展模板时，`怀疑点` 段优先引用 RTL/源码位置，并说明为什么这里可能出 bug；`对应场景` 段保持可直接映射到 case 构造。
-- `已实现 case` 段只列真正对应该测试点的 case；默认只写 `case_name`，必要时才附一个短状态说明；不要在这里写文件路径、函数签名、日志路径或审计信息。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
-- 若复用已有 case，必须补“复用依据”，且严格使用固定两行字段，不得增删；字段含义与示例见 `writing_cases.md`。
-- `test_point` 回填到此为止；除非用户明确要求，否则不要继续在该文件里追加 workflow 摘要或证据块。
-
-### 失败分叉（强制执行）
-
-- 编译失败：先修复语法/宏/链接，再进入运行阶段。
-- 运行失败且出现 `untested exception`：先核查异常准备与特权态，不直接改预期。
-- 运行失败且语义与规则冲突：先对照 `Manual_Reference.md`，再决定是修用例还是改分层。
-- 语义合理但 Spike 不稳定：转 `manual` 或 `compile-only`，并在 `已实现 case` 的短状态说明中简洁标注原因/状态。
-
-## 分层标准
-
-- default：Spike 语义稳定、结果可重复、行为与项目规则一致。
-- manual：场景合理但 Spike 行为不稳定或需人工确认语义。
-- compile-only：用于覆盖 RTL 风险路径，当前不以 Spike 结果作为 gate。
-
-## 输出要求
-
-执行本技能后，默认结论至少应包含以下信息；精确结论模板见 `quality_gate.md` 的“最终结论模板（按需输出）”：
-
-- 修改了哪些文件
-- 新增/修改了哪些 case（默认只列 `case_name`；必要时附短状态）
-- 编译结果（成功/失败数量）
-- 运行结果（非 compile-only：pass/fail/timeout/missing；compile-only：Gate D=N/A + 不运行原因）
-- 若存在非 pass Gate 或用户明确要求：质量门禁问题项
-- 若最终不是 `default`，或用户明确要求：自动裁决（`decision_prelim` / `decision_final`）
-- 若最终不是 `default`，或用户明确要求：分层原因码（`reason_code`，建议参考 `tiering_decision.md`）
-- 后续建议动作（若有）
-
-## 默认禁止事项
-
-- 禁止在未完成单 case 编译前直接全量批跑。
-- 禁止未核对 `test_register.c` 注册状态就宣称“可回归”。
-- 禁止输出 `exclude_check` 字段、`[exclude_check]` 小节，或“exclude list 未命中/已核对”这类模板化表述；如需说明覆盖边界，仅在 Gate E 中简洁描述测试范围即可。
-- 禁止默认输出全量 `Gate A-H`；只有存在非 pass Gate 或用户明确要求时，才输出 `[质量门禁结果]`。
-- 禁止默认输出 `default` case 的独立 `[分层结论]`；只有 `manual` / `compile-only` / `blocked`，或用户明确要求时，才输出分层结论与 `reason_code`。
-- 禁止把“可编译”直接等价为“default 可准入”。
-- 禁止删减已有规则细节来换取表面通过率。
-
-## 详细文档
-
-- 快速执行流程：`quick_execution.md`
-- 质量门禁清单：`quality_gate.md`
-- 自动分层裁决：`tiering_decision.md`
-- 原因码目录：`reason_code_catalog.md`
-- 一页提交核对卡：`submission_card.md`
-- 用例编写细则：`writing_cases.md`
-- 编译/运行/调试细则：`build_run_debug.md`
-- 规则与坑点清单：`rules_and_pitfalls.md`
-- 可复用代码模板：`templates/new_case_template.c`
+- `references/writing_cases.md`
+  - 用例编写、断言覆盖、回填模板、反模式。
+- `references/quick_execution.md`
+  - 快速执行入口和 Gate 对照。
+- `references/quality_gate.md`
+  - Gate A-H 判定与最终结论模板。
+- `references/tiering_decision.md`
+  - `default` / `manual` / `compile-only` 自动裁决。
+- `references/reason_code_catalog.md`
+  - `reason_code` 标准来源。
+- `references/build_run_debug.md`
+  - 编译、运行、日志判读。
+- `references/rules_and_pitfalls.md`
+  - 项目规则与高频坑点。
+- `scripts/find_similar_cases.py`
+  - 检索相似存量 case；支持 `--assert-only --emit-reading-pack`，以及 `--heading-pattern` / `--section-index` 做多条目 markdown 定位。
+- `scripts/check_writeback_format.py`
+  - 校验轻量回填格式，并可选核对 `test_register.c`。
+- `scripts/eval_check_writeback_format.py`
+  - 仅在修改写回校验逻辑时使用；跑固定 fixtures，避免把状态校验、注释注册识别和禁止块判定改坏。
+- `scripts/eval_find_similar_cases.py`
+  - 仅在修改检索逻辑时使用；跑固定 eval fixtures，避免把 `strong/weak/no_close`、Top1 排序和 markdown section 选择调坏。
+- `assets/templates/new_case_template.c`
+  - 最小骨架提醒，不是 case 设计真值。

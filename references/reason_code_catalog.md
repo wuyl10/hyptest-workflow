@@ -91,6 +91,6 @@
 
 ## 4. 交付落地点
 
-- 自动裁决结果：`tiering_decision.md` 输出中记录原因码。
-- 提交前核对：`submission_card.md` 勾选“原因码已记录且来自目录”。
+- 自动裁决结果：`references/tiering_decision.md` 输出中记录原因码。
+- 提交前核对：`references/submission_card.md` 勾选“原因码已记录且来自目录”。
 - 最终摘要：在结论段写明原因码和对应证据。

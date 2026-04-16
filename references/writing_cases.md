@@ -30,6 +30,32 @@
   - `ai_micro_mmode_memblock_p4_cases.c`
 - 新建文件后，仍需按现有仓库规则确认它会被编译系统自动收集。
 
+### 1.2 写新 case 前先看存量 case
+
+- 写新 case 时，优先从仓库现有 `ai_test_cases/*.c` 中找 2~5 个相似 case，再决定如何落地；不要上来就套模板。
+- 存量 case 的价值主要在于：
+  - 看这个仓库现有的环境构造方式
+  - 看断言文案和 `cause/tval/data/guard` 的组合习惯
+  - 看相似路径下常见的特权态切换、页表/PMP/PBMT 处理顺序
+- 但存量 case 不是高于规则的真值。遇到冲突时，优先级始终是：
+  - `test_point/Manual_Reference.md`
+  - 本 skill 的门禁/分层/规则文档
+  - 存量 case
+- 不要机械照抄存量 case。必须先比对：
+  - 场景顺序是否一致
+  - 断言覆盖是否一致
+  - 特权态/翻译路径是否一致
+  - 是否只是“邻近 case”而非“目标 case”
+- 优先参考这些存量 case：
+  - 已在 `test_register.c` 中启用的 default case
+  - 与当前测试点关键维度最接近的 case
+  - 最近仍在被复用、不是纯历史遗留的大文件尾部 case
+- 谨慎参考这些存量 case：
+  - `manual` / `compile-only` / 已注释 case
+  - 历史大文件中风格明显陈旧、断言偏弱、只做近似覆盖的 case
+  - 规则口径已经发生变化的旧 case（例如 misalign、PMA/PBMT、Spike 偏差相关）
+- 需要骨架时，再把 `assets/templates/new_case_template.c` 当作“空白骨架”；模板不替代对存量 case 的检索。
+
 ## 2. 基础函数结构
 
 推荐骨架：
@@ -160,6 +186,8 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 依赖 PMA/PBMT 且未走 Spike gate：`case_name（依赖PMA CSR/TLB一致性/cache一致性，未跑Spike）`
 
 不要在 `test_point` 正文后追加 workflow 回填块或审计式证据块。
+兼容历史短状态写法 `case_name 已注释（manual）`，但新写法优先使用 `case_name（已注释，manual）`。
+若任务要求输出 `Gate A-H`、`decision_prelim` / `decision_final`、`reason_code`，默认放到最终交付摘要，不写进 `test_point`。
 
 ### 7.1 测试点正文模板（默认简版 + RTL扩展）
 
@@ -260,10 +288,11 @@ TEST_ASSERT("normal load should keep triggered=false",
 ## 10. 推荐起步流程
 
 1. 从 `test_point` 选 1 个小场景。
-2. 在 `ai_test_cases` 写 1 个基础 case（非 corner）。
-3. 用 `compile_elf.py --name <case>` 单点编译。
-4. 用单 ELF Spike 命令跑通。
-5. 回填测试点后，再扩展 repeated/adjacent/cross-producer corner。
+2. 检索 2~5 个相似存量 case，确认最值得复用的结构和断言。
+3. 在 `ai_test_cases` 写 1 个基础 case（非 corner）。
+4. 用 `compile_elf.py --name <case>` 单点编译。
+5. 用单 ELF Spike 命令跑通。
+6. 回填测试点后，再扩展 repeated/adjacent/cross-producer corner。
 
 ## 11. 建议的四段式 case 结构
 

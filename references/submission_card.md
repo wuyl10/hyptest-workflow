@@ -27,7 +27,7 @@
 
 ## D. 语义与分层
 
-- [ ] 与项目规则一致（`Manual_Reference.md` + `rules_and_pitfalls.md`）
+- [ ] 与项目规则一致（`Manual_Reference.md` + `references/rules_and_pitfalls.md`）
 - [ ] PMA/TLB/cache 依赖场景已正确标注
 - [ ] 分层结论与 `test_register.c` 注册状态一致
 
@@ -40,11 +40,13 @@
 
 ## F. 自动裁决
 
-- [ ] 已按 `tiering_decision.md` 完成自动裁决
+这些记录用于交付摘要或内部核对，不写回 `test_point`。
+
+- [ ] 已按 `references/tiering_decision.md` 完成自动裁决
 - [ ] 已记录 `decision_prelim`（default/manual/compile-only/blocked）
 - [ ] 已记录 `decision_final`（default/manual/compile-only/blocked）
 - [ ] 已记录 `reason_code`
-- [ ] `reason_code` 已在 `reason_code_catalog.md` 中定义
+- [ ] `reason_code` 已在 `references/reason_code_catalog.md` 中定义
 - [ ] 若为 blocked，已给出修复动作与负责人
 
 ## 一票否决项

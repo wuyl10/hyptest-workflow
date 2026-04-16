@@ -1,0 +1,97 @@
+[
+  {
+    "id": "strong_same_template_query",
+    "description": "specific retry/same-template query should anchor on the same-template follow-up case",
+    "queries": [
+      "same-template",
+      "cross-16b",
+      "refault",
+      "retry",
+      "1b+7b",
+      "same-page"
+    ],
+    "expected_status": "strong_match",
+    "expected_top1": "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_template_store_corner"
+  },
+  {
+    "id": "strong_bridge_word_query",
+    "description": "specific bridge-word low-byte query should anchor on the corresponding sibling case",
+    "queries": [
+      "bridge-word",
+      "last-halfword",
+      "low-byte",
+      "1b+7b",
+      "retry",
+      "same-page"
+    ],
+    "expected_status": "strong_match",
+    "expected_top1": "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_middle_tail_bridge_word_then_upper_tail_last_halfword_low_byte_corner"
+  },
+  {
+    "id": "weak_generic_fault_query",
+    "description": "a generic single-word query should stay weak rather than self-promoting to strong",
+    "queries": [
+      "fault"
+    ],
+    "expected_status": "weak_match"
+  },
+  {
+    "id": "no_close_match_unknown_query",
+    "description": "an unknown query should produce no close match and no unrelated top result",
+    "queries": [
+      "xyz_unlikely_token"
+    ],
+    "expected_status": "no_close_match",
+    "expected_result_count": 0
+  },
+  {
+    "id": "latest_markdown_section_priority",
+    "description": "markdown extraction should prioritize the latest section instead of earlier file noise",
+    "from_file": "latest_section_priority.md",
+    "expected_status": "strong_match",
+    "expected_top1": "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_template_store_corner"
+  },
+  {
+    "id": "explicit_heading_pattern_selection",
+    "description": "heading-pattern should let the caller select a non-latest markdown section explicitly",
+    "from_file": "latest_section_priority.md",
+    "heading_pattern": "earlier width-switch entry",
+    "expected_status": "strong_match",
+    "expected_top1": "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_width_switch_store_corner"
+  },
+  {
+    "id": "explicit_section_index_selection",
+    "description": "section-index should let the caller select a specific markdown heading section explicitly",
+    "from_file": "latest_section_priority.md",
+    "section_index": 1,
+    "expected_status": "strong_match",
+    "expected_top1": "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_width_switch_store_corner"
+  },
+  {
+    "id": "strong_arch_amo_alias_query",
+    "description": "non-memblock arch amo query should anchor on the matching PBMT alias case",
+    "queries": [
+      "amo",
+      "pbmt",
+      "io",
+      "cacheable",
+      "alias",
+      "same-pa"
+    ],
+    "expected_status": "strong_match",
+    "expected_top1": "ai_arch_amo_pbmt_io_fault_then_cacheable_alias_amo_recovers_same_pa_corner"
+  },
+  {
+    "id": "strong_prefetch_mprv_query",
+    "description": "non-memblock micro prefetch query should anchor on the matching prefetch/mprv case",
+    "queries": [
+      "prefetch",
+      "mprv",
+      "same-page",
+      "sfence",
+      "adjacent-preserved"
+    ],
+    "expected_status": "strong_match",
+    "expected_top1": "ai_micro_m_prefetch_mprv_u_same_page_repeated_deny_then_sfence_restore_adjacent_preserved_corner"
+  }
+]

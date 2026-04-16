@@ -50,7 +50,7 @@
 
 ## 4. 建议原因码（用于追溯）
 
-标准来源：`reason_code_catalog.md`
+标准来源：`references/reason_code_catalog.md`
 
 - `D-PASS-DEFAULT`: 编译通过 + 运行通过 + 规则一致 + 可作为 Spike gate
 - `D-MANUAL-NONGATE`: 场景不宜 Spike gate（PMA/TLB/cache 等）
@@ -80,10 +80,10 @@
 
 ## 6. 与现有文档的关系
 
-- 流程入口：`quick_execution.md`
-- 质量约束：`quality_gate.md`
-- 原因码标准：`reason_code_catalog.md`
-- 提交勾选：`submission_card.md`
-- 语义依据：`rules_and_pitfalls.md`
+- 流程入口：`references/quick_execution.md`
+- 质量约束：`references/quality_gate.md`
+- 原因码标准：`references/reason_code_catalog.md`
+- 提交勾选：`references/submission_card.md`
+- 语义依据：`references/rules_and_pitfalls.md`
 
 本文不替代规则文档，只统一裁决动作与输出格式。
