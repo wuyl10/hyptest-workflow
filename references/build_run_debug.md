@@ -92,8 +92,7 @@ python3 get_result.py --platform spike --case ai_arch_lb_sign_extension
 SPIKE_BIN=${SPIKE_BIN:-<path-to-spike>}
 
 $SPIKE_BIN \
-  --misaligned \
-  --isa=rv64IMAFDCVH_zicond_zicntr_zihpm_zba_zbb_zbc_zbs_zbkb_zbkc_zbkx_zimop_zcmop_zcb_zknd_zkne_zknh_zksed_zksh_zvbb_svinval_sscofpmf_svpbmt_zicbom_zicboz_sstc_svnapot_smstateen \
+  --isa=rv64IMAFDCVH_zicond_zicntr_zihpm_zba_zbb_zbc_zbs_zbkb_zbkc_zbkx_zimop_zcmop_zcb_zknd_zkne_zknh_zksed_zksh_zvbb_svinval_sscofpmf_svpbmt_zicbom_zicboz_sstc_svnapot_smstateen_zicclsm \
   individual_tests/spike/ai_arch_lb_sign_extension.ELF
 ```
 
@@ -149,6 +148,7 @@ python3 get_result.py --platform spike --range 504-556 --dry-run
 - `passed_cases`
 - `failed_cases`
 - `missing_elf_cases`
+- `timeout_cases`
 - `untested_exception_cases`
 
 失败日志会保存从 `risc-v NH-V5 tests` 起的完整输出，适合定位。
