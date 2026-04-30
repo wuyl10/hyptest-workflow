@@ -1,0 +1,23 @@
+[
+  {
+    "id": "nhv5_1_ap_cache_tlb_gate",
+    "profile": "nhv5_1_ap",
+    "expected_facts": {
+      "official_spike_has_tlb_model": "false",
+      "official_spike_has_cache_model": "false",
+      "official_spike_has_pma_csr": "false"
+    },
+    "expected_terms": [
+      "RTL-only",
+      "spike_gate_applicable=false"
+    ]
+  },
+  {
+    "id": "template_has_placeholders",
+    "profile": "template",
+    "expected_terms": [
+      "<profile_name>",
+      "spike_gate_applicable"
+    ]
+  }
+]

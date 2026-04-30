@@ -4,7 +4,8 @@
 
 ## 1. 放置位置与命名
 
-- 新用例统一放在 `ai_test_cases/*.c`。
+- AI/批量生成的新用例默认放在 `ai_test_cases/*.c`。
+- 人工维护的新用例按模块放在 `manual_test_cases/<module>/`。
 - 用例函数返回值必须是 `bool`。
 - 推荐命名前缀：
   - 架构语义：`ai_arch_*`
@@ -22,7 +23,7 @@
 
 ### 1.1 大文件拆分规则
 
-- 若目标文件已经明显过长，或用户已明确指出该文件“不应继续追加”，应优先新建 `ai_test_cases/*.c` 文件承载新 case。
+- 若目标文件已经明显过长，或用户已明确指出该文件“不应继续追加”，应优先新建主题明确的 case 文件承载新 case。
 - 对已经成为“历史大文件”的目标，例如 `ai_micro_mmode_memblock_cases.c`，不要默认继续往里堆新 case。
 - 新文件命名应反映主题或子场景，例如：
   - `ai_micro_mmode_memblock_followup_cases.c`
@@ -32,7 +33,7 @@
 
 ### 1.2 写新 case 前先看存量 case
 
-- 写新 case 时，优先从仓库现有 `ai_test_cases/*.c` 中找 2~5 个相似 case，再决定如何落地；不要上来就套模板。
+- 写新 case 时，优先从仓库现有 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c` 中找 2~5 个相似 case，再决定如何落地；不要上来就套模板。
 - 存量 case 的价值主要在于：
   - 看这个仓库现有的环境构造方式
   - 看断言文案和 `cause/tval/data/guard` 的组合习惯
@@ -144,7 +145,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 ## 5. 特权态和环境切换建议
 
 - 用 `goto_priv(...)` 显式切换特权态。
-- no-H 默认策略下，不引入 H 特有指令/CSR；仓库里的 HS 相关 helper 按项目约定作为 S 语义路径别名使用。
+- 特权态、H 扩展、HS helper 语义别名等范围以当前 `spec_profile` 为准；先读 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`。
 - 与页表翻译相关的场景优先走 `M-mode + MPRV` 或项目既有 HS/S 语义路径，保持与现有 case 风格一致。
 - 涉及翻译修改后要配合 `sfence_vma()`。
 - 涉及 PMA/PBMT 操作时，严格标注场景来源（PMA 还是 PBMT）。
@@ -154,7 +155,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 ### 6.1 注册位置
 
 - 统一在 `test_register.c` 中 `TEST_REGISTER(...)`。
-- 不在 `ai_test_cases/*.c` 末尾注册。
+- 不在 case 源文件末尾注册。
 
 ### 6.2 执行顺序注意
 
@@ -224,8 +225,8 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 怀疑点：
 
-- `src/main/scala/xiangshan/mem/lsqueue/StoreQueue.scala:807-820` 把 same-page scalar cross-16B store 固定送进 fake-crosspage 路径，可能导致模板退场不干净。
-- `src/main/scala/xiangshan/mem/lsqueue/StoreMisalignBuffer.scala:257-258` 可能让 retry 结束后的 owner/template 状态被下一条 width-switch store 继续复用。
+- `<RTL/path/File.scala:line>` 描述可疑状态/队列/模板/权限/响应绑定点。
+- `<RTL/path/Other.scala:line>` 描述与本测试点相关的第二个可疑交互点。
 
 对应场景：
 
@@ -255,6 +256,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 每个测试点条目都先写标题，再选默认模板或扩展模板。
 - 默认优先简版模板；满足以下任一条件时启用扩展模板：新增/修改了源码怀疑点、需要引用 RTL/源码位置解释判定、分层结论依赖模块实现细节。
 - 简版模板中的 `构建场景` 与扩展模板中的 `对应场景` 都应可直接指导 case 构造，避免只写抽象结论。
+- 需要项目内具体 RTL 怀疑点示例时，看 `references/rtl_bug_patterns.md`；不要把那里的项目路径写成通用规则。
 - `new-case-only` 场景通常只写到 `已实现 case` 即可；只有复用已有 case 时才出现 `复用依据` 两行。
 - `已实现 case` 段只放与该测试点一一对应的 case；默认只写 `case_name`，只有确有必要时才附短状态说明；不要在这里写文件名、函数签名、日志、Gate 结果或分层块。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
 - 若复用已有 case，必须补“复用依据”，且固定为两行字段：`顺序一致性`（关键顺序一致性对比）与 `断言一致性`（关键断言覆盖一致性对比）。
@@ -289,7 +291,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 1. 从 `test_point` 选 1 个小场景。
 2. 检索 2~5 个相似存量 case，确认最值得复用的结构和断言。
-3. 在 `ai_test_cases` 写 1 个基础 case（非 corner）。
+3. 在合适的 case 目录写 1 个基础 case（非 corner）。
 4. 用 `compile_elf.py --name <case>` 单点编译。
 5. 用单 ELF Spike 命令跑通。
 6. 回填测试点后，再扩展 repeated/adjacent/cross-producer corner。
@@ -347,7 +349,7 @@ TEST_ASSERT("adjacent word remains unchanged", adjacent_val == expected_adjacent
 
 ## 15. 提交前硬检查（可复制到 PR 描述）
 
-- `ai_test_cases/*.c` 中函数命名与文件命名语义一致
+- case 源文件中函数命名与文件命名语义一致
 - 单函数仅 1 个 `TEST_END(...)`
 - 已完成单 case 编译
 - 非 compile-only：已完成单 case 运行且日志中失败类型已归因（不是只给 `FAILED`）

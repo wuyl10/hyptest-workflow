@@ -2,11 +2,19 @@
 
 用途：把快速执行流程和质量门禁合并为一张可勾选清单，用于提交前最后确认。
 
+若本次修改的是 skill 自身，先运行：
+
+```bash
+python3 scripts/self_check.py --quick
+python3 scripts/self_check.py --full --repo-root <repo_root>
+```
+
 ## A. 输入锁定
 
 - [ ] 测试点文件与条目明确
 - [ ] case 名唯一且可追踪
 - [ ] 平台明确（通常 `spike`）
+- [ ] `spec_profile` 已确认（显式指定或默认 profile registry 的 `default_profile`），且已读取 `references/spec_profiles/<spec_profile>.md`
 - [ ] 目标分层明确（default/manual/compile-only）
 
 ## B. 用例结构
@@ -22,13 +30,14 @@
 - [ ] 非 compile-only：单 case 运行完成
 - [ ] 非 compile-only：结果可归因（pass/fail/untested）
 - [ ] compile-only：已注明 Gate D=N/A 与不运行原因
-- [ ] 非 compile-only：日志路径可回溯（`result_log/spike/*.log`）
+- [ ] 非 compile-only：日志路径可回溯（通常为 `result_log/spike/*.log` 或 `result_log/linknan/*.log`）
 - [ ] compile-only：Gate D=N/A 证据可回溯（不运行原因 + 分层依据/原因码）
 
 ## D. 语义与分层
 
-- [ ] 与项目规则一致（`Manual_Reference.md` + `references/rules_and_pitfalls.md`）
-- [ ] PMA/TLB/cache 依赖场景已正确标注
+- [ ] 与项目规则一致（`Manual_Reference.md` + `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`）
+- [ ] 已确认 `spike_gate_applicable`
+- [ ] PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界场景已正确标注
 - [ ] 分层结论与 `test_register.c` 注册状态一致
 
 ## E. 回填与交付
@@ -55,7 +64,7 @@
 
 - [ ] 语义未对齐项目规则
 - [ ] `untested exception` 原因未查明
-- [ ] PMA/TLB/cache 依赖场景未标注却尝试 default 放行
+- [ ] PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界场景未标注却尝试 default 放行
 - [ ] 回填状态与注册状态不一致
 
 ## 提交签字区

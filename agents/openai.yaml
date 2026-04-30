@@ -1,4 +1,4 @@
 interface:
   display_name: "Hyptest Workflow"
   short_description: "Hyptest case workflow for riscv-hyp-tests nhv5.1"
-  default_prompt: "Use $hyptest-workflow to turn hyptest test points into ai_test_cases changes, single-case compile/run validation, tiering, and lightweight test_point writeback."
+  default_prompt: "Use $hyptest-workflow with optional spec_profile=<name> (defaults to the profile registry default) for hyptest test-point to ai_test_cases/manual_test_cases workflow. Use env vars such as SPIKE_BIN, LINKNAN_HOME, and DIFFTEST_REF_SO instead of personal absolute paths; README examples are not a strict input schema."

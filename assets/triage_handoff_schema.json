@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "description": "Workflow-to-triage handoff schema. This is a lightweight contract, not a full JSON Schema implementation.",
+  "required_fields": [
+    "case_name",
+    "platform",
+    "spec_profile",
+    "scenario",
+    "assert_site",
+    "assert_expr",
+    "exception_observed",
+    "excpt_dump",
+    "log_markers",
+    "error_points",
+    "reason_code_candidates",
+    "reason_code_details",
+    "next_single_run",
+    "waveform_needed",
+    "log_paths"
+  ],
+  "field_types": {
+    "case_name": ["string", "null"],
+    "platform": ["string"],
+    "spec_profile": ["string"],
+    "scenario": ["array"],
+    "assert_site": ["string", "null"],
+    "assert_expr": ["string", "null"],
+    "exception_observed": ["object"],
+    "excpt_dump": ["object"],
+    "log_markers": ["object"],
+    "error_points": ["array"],
+    "reason_code_candidates": ["array"],
+    "reason_code_details": ["array"],
+    "next_single_run": ["string", "null"],
+    "waveform_needed": ["boolean"],
+    "log_paths": ["array"]
+  }
+}

@@ -20,7 +20,7 @@
 ### 2.2 MANUAL 类（不进 default，但场景保留）
 
 - `D-MANUAL-NONGATE`
-  - 触发：场景不宜以 Spike 作为 gate（常见于 PMA/TLB/cache 依赖）
+  - 触发：场景不宜以 Spike 作为 gate（常见于 PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等模型边界）
   - 最小证据：规则引用 + 场景说明 + 运行/环境限制说明
   - 后续动作：标为 manual，回填原因
 

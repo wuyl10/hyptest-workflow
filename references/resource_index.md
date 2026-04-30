@@ -1,0 +1,290 @@
+# Resource Index
+
+本文是 `hyptest-workflow` 的资源索引。`SKILL.md` 保留执行规则；脚本、参考文档、eval fixture 的完整清单放这里，方便维护和自检。
+
+## Rule References
+
+- `references/writing_cases.md`
+  - 用例编写、断言覆盖、回填模板、反模式。
+- `references/repo_layout.md`
+  - 当前 hyptest 仓库结构、生成目录、平台名和环境变量。
+- `references/task_input_schema.md`
+  - 任务输入字段、默认值、task_mode、preflight 校验命令。
+- `references/quick_execution.md`
+  - 快速执行入口和 Gate 对照。
+- `references/quality_gate.md`
+  - Gate A-H 判定与最终结论模板。
+- `references/tiering_decision.md`
+  - `default` / `manual` / `compile-only` 自动裁决。
+- `references/reason_code_catalog.md`
+  - `reason_code` Markdown 标准来源。
+- `references/build_run_debug.md`
+  - 编译、运行、日志判读。
+- `references/spec_and_model_limits.md`
+  - 规格/profile 路由入口；指导选择项目 profile。
+- `references/spec_profiles/<name>.md`
+  - 具体项目规则；PMP/PMA/PBMT/MMIO/cache/TLB/CBO 等平台模型边界与 Spike gate 判定。
+- `references/spec_profiles/index.json`
+  - profile registry；记录默认 profile、可选 profile 文件和状态。
+- `references/spec_profiles/template.md`
+  - 新增项目 profile 的空白结构模板；不要从具体项目 profile 复制旧事实。
+- `references/framework_usage_pitfalls.md`
+  - `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册、编译脚本、运行脚本等 harness/工具坑点。
+- `references/rules_and_pitfalls.md`
+  - 兼容旧引用的规则入口索引；不是人工规格入口。
+- `references/coverage_and_dedupe.md`
+  - 测试点覆盖检查、repo/file 级排重口径、case 相似检索和唯一性检索模板。
+- `references/rtl_bug_patterns.md`
+  - 当前项目中可参考的 RTL 怀疑点示例；不是规格真值。
+- `references/triage_handoff_schema.md`
+  - workflow 交给 `hyptest-failure-triage` 的结构化字段约定。
+- `references/submission_card.md`
+  - 提交前复核卡片。
+- `references/maintainer_guide.md`
+  - skill 维护、新增 profile、脚本/eval 变更的检查清单。
+
+## Public Scripts
+
+- `scripts/find_similar_cases.py`
+  - 检索相似存量 case；搜索范围是全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。
+- `scripts/case_extractor.py`
+  - `find_similar_cases.py` 的 case 提取、注册状态读取和缓存 builder。
+- `scripts/similar_case_ranker.py`
+  - `find_similar_cases.py` 的相似度排序、去重、多样性选择和 retrieval assessment。
+- `scripts/similar_case_render.py`
+  - `find_similar_cases.py` 的 snippet、match note、reading-pack 渲染。
+- `scripts/similar_case_terms.py`
+  - `find_similar_cases.py` 的 term/Markdown 提取和打分辅助模块。
+- `scripts/term_aliases.py`
+  - 相似检索共享 term canonical key、alias 展开和 canonical 去重逻辑。
+- `scripts/markdown_sections.py`
+  - Markdown heading section split/filter/index 选择辅助模块；从相似检索 term 逻辑中拆出。
+- `scripts/similar_case_core.py`
+  - 兼容旧 import 的 re-export 模块；新逻辑不要继续堆到这里。
+- `scripts/similar_case_cache.py`
+  - `find_similar_cases.py` 的缓存/fingerprint 辅助模块。
+- `scripts/profile_utils.py`
+  - 读取 profile fenced JSON block、解析地址窗口和共享 profile 查询逻辑。
+- `scripts/query_spec_profile.py`
+  - 按 `spec_profile` 查询 PMA/PBMT/MMIO 机器可读表，可用 PA 地址或 window 过滤；支持 `--summary` 和 `--decision-only`。
+- `scripts/suggest_reason_code.py`
+  - 根据失败现象文本给 `reason_code` 候选，便于分层时快速找到 catalog 条目。
+- `scripts/classify_failure_log.py`
+  - 从失败日志文本中抽取场景、错误点、候选 `reason_code` 和下一步动作；用于 workflow 级失败日志 eval。
+- `scripts/make_triage_handoff.py`
+  - 从失败日志生成 workflow-to-triage handoff JSON。
+- `scripts/validate_task_request.py`
+  - 校验 `repo_root`、`test_point_file`、`platform`、`spec_profile`、`task_mode` 等任务输入；支持 CLI、`--request-json`、`--request-md`。
+- `scripts/check_case_lint.py`
+  - 检查 case 源文件结构问题；支持 `--changed-only`、`--strict-case-end`、`--warnings-as-errors`、`--baseline`、`--write-baseline`，并提示弱断言文案/缺少断言。
+- `scripts/case_lint_baseline_diff.py`
+  - 比较两个 case lint baseline，列出新增/移除 issue。
+- `scripts/check_writeback_format.py`
+  - 校验轻量回填格式，可选核对 `test_register.c`，可用 `--spec-profile` 输出带 warning_code 的 profile-aware 警告。
+- `scripts/writeback_register.py`
+  - `check_writeback_format.py` 使用的 `test_register.c` 注册状态解析模块。
+- `scripts/check_docs_links.py`
+  - 检查 skill 文档中的本地文件引用是否存在。
+- `scripts/check_readme_commands.py`
+  - 检查 README 生成命令块是否与 `list_skill_commands.py --markdown` 一致。
+- `scripts/check_skill_consistency.py`
+  - 检查 `SKILL.md`、README、resource index、`.gitignore`、self-check 脚本之间的维护一致性。
+- `scripts/check_cross_skill_consistency.py`
+  - 检查 `hyptest-workflow` 与 `hyptest-failure-triage` 的关键触发词和旧路径回归风险。
+- `scripts/check_reason_codes.py`
+  - 检查文档引用的 reason_code 是否同时存在于 Markdown catalog 和机器可读 JSON。
+- `scripts/check_resource_index.py`
+  - 检查 `references/resource_index.md` 是否覆盖 public scripts 和关键 assets。
+- `scripts/resolve_spec_profile.py`
+  - 将 `spec_profile=<name>` 或 profile markdown 路径解析为实际 `references/spec_profiles/*.md` 文件；默认 profile registry 的 `default_profile`。
+- `scripts/check_spec_profile.py`
+  - 校验 profile 必备结构和机器可读 PMA/PBMT/MMIO 表。
+- `scripts/check_env.py`
+  - 检查 repo anchors、工具链和 `SPIKE_BIN` / `LINKNAN_HOME` / `DIFFTEST_REF_SO` 等平台环境变量；支持 `--platform all` 和 `--explain`。
+- `scripts/new_spec_profile.py`
+  - 从 profile template 创建新 profile skeleton，可同步更新 profile registry。
+- `scripts/check_hyptest_repo_migration.py`
+  - 检查真实 hyptest 仓库是否仍残留旧目录、旧字段或旧平台名逻辑；用于目录重构后回归。
+- `scripts/check_hyptest_cli_contract.py`
+  - 检查真实 hyptest 仓库的 `compile_elf.py` / `get_result.py` CLI、平台名、`case_elf_asm`、环境变量和个人路径约束。
+- `scripts/repo_snapshot.py`
+  - 只读汇总真实 hyptest 仓库的 case 源、注册状态、test_point 条目、生成物和最新日志。
+- `scripts/check_get_result_log_contract.py`
+  - 检查真实 hyptest 仓库 `get_result.py` 的 summary/log marker contract。
+- `scripts/check_spec_profile_registry.py`
+  - 检查 `references/spec_profiles/index.json` 是否覆盖现有 profile，默认 profile 是否可解析。
+- `scripts/eval_profile_portability.py`
+  - 回归检查通用 README/SKILL/命令输出不泄漏具体默认 profile，只有显式解析时才展开 registry default。
+- `scripts/clean_generated.py`
+  - 清理 `.hyptest_skill_tmp/`、`.hyptest_skill_cache/`、`__pycache__/` 等生成物。
+- `scripts/doctor.py`
+  - 一条命令汇总 profile、文档链接、reason_code、repo 迁移、环境和 quick self-check 的健康检查。
+- `scripts/list_skill_commands.py`
+  - 打印常用 skill 维护/使用命令，支持 `--json` 和 `--markdown`。
+- `scripts/update_readme_commands.py`
+  - 从 `list_skill_commands.py --markdown` 刷新 README 的生成命令块。
+- `scripts/update_script_manifest.py`
+  - 扫描 `scripts/*.py` 并刷新 `assets/script_manifest.json`，避免新增脚本漏登记。
+- `scripts/update_resource_index.py`
+  - 对 `references/resource_index.md` 做必需资源覆盖检查、缺项建议和可选生成块更新。
+- `scripts/skill_summary.py`
+  - 汇总 skill profile、reference、script、eval asset 和推荐自检命令。
+- `scripts/skill_config.py`
+  - 共享默认 profile、profile registry、script manifest、推荐命令和 schema 路径。
+- `scripts/self_check.py`
+  - 汇总常用 skill 自检；支持 `--quick` / `--repo` / `--platform-check` / `--full`，可用 `--json-out` / `--md-out` 留存报告。
+- `scripts/validate_triage_handoff.py`
+  - 校验 workflow-to-triage handoff JSON 字段 contract。
+
+## Eval Scripts
+
+- `scripts/eval_spec_profile.py`
+  - 回归检查 profile 解析、严格结构和机器可读表逻辑。
+- `scripts/eval_spec_profile_registry.py`
+  - 回归检查 profile registry 的默认 profile 和基础结构。
+- `scripts/eval_check_env.py`
+  - 回归检查环境自检脚本。
+- `scripts/eval_hyptest_cli_contract.py`
+  - 回归检查 hyptest CLI contract checker 的正反 fixtures。
+- `scripts/eval_check_case_lint.py`
+  - 回归检查 case lint 的正反例和 `--changed-only`。
+- `scripts/eval_case_lint_baseline_diff.py`
+  - 回归检查 case lint baseline diff 的新增 issue 检测。
+- `scripts/eval_check_writeback_format.py`
+  - 仅在修改写回校验逻辑时使用；跑固定 fixtures。
+- `scripts/eval_find_similar_cache.py`
+  - 回归检查相似 case 检索缓存的 miss/hit/失效/关闭行为。
+- `scripts/eval_find_similar_cases.py`
+  - 仅在修改检索逻辑时使用；跑固定 eval fixtures。
+- `scripts/eval_workflow_smoke.py`
+  - 最小端到端工具链 smoke test，覆盖 env/similar/writeback/profile 的组合路径。
+- `scripts/eval_workflow_task_prompts.py`
+  - 静态检查 `assets/evals/workflow_task_prompts.json` 是否覆盖关键任务场景和必需术语。
+- `scripts/eval_workflow_transcripts.py`
+  - 静态检查真实任务 prompt transcript fixture 的关键期望和反例覆盖。
+- `scripts/eval_failure_log_workflow.py`
+  - 回归检查失败日志分类、候选 `reason_code` 和下一步动作。
+- `scripts/eval_get_result_log_contract.py`
+  - 回归检查 get_result summary/log contract checker。
+- `scripts/eval_triage_handoff.py`
+  - 回归检查 workflow-to-triage handoff JSON 字段。
+- `scripts/eval_joint_handoff.py`
+  - workflow 生成 handoff 后用 shared contract、schema 和 triage skill 字段约定做联合 smoke。
+- `scripts/eval_validate_task_request.py`
+  - 回归检查 task request 的 CLI、JSON、Markdown 输入。
+- `scripts/eval_listed_commands_help.py`
+  - 回归检查 `list_skill_commands.py` 列出的脚本命令仍支持 `--help`。
+- `scripts/eval_reason_code_suggestions.py`
+  - 回归检查失败现象到 `reason_code` 候选的关键词覆盖。
+- `scripts/eval_profile_decisions.py`
+  - 回归检查 profile-local 决策事实和默认 profile 关键 gate 口径。
+- `scripts/eval_case_generation_contract.py`
+  - 静态回归检查写 case 前必须查 profile、排重、平台名纠偏等生成契约。
+
+## Assets
+
+- `assets/templates/new_case_template.c`
+  - 最小骨架提醒，不是 case 设计真值。
+- `assets/reason_codes.json`
+  - 机器可读 reason_code 目录。
+- `assets/script_manifest.json`
+  - 机器可读脚本清单；`self_check.py`、`skill_summary.py`、`check_skill_consistency.py` 使用它降低清单漂移。
+- `assets/triage_handoff_schema.json`
+  - workflow-to-triage handoff 机器可读字段 contract。
+- `assets/joint_handoff_contract.json`
+  - workflow 与 failure-triage 共享的 handoff 字段和 triage 必须识别的术语。
+- `assets/evals/check_writeback_format_eval.json`
+  - `check_writeback_format.py` 的固定 eval fixture。
+- `assets/evals/find_similar_cases_eval.json`
+  - `find_similar_cases.py` 的固定 eval fixture。
+- `assets/evals/latest_section_priority.md`
+  - Markdown section 选择回归 fixture。
+- `assets/evals/workflow_task_prompts.json`
+  - 面向真实任务的 skill prompt eval 集。
+- `assets/evals/failure_log_workflow_eval.json`
+  - 失败日志 workflow eval fixture。
+- `assets/evals/workflow_transcript_eval.json`
+  - 真实任务 prompt transcript eval fixture。
+- `assets/evals/profile_decision_eval.json`
+  - profile-specific gate/decision fixture。
+- `assets/evals/case_generation_contract_eval.json`
+  - case generation workflow contract fixture。
+- `assets/evals/reason_code_suggestion_eval.json`
+  - `suggest_reason_code.py` 的症状文本覆盖 fixture。
+
+<!-- BEGIN GENERATED RESOURCE COVERAGE -->
+## Generated Resource Coverage
+
+该段由 `python3 scripts/update_resource_index.py --write` 维护，只记录必须被索引覆盖的资源路径。
+
+- `assets/joint_handoff_contract.json`
+- `assets/reason_codes.json`
+- `assets/script_manifest.json`
+- `assets/triage_handoff_schema.json`
+- `scripts/case_extractor.py`
+- `scripts/case_lint_baseline_diff.py`
+- `scripts/check_case_lint.py`
+- `scripts/check_cross_skill_consistency.py`
+- `scripts/check_docs_links.py`
+- `scripts/check_env.py`
+- `scripts/check_get_result_log_contract.py`
+- `scripts/check_hyptest_cli_contract.py`
+- `scripts/check_hyptest_repo_migration.py`
+- `scripts/check_readme_commands.py`
+- `scripts/check_reason_codes.py`
+- `scripts/check_resource_index.py`
+- `scripts/check_skill_consistency.py`
+- `scripts/check_spec_profile.py`
+- `scripts/check_spec_profile_registry.py`
+- `scripts/check_writeback_format.py`
+- `scripts/classify_failure_log.py`
+- `scripts/clean_generated.py`
+- `scripts/doctor.py`
+- `scripts/eval_case_generation_contract.py`
+- `scripts/eval_case_lint_baseline_diff.py`
+- `scripts/eval_check_case_lint.py`
+- `scripts/eval_check_env.py`
+- `scripts/eval_check_writeback_format.py`
+- `scripts/eval_failure_log_workflow.py`
+- `scripts/eval_find_similar_cache.py`
+- `scripts/eval_find_similar_cases.py`
+- `scripts/eval_get_result_log_contract.py`
+- `scripts/eval_hyptest_cli_contract.py`
+- `scripts/eval_joint_handoff.py`
+- `scripts/eval_listed_commands_help.py`
+- `scripts/eval_profile_decisions.py`
+- `scripts/eval_profile_portability.py`
+- `scripts/eval_reason_code_suggestions.py`
+- `scripts/eval_spec_profile.py`
+- `scripts/eval_spec_profile_registry.py`
+- `scripts/eval_triage_handoff.py`
+- `scripts/eval_validate_task_request.py`
+- `scripts/eval_workflow_smoke.py`
+- `scripts/eval_workflow_task_prompts.py`
+- `scripts/eval_workflow_transcripts.py`
+- `scripts/find_similar_cases.py`
+- `scripts/list_skill_commands.py`
+- `scripts/make_triage_handoff.py`
+- `scripts/markdown_sections.py`
+- `scripts/new_spec_profile.py`
+- `scripts/profile_utils.py`
+- `scripts/query_spec_profile.py`
+- `scripts/repo_snapshot.py`
+- `scripts/resolve_spec_profile.py`
+- `scripts/self_check.py`
+- `scripts/similar_case_cache.py`
+- `scripts/similar_case_core.py`
+- `scripts/similar_case_ranker.py`
+- `scripts/similar_case_render.py`
+- `scripts/similar_case_terms.py`
+- `scripts/skill_config.py`
+- `scripts/skill_summary.py`
+- `scripts/suggest_reason_code.py`
+- `scripts/term_aliases.py`
+- `scripts/update_readme_commands.py`
+- `scripts/update_resource_index.py`
+- `scripts/update_script_manifest.py`
+- `scripts/validate_task_request.py`
+- `scripts/validate_triage_handoff.py`
+- `scripts/writeback_register.py`
+<!-- END GENERATED RESOURCE COVERAGE -->

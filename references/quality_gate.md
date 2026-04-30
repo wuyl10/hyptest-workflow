@@ -20,6 +20,7 @@
 - 测试点条目明确
 - case 名唯一
 - 平台明确
+- `spec_profile` 明确，或已按默认 profile registry 的 `default_profile` 落位
 - 目标分层明确
 
 证据：
@@ -41,11 +42,11 @@
 
 证据：
 
-- `ai_test_cases/*.c` 变更内容
+- case 源文件变更内容（通常为 `ai_test_cases/*.c` 或 `manual_test_cases/**/*.c`）
 
 失败处理：
 
-- 回到 `references/writing_cases.md` 重构
+- 回到 `references/writing_cases.md` 与 `references/framework_usage_pitfalls.md` 重构
 
 ## Gate C: 编译通过
 
@@ -82,7 +83,7 @@
 
 必须满足：
 
-- 与 `Manual_Reference.md` 和 `references/rules_and_pitfalls.md` 一致
+- 与 `Manual_Reference.md`、`references/spec_and_model_limits.md` 和 `references/spec_profiles/<spec_profile>.md` 一致
 - 或已标注该场景不走 Spike gate
 
 证据：
@@ -116,7 +117,7 @@
   - 默认模板：`测试点 / 构建场景 / 已实现 case`
   - RTL/源码排查模板：`测试点 / 怀疑点 / 对应场景 / 已实现 case`
 - 若本轮未新增 case 而复用了已有 case，已按固定两行字段提供“复用依据”：`顺序一致性`、`断言一致性`
-- 特殊约束（PMA/TLB/cache）已标注
+- 特殊约束（PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界）已标注
 - `已实现 case` 默认只写 `case_name`；仅在必要时追加短状态说明，如 `（default，已启用）`、`（已注释，manual）`、`（compile-only，未跑Spike）`
 - 没有在 `test_point` 里追加 `## ...workflow 回填`、`[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等审计式后半段块
 
@@ -164,7 +165,7 @@
 
 - 语义未对齐项目规则
 - `untested exception` 原因不明
-- PMA/TLB/cache 依赖场景未标注却按 default 放行
+- PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界场景未标注却按 default 放行
 - 回填与注册状态不一致
 
 ## 最终结论模板（按需输出）

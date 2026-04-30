@@ -1,6 +1,6 @@
 # HYPTEST 快速执行版（保质量）
 
-本文是加速执行入口，不是规则简化版。所有质量判定仍以 `references/rules_and_pitfalls.md`、`references/writing_cases.md`、`references/build_run_debug.md` 为准。
+本文是加速执行入口，不是规则简化版。所有质量判定仍以 `references/spec_and_model_limits.md`、当前 `references/spec_profiles/<spec_profile>.md`、`references/writing_cases.md`、`references/framework_usage_pitfalls.md`、`references/build_run_debug.md` 为准。
 
 ## 0. 使用原则
 
@@ -28,6 +28,7 @@ Gate 对照（便于与 `references/quality_gate.md` 对齐）：
 - 测试点文件与条目
 - case 名
 - 平台（通常 `spike`）
+- `spec_profile`（可显式指定；未指定时默认 profile registry 的 `default_profile`）
 - 分层目标（default/manual/compile-only）
 
 通过标准：
@@ -50,11 +51,12 @@ git branch --show-current
 
 执行：
 
-1. 先检索 2~5 个相似存量 case，优先复用已有写法中的结构、断言和环境构造。
+1. 先按 `references/spec_and_model_limits.md` 选择 `spec_profile`（未指定时默认 profile registry 的 `default_profile`），并按 `references/spec_profiles/<spec_profile>.md` 确认规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
+2. 再检索 2~5 个相似存量 case，优先复用已有写法中的结构、断言和环境构造。
    如果测试点描述较长、分支较多，优先让脚本先生成 reading pack，再由模型抽象哪些结构值得学、哪些不能照搬。
-2. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
-3. 在 `ai_test_cases/` 写或改 case。
-4. 保证单函数仅一个 `TEST_END(...)`。
+3. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
+4. 在合适的 case 目录写或改 case：AI/批量生成 case 默认放 `ai_test_cases/`，人工维护 case 放 `manual_test_cases/<module>/`。
+5. 按 `references/framework_usage_pitfalls.md` 复核 `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册和工具使用风险。
 
 建议命令：
 
@@ -131,7 +133,7 @@ python3 get_result.py --platform spike --case <case_name>
 
 执行：
 
-- 对照 `references/rules_and_pitfalls.md` 判定语义是否一致。
+- 对照 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md` 判定语义是否一致，并确认 `spike_gate_applicable`。
 
 通过标准：
 
@@ -198,6 +200,7 @@ python3 scripts/check_writeback_format.py \
 最小交付内容：
 
 - 改动文件列表
+- 实际使用的 `spec_profile`
 - case 列表（默认只列 `case_name`；必要时附短状态）
 - 编译结果
 - 运行结果

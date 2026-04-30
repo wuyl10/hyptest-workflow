@@ -1,0 +1,162 @@
+[
+  {
+    "code": "D-PASS-DEFAULT",
+    "class": "PASS",
+    "default_decision": "default",
+    "meaning": "编译通过、运行通过、规则一致，且可作为 Spike gate。",
+    "typical_followup": "进入 default，保持注册开启。",
+    "owner": "workflow",
+    "next_required_evidence": ["compile log", "run log", "PASS marker"],
+    "keywords": ["default", "pass", "passed", "通过", "gate pass", "hit good trap"]
+  },
+  {
+    "code": "D-MANUAL-NONGATE",
+    "class": "MANUAL",
+    "default_decision": "manual",
+    "meaning": "场景不宜以 Spike 作为 gate，常见于 PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等模型边界。",
+    "typical_followup": "标为 manual，回填规则引用和运行/环境限制。",
+    "owner": "workflow",
+    "next_required_evidence": ["spec profile quote", "model boundary explanation"],
+    "keywords": [
+      "pma",
+      "pbmt",
+      "mmio",
+      "device",
+      "cache",
+      "tlb",
+      "cbo",
+      "refill",
+      "replay",
+      "sbuffer",
+      "mshr",
+      "pmp",
+      "official spike",
+      "spike model",
+      "model gap",
+      "cacheability",
+      "microarchitectural",
+      "nongate"
+    ]
+  },
+  {
+    "code": "D-MANUAL-UNSTABLE",
+    "class": "MANUAL",
+    "default_decision": "manual",
+    "meaning": "语义可解释，但 Spike 或目标平台运行不稳定。",
+    "typical_followup": "标为 manual，补充稳定性观察计划。",
+    "owner": "workflow",
+    "next_required_evidence": ["rerun evidence", "stability note"],
+    "keywords": ["unstable", "flaky", "偶发", "不稳定", "intermittent"]
+  },
+  {
+    "code": "D-MANUAL-RTL-ONLY",
+    "class": "MANUAL",
+    "default_decision": "manual",
+    "meaning": "语义面向 RTL 现象，当前仿真平台无法完整验证。",
+    "typical_followup": "标为 manual，等待 RTL 环境验证。",
+    "owner": "triage",
+    "next_required_evidence": ["RTL run log", "FSDB or waveform note"],
+    "keywords": ["rtl-only", "rtl only", "rtl 现象", "waveform", "fsdb", "波形"]
+  },
+  {
+    "code": "D-COMPILE-ONLY-ENV",
+    "class": "COMPILE",
+    "default_decision": "compile-only",
+    "meaning": "具备编译条件，但运行 gate 因环境或平台限制不成立。",
+    "typical_followup": "标为 compile-only，默认关闭回归注册。",
+    "owner": "env",
+    "next_required_evidence": ["compile log", "environment limitation"],
+    "keywords": ["env", "environment", "环境", "no responder", "无返回", "卡死", "responder missing"]
+  },
+  {
+    "code": "D-COMPILE-ONLY-STAGE",
+    "class": "COMPILE",
+    "default_decision": "compile-only",
+    "meaning": "阶段性先保留代码与编译能力，后续再补运行验证。",
+    "typical_followup": "标为 compile-only，记录下一阶段计划。",
+    "owner": "workflow",
+    "next_required_evidence": ["compile log", "stage note"],
+    "keywords": ["stage", "阶段", "先保留", "后续", "暂存"]
+  },
+  {
+    "code": "D-BLOCK-COMPILE",
+    "class": "BLOCK",
+    "default_decision": "blocked",
+    "meaning": "编译未通过。",
+    "typical_followup": "先修编译错误，不做分层。",
+    "owner": "test-author",
+    "next_required_evidence": ["compiler error"],
+    "keywords": ["compile fail", "compile error", "build fail", "编译失败", "链接失败"]
+  },
+  {
+    "code": "D-BLOCK-UNTSTD",
+    "class": "BLOCK",
+    "default_decision": "blocked",
+    "meaning": "存在原因不明的 untested exception。",
+    "typical_followup": "先完成归因，不做 default 判定。",
+    "owner": "triage",
+    "next_required_evidence": ["failure log", "exception dump"],
+    "keywords": ["untested exception", "untested", "未知异常"]
+  },
+  {
+    "code": "D-BLOCK-RULE",
+    "class": "BLOCK",
+    "default_decision": "blocked",
+    "meaning": "规则未对齐。",
+    "typical_followup": "先修语义或修测试点映射。",
+    "owner": "workflow",
+    "next_required_evidence": ["rule quote", "case/test_point mapping"],
+    "keywords": ["rule", "规则", "语义冲突", "spec mismatch", "expectation mismatch"]
+  },
+  {
+    "code": "D-BLOCK-EVIDENCE",
+    "class": "BLOCK",
+    "default_decision": "blocked",
+    "meaning": "日志、统计或回填证据缺失。",
+    "typical_followup": "补齐证据后再裁决。",
+    "owner": "workflow",
+    "next_required_evidence": ["missing log or summary field"],
+    "keywords": ["evidence", "证据", "日志缺失", "missing log", "missing_required", "missing pass marker"]
+  },
+  {
+    "code": "D-BLOCK-RUN-NOT-ATTEMPTED",
+    "class": "BLOCK",
+    "default_decision": "blocked",
+    "meaning": "该场景需要运行 gate，但本轮未执行单 case 运行。",
+    "typical_followup": "补跑单 case 或调整为合法 compile-only 场景。",
+    "owner": "workflow",
+    "next_required_evidence": ["single-case run log or compile-only reason"],
+    "keywords": ["not attempted", "未运行", "未跑", "run not attempted"]
+  },
+  {
+    "code": "D-BLOCK-RUN-UNEXPLAINED",
+    "class": "BLOCK",
+    "default_decision": "blocked",
+    "meaning": "已运行，但失败结果不可归因。",
+    "typical_followup": "先完成归因，再继续分层。",
+    "owner": "triage",
+    "next_required_evidence": ["run.log", "assert.log", "assert_site/assert_expr or FSDB"],
+    "keywords": [
+      "unexplained",
+      "无法归因",
+      "原因不明",
+      "failed",
+      "assert_site",
+      "assert_expr",
+      "timeout",
+      "rc=124",
+      "50000 cycles no commit",
+      "no commit"
+    ]
+  },
+  {
+    "code": "D-BLOCK-REGISTER",
+    "class": "BLOCK",
+    "default_decision": "blocked",
+    "meaning": "分层与 test_register.c 状态不一致。",
+    "typical_followup": "修正注册状态再提交。",
+    "owner": "workflow",
+    "next_required_evidence": ["test_register.c state", "writeback status"],
+    "keywords": ["register", "test_register", "注册不一致", "registration mismatch"]
+  }
+]

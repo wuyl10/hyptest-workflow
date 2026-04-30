@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "default_profile": "nhv5_1_ap",
+  "profiles": [
+    {
+      "name": "nhv5_1_ap",
+      "path": "references/spec_profiles/nhv5_1_ap.md",
+      "description": "NHV5.1AP hyptest profile for LinkNan/AP-core verification.",
+      "status": "active"
+    },
+    {
+      "name": "template",
+      "path": "references/spec_profiles/template.md",
+      "description": "Blank template for adding a new project profile.",
+      "status": "template"
+    }
+  ]
+}

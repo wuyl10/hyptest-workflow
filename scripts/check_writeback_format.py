@@ -14,16 +14,21 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from writeback_register import load_registration_status
+
 
 ENTRY_HEADER_RE = re.compile(r"^###\s+P[0-9A-Za-z]")
-CASE_NAME_RE = re.compile(r"`(ai_[A-Za-z0-9_]+)`")
-REGISTER_RE = re.compile(r"TEST_REGISTER\s*\(\s*(ai_[A-Za-z0-9_]+)\s*\)")
+CASE_NAME_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)`")
 DEPENDENCY_STATUS_RE = re.compile(r"^（依赖[^）]+，未跑Spike）$")
+PROFILE_NONGATE_RE = re.compile(
+    r"PMA|PBMT|MMIO|Device|cache|TLB|refill|replay|CBO|sbuffer|MSHR|PMAADDR|PMACFG",
+    re.IGNORECASE,
+)
 
 SECTION_TEST_POINT = "测试点："
 SECTION_SCENARIO = "构建场景："
@@ -56,13 +61,6 @@ ALLOWED_STATUS_SUFFIXES = {
 }
 
 
-@dataclass
-class ConditionalFrame:
-    deterministic: bool
-    active: bool
-    branch_taken: bool
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate lightweight writeback format in hyptest test_point markdown files."
@@ -84,9 +82,18 @@ def parse_args() -> argparse.Namespace:
         help="Glob pattern to validate, resolved from repo-root or current directory; can be repeated",
     )
     parser.add_argument(
+        "--all-test-points",
+        action="store_true",
+        help="Validate all test_point markdown files under repo-root.",
+    )
+    parser.add_argument(
         "--check-register",
         action="store_true",
         help="Check writeback status text against test_register.c when repo-root is given",
+    )
+    parser.add_argument(
+        "--spec-profile",
+        help="Optional profile name/path; adds warnings for obvious profile-nongate default markings.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text")
     return parser.parse_args()
@@ -94,158 +101,6 @@ def parse_args() -> argparse.Namespace:
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore")
-
-
-def strip_inline_comment_markers(text: str) -> str:
-    text = re.sub(r"/\*.*?\*/", " ", text)
-    return text.split("//", 1)[0].strip()
-
-
-def parse_pp_boolean(expr: str) -> bool | None:
-    normalized = strip_inline_comment_markers(expr)
-    if normalized == "0":
-        return False
-    if normalized == "1":
-        return True
-    return None
-
-
-def update_conditional_stack(stripped_code: str, stack: List[ConditionalFrame]) -> None:
-    if not stripped_code.startswith("#"):
-        return
-
-    directive_line = stripped_code[1:].strip()
-    if not directive_line:
-        return
-
-    parts = directive_line.split(None, 1)
-    directive = parts[0]
-    expr = parts[1] if len(parts) > 1 else ""
-
-    if directive == "if":
-        parsed = parse_pp_boolean(expr)
-        if parsed is None:
-            stack.append(ConditionalFrame(deterministic=False, active=True, branch_taken=True))
-        else:
-            stack.append(
-                ConditionalFrame(
-                    deterministic=True,
-                    active=parsed,
-                    branch_taken=parsed,
-                )
-            )
-        return
-
-    if directive in {"ifdef", "ifndef"}:
-        stack.append(ConditionalFrame(deterministic=False, active=True, branch_taken=True))
-        return
-
-    if directive == "elif":
-        if not stack:
-            return
-        frame = stack[-1]
-        if not frame.deterministic:
-            return
-        parsed = parse_pp_boolean(expr)
-        if frame.branch_taken:
-            frame.active = False
-            return
-        if parsed is None:
-            frame.active = True
-            frame.branch_taken = True
-            return
-        frame.active = parsed
-        frame.branch_taken = parsed
-        return
-
-    if directive == "else":
-        if not stack:
-            return
-        frame = stack[-1]
-        if not frame.deterministic:
-            return
-        frame.active = not frame.branch_taken
-        frame.branch_taken = True
-        return
-
-    if directive == "endif" and stack:
-        stack.pop()
-
-
-def split_code_and_comment_text(line: str, in_block_comment: bool) -> Tuple[str, str, bool]:
-    code_parts: List[str] = []
-    comment_parts: List[str] = []
-    index = 0
-
-    while index < len(line):
-        if in_block_comment:
-            end = line.find("*/", index)
-            if end == -1:
-                comment_parts.append(line[index:])
-                return "".join(code_parts), "".join(comment_parts), True
-            comment_parts.append(line[index : end + 2])
-            index = end + 2
-            in_block_comment = False
-            continue
-
-        if line.startswith("//", index):
-            comment_parts.append(line[index:])
-            break
-
-        if line.startswith("/*", index):
-            end = line.find("*/", index + 2)
-            if end == -1:
-                comment_parts.append(line[index:])
-                return "".join(code_parts), "".join(comment_parts), True
-            comment_parts.append(line[index : end + 2])
-            index = end + 2
-            continue
-
-        code_parts.append(line[index])
-        index += 1
-
-    return "".join(code_parts), "".join(comment_parts), in_block_comment
-
-
-def is_code_active(stack: List[ConditionalFrame]) -> bool:
-    return all(frame.active for frame in stack)
-
-
-def record_status(status: Dict[str, str], case_name: str, value: str) -> None:
-    existing = status.get(case_name)
-    if existing == "enabled":
-        return
-    if value == "enabled" or existing is None:
-        status[case_name] = value
-
-
-def load_registration_status(repo_root: Path) -> Dict[str, str]:
-    register_path = repo_root / "test_register.c"
-    status: Dict[str, str] = {}
-    if not register_path.is_file():
-        return status
-
-    in_block_comment = False
-    conditional_stack: List[ConditionalFrame] = []
-
-    for line in read_text(register_path).splitlines():
-        code_text, comment_text, in_block_comment = split_code_and_comment_text(
-            line, in_block_comment
-        )
-
-        stripped_code = code_text.strip()
-        if stripped_code.startswith("#"):
-            update_conditional_stack(stripped_code, conditional_stack)
-            continue
-
-        for match in REGISTER_RE.finditer(comment_text):
-            record_status(status, match.group(1), "commented")
-
-        line_status = "enabled" if is_code_active(conditional_stack) else "commented"
-        for match in REGISTER_RE.finditer(code_text):
-            record_status(status, match.group(1), line_status)
-
-    return status
 
 
 def collect_files(args: argparse.Namespace) -> List[Path]:
@@ -266,6 +121,16 @@ def collect_files(args: argparse.Namespace) -> List[Path]:
                 if resolved.is_file() and resolved not in seen:
                     seen.add(resolved)
                     files.append(resolved)
+
+    if args.all_test_points:
+        if not args.repo_root:
+            raise ValueError("--all-test-points requires --repo-root")
+        base = Path(args.repo_root).expanduser().resolve()
+        for path in sorted((base / "test_point").glob("*.md")):
+            resolved = path.resolve()
+            if resolved.is_file() and resolved not in seen:
+                seen.add(resolved)
+                files.append(resolved)
 
     return files
 
@@ -324,10 +189,11 @@ def validate_case_lines(
     case_lines: List[str],
     register_status: Dict[str, str],
     check_register: bool,
-) -> List[str]:
+) -> Tuple[List[str], List[dict[str, str]]]:
     issues: List[str] = []
+    warnings: List[dict[str, str]] = []
     if not case_lines:
-        return ["`已实现 case` 段为空"]
+        return ["`已实现 case` 段为空"], warnings
 
     found_case_name = False
     for line in case_lines:
@@ -370,10 +236,20 @@ def validate_case_lines(
                     f"{case_name} 标注为依赖约束未跑 Spike，但 test_register.c 中不是 commented"
                 )
 
+        if suffix == "（default，已启用）" and PROFILE_NONGATE_RE.search(content):
+            warnings.append(
+                {
+                    "warning_code": "PROFILE_NONGATE_DEFAULT",
+                    "case": case_name,
+                    "message": f"{case_name} default 标注旁出现 PMA/PBMT/MMIO/cache/TLB 等 profile-nongate 关键词，请确认 spike_gate_applicable=true",
+                    "suggestion": "若 profile 查询显示 spike_gate_applicable=false，应改为 manual/compile-only/blocked 或补证据。",
+                }
+            )
+
     if not found_case_name and not any("暂无" in line for line in case_lines):
         issues.append("`已实现 case` 段未找到有效 case 名")
 
-    return issues
+    return issues, warnings
 
 
 def validate_entry(
@@ -381,9 +257,11 @@ def validate_entry(
     block: List[str],
     register_status: Dict[str, str],
     check_register: bool,
-) -> List[str]:
+) -> Tuple[List[str], List[dict[str, str]]]:
     issues: List[str] = []
+    warnings: List[dict[str, str]] = []
     title = block[0].strip()
+    block_text = "\n".join(block)
 
     has_test_point = find_section_index(block, SECTION_TEST_POINT) is not None
     has_scenario = find_section_index(block, SECTION_SCENARIO) is not None
@@ -401,14 +279,17 @@ def validate_entry(
     if implemented_index is None:
         issues.append(f"{title}: 缺少 `{SECTION_IMPLEMENTED}`")
     else:
-        issues.extend(
-            f"{title}: {issue}"
-            for issue in validate_case_lines(
-                collect_implemented_case_lines(block, implemented_index),
-                register_status,
-                check_register,
-            )
+        case_issues, case_warnings = validate_case_lines(
+            collect_implemented_case_lines(block, implemented_index),
+            register_status,
+            check_register,
         )
+        issues.extend(f"{title}: {issue}" for issue in case_issues)
+        for warning in case_warnings:
+            warning = dict(warning)
+            warning["entry"] = title
+            warning["message"] = f"{title}: {warning['message']}"
+            warnings.append(warning)
 
     if reuse_index is not None:
         if find_section_index(block[reuse_index:], SECTION_ORDER) is None:
@@ -416,17 +297,36 @@ def validate_entry(
         if find_section_index(block[reuse_index:], SECTION_ASSERT) is None:
             issues.append(f"{title}: 出现 `复用依据` 时缺少 `{SECTION_ASSERT}`")
 
-    return issues
+    if PROFILE_NONGATE_RE.search(block_text):
+        implemented_lines = (
+            collect_implemented_case_lines(block, implemented_index)
+            if implemented_index is not None
+            else []
+        )
+        if any("（default，已启用）" in line for line in implemented_lines):
+            warnings.append(
+                {
+                    "warning_code": "PROFILE_NONGATE_ENTRY_DEFAULT",
+                    "entry": title,
+                    "case": "",
+                    "message": f"{title}: 条目包含 PMA/PBMT/MMIO/cache/TLB 等关键词且 case 标为 default，请按 profile 复核 Spike gate",
+                    "suggestion": "用 scripts/query_spec_profile.py 查询对应 PMA/PBMT/window 的 default_decision。",
+                }
+            )
+
+    return issues, warnings
 
 
 def validate_file(
     path: Path,
     register_status: Dict[str, str],
     check_register: bool,
+    profile_text: str = "",
 ) -> Dict[str, object]:
     text = read_text(path)
     lines = text.splitlines()
     issues: List[str] = []
+    warnings: List[dict[str, str]] = []
 
     for marker in DISALLOWED_MARKERS:
         if marker in text:
@@ -438,21 +338,49 @@ def validate_file(
     else:
         for idx, (start, end) in enumerate(entries, start=1):
             block = lines[start:end]
-            issues.extend(validate_entry(idx, block, register_status, check_register))
+            entry_issues, entry_warnings = validate_entry(idx, block, register_status, check_register)
+            issues.extend(entry_issues)
+            if profile_text:
+                warnings.extend(entry_warnings)
 
     return {
         "file": str(path),
         "entry_count": len(entries),
         "ok": not issues,
         "issues": issues,
+        "warnings": warnings,
     }
+
+
+def resolve_profile_text(raw_profile: str | None) -> str:
+    if not raw_profile:
+        return ""
+    resolver = Path(__file__).resolve().parent / "resolve_spec_profile.py"
+    completed = subprocess.run(
+        [sys.executable, str(resolver), "--spec-profile", raw_profile],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ValueError(completed.stderr.strip() or completed.stdout.strip())
+    return Path(completed.stdout.strip()).read_text(encoding="utf-8", errors="ignore")
 
 
 def main() -> int:
     args = parse_args()
-    files = collect_files(args)
+    try:
+        files = collect_files(args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     if not files:
         print("No files found. Use --file and/or --glob.", file=sys.stderr)
+        return 2
+    try:
+        profile_text = resolve_profile_text(args.spec_profile)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
         return 2
 
     register_status: Dict[str, str] = {}
@@ -463,12 +391,14 @@ def main() -> int:
         register_status = load_registration_status(Path(args.repo_root).expanduser().resolve())
 
     results = [
-        validate_file(path, register_status, args.check_register)
+        validate_file(path, register_status, args.check_register, profile_text)
         for path in files
     ]
+    warning_count = sum(len(item["warnings"]) for item in results)
     payload = {
         "checked_file_count": len(results),
         "ok_file_count": sum(1 for item in results if item["ok"]),
+        "warning_count": warning_count,
         "results": results,
     }
 
@@ -482,6 +412,13 @@ def main() -> int:
             print(f"{status} {item['file']} entries={item['entry_count']}")
             for issue in item["issues"]:
                 print(f"  - {issue}")
+            for warning in item.get("warnings", []):
+                print(
+                    "  warning: "
+                    f"{warning.get('warning_code', 'WARNING')}: {warning.get('message', warning)}"
+                )
+                if warning.get("suggestion"):
+                    print(f"    suggestion: {warning['suggestion']}")
 
     return 0 if payload["ok_file_count"] == payload["checked_file_count"] else 1
 

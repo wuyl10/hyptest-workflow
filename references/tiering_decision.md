@@ -53,7 +53,7 @@
 标准来源：`references/reason_code_catalog.md`
 
 - `D-PASS-DEFAULT`: 编译通过 + 运行通过 + 规则一致 + 可作为 Spike gate
-- `D-MANUAL-NONGATE`: 场景不宜 Spike gate（PMA/TLB/cache 等）
+- `D-MANUAL-NONGATE`: 场景不宜 Spike gate（PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等）
 - `D-MANUAL-UNSTABLE`: 运行不稳定但语义可解释
 - `D-COMPILE-ONLY-ENV`: 仅具备编译条件，且本轮不执行运行 gate
 - `D-BLOCK-RUN-NOT-ATTEMPTED`: 需要运行 gate 但本轮未执行
@@ -84,6 +84,7 @@
 - 质量约束：`references/quality_gate.md`
 - 原因码标准：`references/reason_code_catalog.md`
 - 提交勾选：`references/submission_card.md`
-- 语义依据：`references/rules_and_pitfalls.md`
+- 语义依据：`references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`
+- 框架/API 坑点：`references/framework_usage_pitfalls.md`
 
 本文不替代规则文档，只统一裁决动作与输出格式。

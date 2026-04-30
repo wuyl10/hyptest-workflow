@@ -3,7 +3,7 @@
 
 /*
  * Read references/writing_cases.md first.
- * Inspect 2~5 similar existing ai_test_cases before filling this skeleton.
+ * Inspect 2~5 similar existing cases before filling this skeleton.
  * This file is only a minimal shape reminder, not a source of truth.
  */
 

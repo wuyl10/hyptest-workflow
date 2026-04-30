@@ -57,7 +57,10 @@
     "from_file": "latest_section_priority.md",
     "heading_pattern": "earlier width-switch entry",
     "expected_status": "strong_match",
-    "expected_top1": "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_width_switch_store_corner"
+    "expected_top1_any": [
+      "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_width_switch_store_corner",
+      "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_halfword_width_switch_store_corner"
+    ]
   },
   {
     "id": "explicit_section_index_selection",
@@ -65,7 +68,22 @@
     "from_file": "latest_section_priority.md",
     "section_index": 1,
     "expected_status": "strong_match",
-    "expected_top1": "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_width_switch_store_corner"
+    "expected_top1_any": [
+      "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_width_switch_store_corner",
+      "ai_micro_m_samepage_cross16b_store_refault_upperx4_retry_store_then_same_address_halfword_width_switch_store_corner"
+    ]
+  },
+  {
+    "id": "strong_manual_addr_unaligned_query",
+    "description": "manual_test_cases entries should be indexed and can be top references",
+    "queries": [
+      "addr_unaligned",
+      "misaligned",
+      "load",
+      "store"
+    ],
+    "expected_status": "strong_match",
+    "expected_top1": "addr_unaligned_1"
   },
   {
     "id": "strong_arch_amo_alias_query",

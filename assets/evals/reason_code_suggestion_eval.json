@@ -1,0 +1,38 @@
+[
+  {
+    "id": "pma_pbmt_mmio_nongate",
+    "symptom": "PMA PBMT MMIO Device cacheability path is an official Spike model gap",
+    "expected_top_code": "D-MANUAL-NONGATE",
+    "expected_codes": ["D-MANUAL-NONGATE"]
+  },
+  {
+    "id": "missing_mmio_responder_compile_only",
+    "symptom": "MMIO no responder, simulated IO has no return and the case will hang",
+    "expected_top_code": "D-COMPILE-ONLY-ENV",
+    "expected_codes": ["D-COMPILE-ONLY-ENV"]
+  },
+  {
+    "id": "untested_exception_blocks",
+    "symptom": "untested exception with missing_required PASSED and exception dump",
+    "expected_top_code": "D-BLOCK-UNTSTD",
+    "expected_codes": ["D-BLOCK-UNTSTD"]
+  },
+  {
+    "id": "assert_timeout_unexplained",
+    "symptom": "assert_site and assert_expr present, timeout rc=124, 50000 cycles no commit",
+    "expected_top_code": "D-BLOCK-RUN-UNEXPLAINED",
+    "expected_codes": ["D-BLOCK-RUN-UNEXPLAINED"]
+  },
+  {
+    "id": "register_mismatch",
+    "symptom": "test_register registration mismatch, writeback says default enabled but register is commented",
+    "expected_top_code": "D-BLOCK-REGISTER",
+    "expected_codes": ["D-BLOCK-REGISTER"]
+  },
+  {
+    "id": "unknown_fallback",
+    "symptom": "opaque issue without any known keyword",
+    "expected_top_code": "D-BLOCK-EVIDENCE",
+    "expected_codes": ["D-BLOCK-EVIDENCE"]
+  }
+]

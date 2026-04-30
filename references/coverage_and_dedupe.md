@@ -8,7 +8,7 @@
   - 关注仓库里的 `test_point/*.md` 是否已经存在相近测试点。
   - 判断对象是“怀疑点 / 场景轴 / 断言目标”。
 - `case` 级去重检查：
-  - 关注仓库里的 `ai_test_cases/*.c` 是否已经有相近或重复实现。
+  - 关注仓库里的 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c` 是否已经有相近或重复实现。
   - 判断对象是“场景构造 / 断言结构 / 函数名唯一性”。
 
 不要把这两类检查混成一件事。
@@ -101,7 +101,7 @@ python3 scripts/find_similar_cases.py \
 
 注意：
 
-- `find_similar_cases.py` 的搜索范围始终是全仓 `ai_test_cases/*.c`
+- `find_similar_cases.py` 的搜索范围始终是全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`
 - `--from-file` 只负责提取查询词，不会把搜索范围限制在当前 `test_point_file`
 
 ## 5. 精确唯一性检索
@@ -111,7 +111,7 @@ python3 scripts/find_similar_cases.py \
 推荐命令：
 
 ```bash
-rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases test_register.c
+rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases manual_test_cases test_register.c
 ```
 
 结论规则：

@@ -71,8 +71,8 @@ python3 compile_elf.py --plat spike --include-commented --match '^ai_micro_'
 
 编译输出目录：
 
-- `individual_tests/spike/*.ELF`
-- `individual_tests/spike/*.asm`
+- `case_elf_asm/spike/*.ELF`
+- `case_elf_asm/spike/*.asm`
 
 ## 4. 运行
 
@@ -86,21 +86,19 @@ python3 compile_elf.py --plat spike --include-commented --match '^ai_micro_'
 python3 get_result.py --platform spike --case ai_arch_lb_sign_extension
 ```
 
-若需手动跑：
+若需查看实际 runner 命令，优先用 dry-run：
 
 ```bash
-SPIKE_BIN=${SPIKE_BIN:-<path-to-spike>}
-
-$SPIKE_BIN \
-  --isa=rv64IMAFDCVH_zicond_zicntr_zihpm_zba_zbb_zbc_zbs_zbkb_zbkc_zbkx_zimop_zcmop_zcb_zknd_zkne_zknh_zksed_zksh_zvbb_svinval_sscofpmf_svpbmt_zicbom_zicboz_sstc_svnapot_smstateen_zicclsm \
-  individual_tests/spike/ai_arch_lb_sign_extension.ELF
+python3 get_result.py --platform spike --case ai_arch_lb_sign_extension --dry-run
 ```
 
 说明：
 
-- 手动命令应与 `get_result.py` 的 `DEFAULT_COMMAND_TEMPLATES["spike"]` 保持一致。
-- 若本地手动命令与脚本默认模板不一致，以 `get_result.py` 默认模板为准。
-- runner 的 ISA 参数可能是超集配置（例如含 H 位）以保持模板统一；这表示“允许超集运行”，不代表启用 H 语义断言。
+- 不在本文长期维护手写 Spike ISA 参数，避免与 `get_result.py` runner 模板漂移。
+- 若必须手动执行，先用 `get_result.py --dry-run` 拿到当前命令，再按需复制修改。
+- 若本地手动命令与脚本 runner 模板不一致，以 `get_result.py` 为准。
+- runner 参数不等价于项目规格；规格与 Spike gate 口径以 `references/spec_profiles/<spec_profile>.md` 为准。
+- 若失败需要 stuck/timeout、difftest mismatch、FSDB、50000 cycles no commit 或 suspected RTL bug 判断，切到 `hyptest-failure-triage` 做失败闭环。
 
 ## 4.2 批量跑（推荐）
 
@@ -127,7 +125,7 @@ python3 get_result.py --platform spike --case ai_arch_lb_sign_extension
 按 ELF 目录全跑：
 
 ```bash
-python3 get_result.py --platform spike --elf-dir individual_tests/spike --all-elves
+python3 get_result.py --platform spike --elf-dir case_elf_asm/spike --all-elves
 ```
 
 先看将要执行的 case（不真正运行）：
@@ -141,7 +139,7 @@ python3 get_result.py --platform spike --range 504-556 --dry-run
 默认日志目录：
 
 - `result_log/spike/`
-- `result_log/xiangshan/`
+- `result_log/linknan/`
 
 `get_result.py` 汇总信息常看字段：
 
@@ -199,6 +197,23 @@ ls result_log/spike | tail
 # 关注 returncode、missing_required、found_forbidden、untested_occurrences
 
 # 5) 根据结果决定是否进入 default 注册
+```
+
+## 7.1 环境自检
+
+开始编译/运行前，建议先检查 repo anchors 和平台环境变量：
+
+```bash
+python3 scripts/check_env.py --repo-root <repo_root> --platform spike
+python3 scripts/check_env.py --repo-root <repo_root> --platform linknan
+```
+
+`check_env.py` 只检查环境是否足够执行，不会 fallback 到个人路径。
+
+需要提示 export 写法时：
+
+```bash
+python3 scripts/check_env.py --repo-root <repo_root> --platform spike --print-exports
 ```
 
 ## 8. default/manual/compile-only 决策

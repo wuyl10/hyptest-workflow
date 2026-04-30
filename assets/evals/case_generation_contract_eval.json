@@ -1,0 +1,40 @@
+[
+  {
+    "id": "profile_first_for_pma_pbmt",
+    "prompt": "新增一个 PBMT=IO + PMA device 的非对齐 store case，默认跑 spike。",
+    "expected_terms": [
+      "spec_profile",
+      "references/spec_profiles/<spec_profile>.md",
+      "spike_gate_applicable",
+      "manual"
+    ],
+    "forbidden_terms": [
+      "先直接写 case 再看 profile"
+    ]
+  },
+  {
+    "id": "reject_old_xiangshan_platform_alias",
+    "prompt": "platform=xiangshan，跑一下这个新 case。",
+    "expected_terms": [
+      "platform=linknan",
+      "LINKNAN_HOME",
+      "DIFFTEST_REF_SO"
+    ],
+    "forbidden_terms": [
+      "--platform <old-xiangshan>",
+      "--plat <old-xiangshan>"
+    ]
+  },
+  {
+    "id": "new_case_requires_dedupe",
+    "prompt": "从 test_point 继续新增 3 个 AI case。",
+    "expected_terms": [
+      "coverage_scope=repo",
+      "find_similar_cases.py",
+      "函数名唯一"
+    ],
+    "forbidden_terms": [
+      "只看当前文件就声称全仓未覆盖"
+    ]
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "id": "spike_model_gap_pma_pbmt",
+    "log": "ai_arch_amo_pbmt_io_fault_then_cacheable_alias_amo_recovers_same_pa_corner\\nmissing_required=['PASSED'], found_forbidden=['untested exception', 'ERROR:']\\nERROR: official Spike does not model PMA/PBMT IO cacheability for this path\\n",
+    "expected": {
+      "scenario_terms": ["pbmt", "pma", "io"],
+      "error_terms": ["official Spike", "model"],
+      "reason_code_any": ["D-MANUAL-NONGATE", "D-COMPILE-ONLY-ENV"],
+      "next_action_terms": ["profile", "LinkNan"]
+    }
+  },
+  {
+    "id": "missing_exception_setup_assert",
+    "log": "ai_arch_trigger_case FAILED\\nassert_site=ai_arch_trigger_breakpoint_cases.c:6021\\nassert_expr=excpt.triggered && excpt.cause == CAUSE_LOAD_PAGE_FAULT\\nexcpt.triggered = 0\\n",
+    "expected": {
+      "scenario_terms": ["trigger", "page fault"],
+      "error_terms": ["assert", "excpt.triggered"],
+      "reason_code_any": ["D-BLOCK-RUN-UNEXPLAINED", "D-BLOCK-EVIDENCE"],
+      "next_action_terms": ["TEST_SETUP_EXCEPT", "assert"],
+      "assert_site": "ai_arch_trigger_breakpoint_cases.c:6021",
+      "assert_expr": "excpt.triggered && excpt.cause == CAUSE_LOAD_PAGE_FAULT",
+      "exception_observed": {
+        "triggered": 0
+      },
+      "log_marker_values": {
+        "has_failed": true
+      }
+    }
+  },
+  {
+    "id": "linknan_stuck_timeout",
+    "log": "ai_micro_hs_vector_store_tail_corner timeout, rc=124, missing_required=['PASSED']\\n50000 cycles no commit\\nrun.log saved under LinkNan/sim/simv/ai_micro_hs_vector_store_tail_corner/run.log\\n",
+    "expected": {
+      "scenario_terms": ["vector", "store"],
+      "error_terms": ["timeout", "50000 cycles no commit"],
+      "reason_code_any": ["D-BLOCK-RUN-UNEXPLAINED", "D-MANUAL-NONGATE"],
+      "next_action_terms": ["run.log", "FSDB"]
+    }
+  }
+]

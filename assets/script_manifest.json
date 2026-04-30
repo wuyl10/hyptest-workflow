@@ -1,0 +1,402 @@
+{
+  "version": 1,
+  "description": "Machine-readable script inventory for hyptest-workflow consistency checks.",
+  "scripts": [
+    {
+      "path": "scripts/case_extractor.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/case_lint_baseline_diff.py",
+      "group": "case-workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/check_case_lint.py",
+      "group": "check",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/check_cross_skill_consistency.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_docs_links.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_env.py",
+      "group": "check",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/check_get_result_log_contract.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_hyptest_cli_contract.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_hyptest_repo_migration.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_readme_commands.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_reason_codes.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_resource_index.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_skill_consistency.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_spec_profile.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_spec_profile_registry.py",
+      "group": "check",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/check_writeback_format.py",
+      "group": "check",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/classify_failure_log.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/clean_generated.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/doctor.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/eval_case_generation_contract.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_lint_baseline_diff.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_check_case_lint.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_check_env.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_check_writeback_format.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_failure_log_workflow.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_find_similar_cache.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_find_similar_cases.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_get_result_log_contract.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_hyptest_cli_contract.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_joint_handoff.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_listed_commands_help.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_profile_decisions.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_profile_portability.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_reason_code_suggestions.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_spec_profile.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_spec_profile_registry.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_triage_handoff.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_validate_task_request.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_workflow_smoke.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_workflow_task_prompts.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_workflow_transcripts.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/find_similar_cases.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/list_skill_commands.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/make_triage_handoff.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/markdown_sections.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/new_spec_profile.py",
+      "group": "profile",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/profile_utils.py",
+      "group": "profile",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/query_spec_profile.py",
+      "group": "profile",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/repo_snapshot.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/resolve_spec_profile.py",
+      "group": "profile",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/self_check.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/similar_case_cache.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/similar_case_core.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/similar_case_ranker.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/similar_case_render.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/similar_case_terms.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/skill_config.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/skill_summary.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/suggest_reason_code.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/term_aliases.py",
+      "group": "similar-search",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/update_readme_commands.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/update_resource_index.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/update_script_manifest.py",
+      "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/validate_task_request.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/validate_triage_handoff.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/writeback_register.py",
+      "group": "case-workflow",
+      "public": true,
+      "self_check": false
+    }
+  ]
+}

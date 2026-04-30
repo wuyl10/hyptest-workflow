@@ -9,6 +9,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List
@@ -42,6 +43,12 @@ def read_fixture(path: Path) -> List[Dict[str, object]]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def temp_parent() -> Path:
+    path = Path(__file__).resolve().parent.parent / ".hyptest_skill_tmp"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def resolve_input_path(raw: str, repo_root: Path, fixture_path: Path) -> Path:
     candidate = Path(raw)
     if candidate.is_absolute() and candidate.exists():
@@ -64,12 +71,15 @@ def run_eval_case(
     fixture_path: Path,
     case: Dict[str, object],
     timeout_seconds: float,
+    cache_dir: Path,
 ) -> tuple[List[str], float]:
     command = [
         sys.executable,
         str(script_path),
         "--repo-root",
         str(repo_root),
+        "--cache-dir",
+        str(cache_dir),
         "--json",
     ]
 
@@ -113,6 +123,10 @@ def run_eval_case(
     payload = json.loads(completed.stdout)
     failures: List[str] = []
 
+    cache_payload = payload.get("cache", {})
+    if cache_payload.get("enabled") is not True:
+        failures.append("expected cache.enabled=true in JSON payload")
+
     expected_status = case.get("expected_status")
     if expected_status and payload.get("retrieval_status") != expected_status:
         failures.append(
@@ -120,10 +134,29 @@ def run_eval_case(
         )
 
     expected_top1 = case.get("expected_top1")
-    if expected_top1:
+    expected_top1_any = case.get("expected_top1_any")
+    if expected_top1_any:
+        expected_top1_values = [str(item) for item in expected_top1_any]
+    elif expected_top1:
+        expected_top1_values = [str(expected_top1)]
+    else:
+        expected_top1_values = []
+
+    if expected_top1_values:
         actual_top1 = payload["results"][0]["case_name"] if payload.get("results") else None
-        if actual_top1 != expected_top1:
-            failures.append(f"expected top1 {expected_top1}, got {actual_top1}")
+        quality_top1 = payload.get("retrieval_quality", {}).get("top1")
+        if actual_top1 not in expected_top1_values:
+            expected_text = " or ".join(expected_top1_values)
+            failures.append(f"expected top1 {expected_text}, got {actual_top1}")
+        if quality_top1 != actual_top1:
+            failures.append(f"retrieval_quality.top1 drifted from actual top1 {actual_top1} to {quality_top1}")
+        quality_top3 = payload.get("retrieval_quality", {}).get("top3", [])
+        if actual_top1 and actual_top1 not in quality_top3:
+            failures.append("retrieval_quality.top3 should include the actual top1")
+
+    quality = payload.get("retrieval_quality", {})
+    if payload.get("result_count", 0) > 0 and not quality.get("top5_scores"):
+        failures.append("retrieval_quality should include top5_scores when results exist")
 
     expected_result_count = case.get("expected_result_count")
     if expected_result_count is not None and payload.get("result_count") != expected_result_count:
@@ -145,31 +178,37 @@ def main() -> int:
     passed = 0
 
     total = len(eval_cases)
-    for index, case in enumerate(eval_cases, start=1):
-        label = str(case.get("id", "unnamed"))
-        description = str(case.get("description", "")).strip()
-        progress = f"[{index}/{total}]"
-        print(f"RUN  {progress} {label}", flush=True)
-        if description:
-            print(f"  desc: {description}", flush=True)
+    with tempfile.TemporaryDirectory(
+        prefix="hyptest_similar_eval_cache_",
+        dir=temp_parent(),
+    ) as tmpdir:
+        cache_dir = Path(tmpdir)
+        for index, case in enumerate(eval_cases, start=1):
+            label = str(case.get("id", "unnamed"))
+            description = str(case.get("description", "")).strip()
+            progress = f"[{index}/{total}]"
+            print(f"RUN  {progress} {label}", flush=True)
+            if description:
+                print(f"  desc: {description}", flush=True)
 
-        failures, duration = run_eval_case(
-            script_path,
-            repo_root,
-            fixture_path,
-            case,
-            args.case_timeout_seconds,
-        )
-        if failures:
-            print(f"FAIL {progress} {label} ({duration:.2f}s)")
-            for failure in failures:
-                print(f"  - {failure}")
-            if args.fail_fast:
-                return 1
-            continue
+            failures, duration = run_eval_case(
+                script_path,
+                repo_root,
+                fixture_path,
+                case,
+                args.case_timeout_seconds,
+                cache_dir,
+            )
+            if failures:
+                print(f"FAIL {progress} {label} ({duration:.2f}s)")
+                for failure in failures:
+                    print(f"  - {failure}")
+                if args.fail_fast:
+                    return 1
+                continue
 
-        passed += 1
-        print(f"PASS {progress} {label} ({duration:.2f}s)")
+            passed += 1
+            print(f"PASS {progress} {label} ({duration:.2f}s)")
 
     print(f"summary: {passed}/{total} passed")
     return 0 if passed == total else 1

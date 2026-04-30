@@ -1,0 +1,32 @@
+[
+  {
+    "id": "new_case_only_requires_new_point",
+    "prompt": "repo_root=/repo，test_point_file=test_point/mem.md，task_mode=new-case-only，new_case_count=1，spec_profile=<spec_profile>，补一个新测试点和新 case。",
+    "expected_terms": ["new-case-only", "### PnX", "ai_", "test_register.c", "coverage_scope=repo"],
+    "forbidden_terms": ["只分析", "不新增"]
+  },
+  {
+    "id": "analysis_only_no_edits",
+    "prompt": "只分析这个 spike fail，不要改代码：missing_required=['PASSED'], found_forbidden=['ERROR:']。",
+    "expected_terms": ["triage-only", "不改代码", "reason_code", "日志"],
+    "forbidden_terms": ["apply_patch", "新增 case"]
+  },
+  {
+    "id": "legacy_platform_alias_redirect",
+    "prompt": "platform=xiangshan，帮我跑 ai_case。",
+    "expected_terms": ["platform=linknan", "LINKNAN_HOME", "DIFFTEST_REF_SO"],
+    "forbidden_terms": ["legacy hyptest platform flag"]
+  },
+  {
+    "id": "rtl_only_cache_tlb_policy",
+    "prompt": "这个 case 涉及 TLB/cache 一致性，official Spike 能不能作为 default gate？",
+    "expected_terms": ["RTL-only", "spike_gate_applicable=false", "spec_profile"],
+    "forbidden_terms": ["official Spike 通过即可"]
+  },
+  {
+    "id": "supplement_existing_point_no_new_heading",
+    "prompt": "继续补 P6B 这个已有测试点，新增一个 case，不要新增新的 P6C。",
+    "expected_terms": ["supplement-existing-point", "P6B", "不新增新的", "file"],
+    "forbidden_terms": ["P6C"]
+  }
+]
