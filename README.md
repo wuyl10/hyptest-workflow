@@ -57,19 +57,19 @@ python3 scripts/list_skill_commands.py
 <!-- BEGIN GENERATED COMMANDS -->
 ### self-check
 
-- `quick`: Fast skill checks; no simulator environment required.
+- `quick`: 快速检查 skill 本身；不需要模拟器环境。
 
   ```bash
   python3 scripts/self_check.py --quick --spec-profile <spec_profile>
   ```
 
-- `repo`: Skill checks plus repo migration, CLI contract, and lint-baseline checks.
+- `repo`: 在 quick 基础上检查仓库迁移、CLI 约定和 lint baseline。
 
   ```bash
   python3 scripts/self_check.py --repo --repo-root <repo_root> --spec-profile <spec_profile>
   ```
 
-- `full`: Full checks including real-repo similar-case eval, with saved reports.
+- `full`: 完整检查，包含真实仓库相似 case eval，并保存报告。
 
   ```bash
   python3 scripts/self_check.py --full --repo-root <repo_root> --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md
@@ -77,25 +77,25 @@ python3 scripts/list_skill_commands.py
 
 ### doctor
 
-- `repo-health`: Grouped profile, skill, repo, CLI contract, lint-baseline, env and self-check health report.
+- `repo-health`: 按 profile、skill、repo、CLI、lint baseline、环境和 self-check 分组输出健康报告。
 
   ```bash
   python3 scripts/doctor.py --repo-root <repo_root> --pre-submit --strict --spec-profile <spec_profile>
   ```
 
-- `task-request`: Validate task inputs before editing or running cases.
+- `task-request`: 修改或运行 case 前校验任务输入参数。
 
   ```bash
   python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3
   ```
 
-- `platform-env`: Check Spike and LinkNan environment variables and explain what each one is used for.
+- `platform-env`: 检查 Spike 和 LinkNan 环境变量，并说明各变量用途。
 
   ```bash
   python3 scripts/check_env.py --repo-root <repo_root> --platform all --explain --print-exports
   ```
 
-- `doctor-all`: Run grouped doctor checks including both Spike and LinkNan env checks.
+- `doctor-all`: 运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。
 
   ```bash
   python3 scripts/doctor.py --repo-root <repo_root> --platform all --pre-submit --spec-profile <spec_profile>
@@ -103,43 +103,43 @@ python3 scripts/list_skill_commands.py
 
 ### case-workflow
 
-- `similar-cases`: Search existing ai/manual case sources before writing a new case.
+- `similar-cases`: 写新 case 前搜索已有 ai/manual case 源文件。
 
   ```bash
   python3 scripts/find_similar_cases.py --repo-root <repo_root> --query '<scenario terms>' --limit 5 --explain-score
   ```
 
-- `case-lint`: Lint changed case sources for harness-shape mistakes.
+- `case-lint`: 检查已改 case 源文件的测试框架结构问题。
 
   ```bash
   python3 scripts/check_case_lint.py --repo-root <repo_root> --changed-only --strict-case-end --warnings-as-errors
   ```
 
-- `case-lint-baseline`: Fail only on active lint issues not covered by the known baseline.
+- `case-lint-baseline`: 只对不在已知 baseline 内的活跃 lint 问题报错。
 
   ```bash
   python3 scripts/check_case_lint.py --repo-root <repo_root> --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors
   ```
 
-- `cli-contract`: Check compile/run script platform names, case_elf_asm, required env vars and personal-path regressions.
+- `cli-contract`: 检查编译/运行脚本的平台名、case_elf_asm、必需环境变量和个人路径回归。
 
   ```bash
   python3 scripts/check_hyptest_cli_contract.py --repo-root <repo_root>
   ```
 
-- `repo-snapshot`: Print a read-only snapshot of case sources, register state, test_point coverage, artifacts and latest logs.
+- `repo-snapshot`: 只读汇总 case 源、注册状态、test_point 覆盖、产物和最新日志。
 
   ```bash
   python3 scripts/repo_snapshot.py --repo-root <repo_root>
   ```
 
-- `baseline-diff`: Review added/removed lint baseline issues before accepting a new baseline.
+- `baseline-diff`: 接受新 baseline 前查看新增/删除的 lint baseline 问题。
 
   ```bash
   python3 scripts/case_lint_baseline_diff.py --old <old_baseline.json> --new <new_baseline.json>
   ```
 
-- `writeback-check`: Validate lightweight test_point writeback and registration consistency.
+- `writeback-check`: 检查 test_point 轻量回填格式和注册一致性。
 
   ```bash
   python3 scripts/check_writeback_format.py --repo-root <repo_root> --file <test_point_file> --check-register --spec-profile <spec_profile>
@@ -147,49 +147,49 @@ python3 scripts/list_skill_commands.py
 
 ### profile-and-tiering
 
-- `profile-query`: Summarize PMA/PBMT/MMIO profile rules for an address.
+- `profile-query`: 按地址汇总 PMA/PBMT/MMIO profile 规则。
 
   ```bash
   python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --address <pa> --summary
   ```
 
-- `profile-registry`: Check the profile registry and default profile mapping.
+- `profile-registry`: 检查 profile 注册表和默认 profile 映射。
 
   ```bash
   python3 scripts/check_spec_profile_registry.py
   ```
 
-- `new-profile`: Create a new spec profile skeleton from the template and register it.
+- `new-profile`: 基于模板创建新的 spec profile 骨架并写入注册表。
 
   ```bash
   python3 scripts/new_spec_profile.py --name <profile_name> --title '<project/core title>' --update-registry
   ```
 
-- `profile-decision`: Print only matching profile default_decision values.
+- `profile-decision`: 只输出匹配地址的 profile default_decision。
 
   ```bash
   python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --address <pa> --decision-only
   ```
 
-- `reason-code`: Suggest candidate reason_code values from a failure symptom.
+- `reason-code`: 根据失败现象给出候选 reason_code。
 
   ```bash
   python3 scripts/suggest_reason_code.py --symptom '<failure symptom>'
   ```
 
-- `reason-code-eval`: Check symptom-to-reason_code suggestion fixtures.
+- `reason-code-eval`: 检查失败现象到 reason_code 建议的 eval 样例。
 
   ```bash
   python3 scripts/eval_reason_code_suggestions.py
   ```
 
-- `failure-log`: Extract scenario, error points, reason_code candidates and next actions from a failure log.
+- `failure-log`: 从失败日志提取场景、错误点、候选 reason_code 和下一步动作。
 
   ```bash
   python3 scripts/classify_failure_log.py --log-file <log> --json
   ```
 
-- `triage-handoff`: Create a workflow-to-triage handoff card for deeper failure analysis.
+- `triage-handoff`: 生成 workflow 交给 failure-triage 深入分析的交接卡片。
 
   ```bash
   python3 scripts/make_triage_handoff.py --log-file <log> --platform linknan --spec-profile <spec_profile> --json
@@ -197,49 +197,49 @@ python3 scripts/list_skill_commands.py
 
 ### maintenance
 
-- `readme-check`: Check README generated command block is in sync.
+- `readme-check`: 检查 README 生成命令块是否同步。
 
   ```bash
   python3 scripts/check_readme_commands.py
   ```
 
-- `readme-update`: Refresh README generated command block.
+- `readme-update`: 刷新 README 生成命令块。
 
   ```bash
   python3 scripts/update_readme_commands.py
   ```
 
-- `resource-index-check`: Check resource_index.md mentions public scripts and key assets.
+- `resource-index-check`: 检查 resource_index.md 是否覆盖 public scripts 和关键资产。
 
   ```bash
   python3 scripts/check_resource_index.py
   ```
 
-- `manifest-check`: Check assets/script_manifest.json is in sync with scripts/*.py.
+- `manifest-check`: 检查 assets/script_manifest.json 是否与 scripts/*.py 同步。
 
   ```bash
   python3 scripts/update_script_manifest.py --check
   ```
 
-- `manifest-update`: Refresh assets/script_manifest.json after adding or removing scripts.
+- `manifest-update`: 新增或删除脚本后刷新 assets/script_manifest.json。
 
   ```bash
   python3 scripts/update_script_manifest.py --write
   ```
 
-- `resource-index-update`: Refresh the generated resource coverage block in resource_index.md.
+- `resource-index-update`: 刷新 resource_index.md 中的资源覆盖生成块。
 
   ```bash
   python3 scripts/update_resource_index.py --write
   ```
 
-- `profile-portability`: Check generic skill surfaces do not hardcode the concrete default profile.
+- `profile-portability`: 检查通用 skill 入口没有写死具体默认 profile。
 
   ```bash
   python3 scripts/eval_profile_portability.py
   ```
 
-- `listed-command-help`: Check README/listed script commands still expose --help.
+- `listed-command-help`: 检查 README/命令清单里的脚本仍然支持 --help。
 
   ```bash
   python3 scripts/eval_listed_commands_help.py
@@ -247,7 +247,7 @@ python3 scripts/list_skill_commands.py
 
 ### cleanup
 
-- `clean-generated`: Remove skill-local temporary/cache files.
+- `clean-generated`: 删除 skill 本地临时文件和缓存文件。
 
   ```bash
   python3 scripts/clean_generated.py --repo-root <repo_root>
@@ -255,7 +255,7 @@ python3 scripts/list_skill_commands.py
 
 ### summary
 
-- `skill-summary`: Summarize profiles, references, scripts, eval assets, and recommended checks.
+- `skill-summary`: 汇总 profiles、references、scripts、eval assets 和推荐检查命令。
 
   ```bash
   python3 scripts/skill_summary.py

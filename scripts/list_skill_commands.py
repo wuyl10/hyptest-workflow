@@ -206,6 +206,41 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
     },
 ]
 
+README_DESC_ZH: dict[str, str] = {
+    "quick": "快速检查 skill 本身；不需要模拟器环境。",
+    "repo": "在 quick 基础上检查仓库迁移、CLI 约定和 lint baseline。",
+    "full": "完整检查，包含真实仓库相似 case eval，并保存报告。",
+    "repo-health": "按 profile、skill、repo、CLI、lint baseline、环境和 self-check 分组输出健康报告。",
+    "task-request": "修改或运行 case 前校验任务输入参数。",
+    "platform-env": "检查 Spike 和 LinkNan 环境变量，并说明各变量用途。",
+    "doctor-all": "运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。",
+    "similar-cases": "写新 case 前搜索已有 ai/manual case 源文件。",
+    "case-lint": "检查已改 case 源文件的测试框架结构问题。",
+    "case-lint-baseline": "只对不在已知 baseline 内的活跃 lint 问题报错。",
+    "cli-contract": "检查编译/运行脚本的平台名、case_elf_asm、必需环境变量和个人路径回归。",
+    "repo-snapshot": "只读汇总 case 源、注册状态、test_point 覆盖、产物和最新日志。",
+    "baseline-diff": "接受新 baseline 前查看新增/删除的 lint baseline 问题。",
+    "writeback-check": "检查 test_point 轻量回填格式和注册一致性。",
+    "profile-query": "按地址汇总 PMA/PBMT/MMIO profile 规则。",
+    "profile-registry": "检查 profile 注册表和默认 profile 映射。",
+    "new-profile": "基于模板创建新的 spec profile 骨架并写入注册表。",
+    "profile-decision": "只输出匹配地址的 profile default_decision。",
+    "reason-code": "根据失败现象给出候选 reason_code。",
+    "reason-code-eval": "检查失败现象到 reason_code 建议的 eval 样例。",
+    "failure-log": "从失败日志提取场景、错误点、候选 reason_code 和下一步动作。",
+    "triage-handoff": "生成 workflow 交给 failure-triage 深入分析的交接卡片。",
+    "readme-check": "检查 README 生成命令块是否同步。",
+    "readme-update": "刷新 README 生成命令块。",
+    "resource-index-check": "检查 resource_index.md 是否覆盖 public scripts 和关键资产。",
+    "manifest-check": "检查 assets/script_manifest.json 是否与 scripts/*.py 同步。",
+    "manifest-update": "新增或删除脚本后刷新 assets/script_manifest.json。",
+    "resource-index-update": "刷新 resource_index.md 中的资源覆盖生成块。",
+    "profile-portability": "检查通用 skill 入口没有写死具体默认 profile。",
+    "listed-command-help": "检查 README/命令清单里的脚本仍然支持 --help。",
+    "clean-generated": "删除 skill 本地临时文件和缓存文件。",
+    "skill-summary": "汇总 profiles、references、scripts、eval assets 和推荐检查命令。",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="List common hyptest-workflow commands.")
@@ -220,7 +255,8 @@ def render_markdown() -> str:
         lines.append(f"### {group['group']}")
         lines.append("")
         for item in group["commands"]:
-            lines.append(f"- `{item['name']}`: {item['desc']}")
+            desc = README_DESC_ZH.get(str(item["name"]), item["desc"])
+            lines.append(f"- `{item['name']}`: {desc}")
             lines.append("")
             lines.append("  ```bash")
             lines.append(f"  {item['cmd']}")
