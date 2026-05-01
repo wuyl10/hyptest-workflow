@@ -2,25 +2,25 @@
 
 本文放 `hyptest-workflow` 的可复制 prompt 模板。README 只保留快速入口；完整模板放这里，避免 README 过长。
 
-## 路径写法
+## riscv-hyp-tests 仓库位置
 
-`repo_root` 是 workflow 输入，不是 hyptest 平台环境变量。共享文档里建议写成占位符，使用时替换为实际仓库根目录：
+`repo_root` 是 prompt 字段名，含义是 `riscv-hyp-tests` 仓库根目录。共享文档里建议写成占位符，使用时替换为实际仓库位置：
 
 ```text
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 ```
 
-如果当前 shell 或团队环境已经有仓库路径变量，可以直接写：
+如果团队希望少写路径，可以约定一个明确的便利变量：
 
 ```text
-repo_root: $REPO_ROOT
+repo_root: $HYPTEST_REPO
 test_point_file: test_point/<xxx>.md
 ```
 
 仓库路径变量只是个人或团队便利别名，不要求 hyptest 仓库必须提供。脚本入口会展开 `$VAR` 路径，所以 request 文件或命令里可以用团队已有变量名。`SPIKE_BIN`、`LINKNAN_HOME`、`DIFFTEST_REF_SO`、`CROSS_COMPILE` 仍按 hyptest 仓库的编译/运行环境说明设置，这里不复制配置说明。
 
-如果 `test_point_file` 写相对路径，按 `repo_root` 下的路径理解；如果写绝对路径，也可以使用 `$REPO_ROOT/test_point/<file>.md`。不要在共享文档里写个人绝对路径。
+如果 `test_point_file` 写相对路径，按 `repo_root` 下的路径理解；如果写绝对路径，也可以使用 `$HYPTEST_REPO/test_point/<file>.md`。不要在共享文档里写个人绝对路径。
 
 ## 高质量默认 Prompt
 

@@ -20,7 +20,7 @@
 | `references/prompt_recipes.md` | 高质量 prompt、更快 prompt、模块 suspected bug prompt、只读预检等可复制模板 |
 | `references/command_index.md` | 完整命令索引，由 `scripts/list_skill_commands.py --markdown` 生成 |
 | `references/quick_execution.md` | 从 preflight 到 gate、postcheck、submission card 的快速闭环 |
-| `references/task_input_schema.md` | `repo_root`、`test_point_file`、`platform`、`task_mode` 等输入字段 |
+| `references/task_input_schema.md` | 目标仓库、测试点文件、平台、任务模式等输入字段 |
 | `references/coverage_and_dedupe.md` | 测试点覆盖检查、case 去重和唯一性证据口径 |
 | `references/spec_and_model_limits.md` | 规格/profile 路由和平台模型边界入口 |
 | `references/spec_profiles/` | 项目 profile，决定 Spike gate、PMA/PBMT/MMIO 等口径 |
@@ -48,23 +48,23 @@
 
 如果任务已经进入 selfcheck fail、difftest mismatch、stuck、`50000 cycles no commit`、FSDB 波形或疑似 RTL bug 深挖，优先使用 `hyptest-failure-triage`。`hyptest-workflow` 负责 case 落地、证据整理和初步归因；深入失败闭环交给 triage。若任务需要波形 first-bad-cycle、握手、协议或 X-state 分析，同时使用 `waveform-debug`。
 
-## 路径和环境
+## 目标仓库和环境
 
-`repo_root` 是 workflow 输入，不是 hyptest 平台环境变量：
+一次任务需要先说明 `riscv-hyp-tests` 仓库位置。推荐直接在 prompt 里填仓库根目录：
 
 ```text
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 ```
 
-如果当前 shell 或团队环境已有仓库路径变量，也可以写：
+如果团队希望少写路径，可以约定一个明确的便利变量：
 
 ```text
-repo_root: $REPO_ROOT
+repo_root: $HYPTEST_REPO
 test_point_file: test_point/<xxx>.md
 ```
 
-路径字段支持 shell 风格的 `$VAR` 展开。仓库路径变量只是个人或团队便利别名，不要求 hyptest 仓库必须提供。
+这里的 `repo_root` 只是 prompt 字段名，含义是“`riscv-hyp-tests` 仓库根目录”；它不是 hyptest 平台环境变量。`HYPTEST_REPO` 也只是可选的团队便利别名，不要求 hyptest 仓库必须提供。路径字段支持 shell 风格的 `$VAR` 展开。
 
 hyptest 编译/运行环境变量仍按 hyptest 仓库既有说明设置，例如：
 
@@ -78,7 +78,7 @@ CROSS_COMPILE     RISC-V toolchain prefix
 本 README 不重复展开这些变量的配置方式。需要检查环境时运行：
 
 ```bash
-python3 scripts/check_env.py --repo-root <repo_root> --platform all --explain
+python3 scripts/check_env.py --repo-root <hyptest_repo> --platform all --explain
 ```
 
 平台名只使用 `spike` 或 `linknan`；不要把 `xiangshan` 写成 hyptest 的 `platform` / `--plat` 参数。
@@ -93,7 +93,7 @@ python3 scripts/list_skill_commands.py
 
 一次新增 case 的典型闭环：
 
-1. 锁定输入：`repo_root`、`test_point_file`、`platform`、`task_mode`、`target_policy`、`spec_profile`。
+1. 锁定输入：目标仓库、测试点文件、平台、任务模式、目标策略和 `spec_profile`。
 2. 区分新增测试点还是补已有 `### PnX`。`test_point_file` 只是容器，`### PnX` 才是独立测试点。
 3. 做全仓测试点覆盖检查、repo 级 case 相似检索和函数名唯一性检查。
 4. 确认 `spec_profile`、Spike gate 适用性和平台模型边界。
@@ -106,10 +106,12 @@ python3 scripts/list_skill_commands.py
 常用入口：
 
 ```bash
-python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1
-python3 scripts/case_preflight_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --coverage-scope repo --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
-python3 scripts/case_gate_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
+python3 scripts/validate_task_request.py --repo-root <hyptest_repo> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1
+python3 scripts/case_preflight_pack.py --repo-root <hyptest_repo> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --coverage-scope repo --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
+python3 scripts/case_gate_pack.py --repo-root <hyptest_repo> --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
 ```
+
+这里的 `<hyptest_repo>` 就是目标 `riscv-hyp-tests-nhv5.1` 仓库根目录；如果使用变量，建议写成 `"$HYPTEST_REPO"`。
 
 更多命令见 `references/command_index.md`。
 

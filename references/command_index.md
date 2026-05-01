@@ -2,13 +2,13 @@
 
 本文是 `hyptest-workflow` 的常用命令索引。README 只保留最高频入口；完整命令由 `scripts/list_skill_commands.py --markdown` 生成到这里。
 
-命令中的 `<repo_root>` 表示 `riscv-hyp-tests-nhv5.1` 仓库根目录，`<test_point_file>` 表示测试点文件路径。可以直接替换为实际路径，也可以使用当前 shell 已有的路径变量：
+命令中的 `<repo_root>` 表示 `riscv-hyp-tests-nhv5.1` 仓库根目录，`<test_point_file>` 表示测试点文件路径。推荐直接替换为实际的 `riscv-hyp-tests` 仓库位置：
 
 ```bash
 python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-file <repo_root>/test_point/<file>.md ...
 ```
 
-如果团队习惯在 shell 中设置某个仓库路径变量，也可以写成 `--repo-root "$REPO_ROOT"`。这只是命令书写便利，变量名不由 workflow 或 hyptest 强制规定。
+如果团队希望少写路径，可以约定 `HYPTEST_REPO` 作为便利变量，例如 `--repo-root "$HYPTEST_REPO"`。它只是命令书写便利，不是 hyptest 平台环境变量。
 
 所有带 `--spec-profile <spec_profile>` 的命令都可以省略该参数；省略时使用 `references/spec_profiles/index.json` 中的 `default_profile`。需要复核实际解析结果时，先跑 `python3 scripts/resolve_spec_profile.py --spec-profile <spec_profile>`。
 

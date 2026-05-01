@@ -13,7 +13,7 @@
 | `test_point_file` | 新增/回填测试点时 | path | `test_point` 容器文件；每个 `### PnX` 才是独立测试点。 |
 | `task_mode` | 新增/修改 case 时 | enum | 常用值见下表。 |
 
-路径字段支持 shell 风格的 `$VAR` 展开，便于复用团队已有的仓库路径变量。`repo_root` 本身是 workflow 输入，不是 hyptest 平台环境变量；`SPIKE_BIN`、`LINKNAN_HOME`、`DIFFTEST_REF_SO`、`CROSS_COMPILE` 等编译/运行变量按 hyptest 仓库环境说明设置。
+路径字段支持 shell 风格的 `$VAR` 展开，便于复用团队已有的仓库路径变量。`repo_root` 本身是 workflow 输入，不是 hyptest 平台环境变量；若团队需要变量，建议约定 `HYPTEST_REPO` 作为 `riscv-hyp-tests` 仓库位置的便利别名。`SPIKE_BIN`、`LINKNAN_HOME`、`DIFFTEST_REF_SO`、`CROSS_COMPILE` 等编译/运行变量按 hyptest 仓库环境说明设置。
 
 ## Optional Fields
 
