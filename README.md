@@ -51,15 +51,16 @@
 ## 目标仓库和环境
 
 日常 prompt 不需要写完整环境清单。规则是：当前执行环境已经能读到的变量可以省略；读不到、但本轮必需的变量才写进 prompt。对外统一使用 `HYPTEST_HOME` 和 `HYPTEST_*`，不要写个人绝对路径或其它项目的通用变量名。
+
 使用前需要配置对应环境变量：
 | 变量名 | 路径 |
 | --- | --- |
-| `HYPTEST_HOME` | 对应riscv-hyp-tests的仓库路径 |
+| `HYPTEST_HOME`  | 对应riscv-hyp-tests的仓库路径 |
 | `HYPTEST_SPIKE_BIN` | 单跑ELF的spike bin路径（建议使用社区版spike）|
 | `HYPTEST_LINKNAN_HOME` | Linknan仓库路径 |
 | `HYPTEST_DIFFTEST_REF_SO` | Linknan跑difftest时用的golden ref路径 （使用对应Linknan维护的spike仓库riscv64-spike-so）|
-Nanhu 源码不单独设置环境变量，固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。
 
+注：Nanhu 源码不单独设置环境变量，固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。
 
 常见组合：
 
