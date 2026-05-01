@@ -2,21 +2,14 @@
 
 本文放 `hyptest-workflow` 的可复制 prompt 模板。README 只保留快速入口；完整模板放这里，避免 README 过长。
 
-## 本轮环境变量写法
+## 环境变量描述
 
-日常 prompt 不需要写完整环境清单。规则很简单：当前 Codex/脚本进程已经能读到的变量可以省略；读不到、但本轮必需的变量才写进 prompt。prompt 中显式写的值优先于 shell 环境，并会作为本轮脚本覆盖传入，例如 `--env HYPTEST_SPIKE_BIN=<path>`。
+日常 prompt 不需要写完整环境清单。规则很简单：进程已经能读到的变量可以省略；读不到、但本轮必需的变量才写进 prompt。prompt 中显式写的值优先于 shell 环境，并会作为本轮脚本覆盖传入，例如 `--env HYPTEST_SPIKE_BIN=<path>`。
 
-| 字段 | 什么时候需要 | 写法 | 备注 |
-| --- | --- | --- | --- |
-| `HYPTEST_HOME` | 需要读写 `riscv-hyp-tests` 仓库，且当前环境没有 `HYPTEST_HOME` 时 | `<riscv-hyp-tests-nhv5.1 仓库根目录>` 或 `$HYPTEST_HOME` | 目标 `riscv-hyp-tests` 仓库根目录；脚本 CLI 内部仍使用 `--repo-root`。 |
-| `HYPTEST_SPIKE_BIN` | `platform=spike` 且会运行 gate，当前环境没有 `HYPTEST_SPIKE_BIN` 时 | `<community/upstream Spike 可执行文件>` 或 `$HYPTEST_SPIKE_BIN` | 尽量指向社区版/上游 riscv-isa-sim Spike，用于 architecture/default gate。 |
-| `HYPTEST_LINKNAN_HOME` | `platform=linknan`，或需要读取 LinkNan/Nanhu 源码证据，且当前环境没有 `HYPTEST_LINKNAN_HOME` 时 | `<LinkNan 仓库根目录>` 或 `$HYPTEST_LINKNAN_HOME` | Nanhu 源码固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。 |
-| `HYPTEST_DIFFTEST_REF_SO` | `platform=linknan` 且会运行 gate，当前环境没有 `HYPTEST_DIFFTEST_REF_SO` 时 | `<riscv64-spike-so 路径>` 或 `$HYPTEST_DIFFTEST_REF_SO` | 定制 Spike/difftest reference 走这里，不要混作 `HYPTEST_SPIKE_BIN`。 |
-| `HYPTEST_TMPDIR` | `/tmp` 空间不足时 | `/nfs/home/<user>/.tmp` | 只影响本轮临时目录。 |
+环境变量清单：`HYPTEST_HOME`、`HYPTEST_SPIKE_BIN`、`HYPTEST_LINKNAN_HOME`、 `HYPTEST_DIFFTEST_REF_SO`、`HYPTEST_TMPDIR`
 
-对外 prompt、共享模板和当前进程环境统一写 `HYPTEST_HOME` 和 `HYPTEST_*`。这些是 workflow 的输入字段；调用 `riscv-hyp-tests` 仓库脚本时需要的运行时适配由 workflow 脚本处理。
 
-复制模板后必须替换所有尖括号占位符，例如 `<xxx>`、`<module>`、`<当前项目 spec_profile>`。preflight 会把未替换占位符当成无效输入，而不是继续猜路径或 profile。
+复制模板后必须替换所有尖括号占位符，例如 `<xxx>`、`<module>`等。preflight 会把未替换占位符当成无效输入，而不是继续猜路径或 profile。
 
 ### 日常最短写法
 
@@ -25,7 +18,7 @@
 ```text
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <当前项目 spec_profile>
+spec_profile: <当前项目 spec_profile，不填则默认nhv5_1_ap>  
 ```
 
 如果当前进程看不到必需变量，只补缺的变量。例如 spike-only gate 缺路径时：
@@ -45,6 +38,7 @@ HYPTEST_SPIKE_BIN: <community/upstream Spike 可执行文件>
 HYPTEST_LINKNAN_HOME: <LinkNan 仓库根目录>
 test_point_file: test_point/<module>_suspected_bug_corner_points_<n>.md
 platform: spike
+target_module: <对应要测的模块>
 ```
 
 跑 LinkNan / difftest gate 时给 LinkNan 和 difftest-ref；`HYPTEST_SPIKE_BIN` 与本轮无关，可以省略：
@@ -62,7 +56,7 @@ workflow 会根据 `platform` 和 `task_mode` 判断本轮真正需要哪些 run
 
 可以写自然语言说明“本轮只跑 spike，不跑 LinkNan”，也可以完全省略无关组件。
 
-如果团队已经设置好变量，不需要在 prompt 里再写 `$HYPTEST_HOME`、`$HYPTEST_SPIKE_BIN` 这类重复行。只有在共享模板、可移植 request 文件、或需要强调本轮使用哪个变量时，才写 `$VAR`。变量必须能被 Codex/脚本所在的非交互 shell 读到。如果写在 `~/.bashrc`，要放在 `case $-` / `return` 这类保护之前；否则终端里能看到，脚本或 CI 可能看不到。
+如果已经设置好环境变量，不需要在 prompt 里再写 `$HYPTEST_HOME`、`$HYPTEST_SPIKE_BIN` 这类重复行。只有在共享模板、可移植 request 文件、或需要强调本轮使用哪个变量时才写。
 
 ### 识别不到时怎么提醒
 
@@ -75,8 +69,6 @@ preflight 不会用历史聊天或 PATH 猜关键路径。必需字段缺失时�
 | `platform=spike` 且要运行 gate，但没有 `HYPTEST_SPIKE_BIN` | issue，不跑 spike gate | `HYPTEST_SPIKE_BIN: <community/upstream Spike 可执行文件>` 或让当前进程可见 `HYPTEST_SPIKE_BIN` |
 | `platform=linknan` 且要运行 gate，但缺 `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` | issue，不跑 linknan gate | 补缺失字段；Nanhu 源码会从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导 |
 | `platform=linknan` 且 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 不存在 | issue，不跑 linknan gate | 初始化 LinkNan 的 `dependencies/nanhu` submodule，或修正 `HYPTEST_LINKNAN_HOME` |
-
-如果 `test_point_file` 写相对路径，按 `HYPTEST_HOME` 下的路径理解；如果写绝对路径，也可以使用 `$HYPTEST_HOME/test_point/<file>.md`。不要在共享文档里写个人绝对路径。
 
 连续对话里，workflow 可以沿用前文理解任务意图，例如你前面刚指定了 `riscv-hyp-tests` 仓库、测试点文件和平台，后面说“继续新增 1 个用例”通常能被理解。但脚本 preflight 不读聊天历史；真正执行前仍以本轮 prompt、CLI 参数和当前进程环境为准。为了可复现，正式交付或让别人复跑时，建议仍写清 `test_point_file`、`platform`、`spec_profile` 和任务目标；路径变量只在当前环境不可见时补充。
 
@@ -99,7 +91,7 @@ spec_profile: nhv5_1_ap
 
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <当前项目 spec_profile>
+spec_profile: <当前项目 spec_profile，不填则默认nhv5_1_ap>
 
 task_mode: new-case-only
 new_case_count: 1
@@ -126,7 +118,7 @@ target_policy: default-first
 
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <当前项目 spec_profile>
+spec_profile: <当前项目 spec_profile，不填则默认nhv5_1_ap>
 
 task_mode: new-case-only
 new_case_count: 1
