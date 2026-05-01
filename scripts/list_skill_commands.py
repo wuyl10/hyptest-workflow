@@ -69,7 +69,7 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
             },
             {
                 "name": "case-preflight-pack",
-                "cmd": "python3 scripts/case_preflight_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --coverage-scope repo --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json",
+                "cmd": "python3 scripts/case_preflight_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json",
                 "desc": "Collect task/profile/env/repo/similar-case context before writing a case, with conservative pack caching.",
             },
             {
@@ -271,7 +271,7 @@ README_DESC_ZH: dict[str, str] = {
     "doctor-all": "运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。",
     "similar-cases": "写新 case 前搜索已有 ai/manual case 源文件。",
     "repo-evidence-index": "构建或复用全仓 case、test_point、注册状态证据索引缓存。",
-    "case-preflight-pack": "写 case 前聚合任务、profile、环境、repo 快照和相似 case reading pack，并使用保守缓存复用结果。",
+    "case-preflight-pack": "写 case 前聚合任务、规格/平台口径、环境、repo 快照和相似 case reading pack；覆盖范围可按 task_mode 自动推导。",
     "case-skeleton": "从 preflight 证据生成保守 C 骨架，不裁决 case 语义。",
     "case-name-suggest": "根据 preflight/test_point 术语建议 case 名，并做全仓精确/相似命名冲突检查。",
     "case-lint": "检查已改 case 源文件的测试框架结构问题。",

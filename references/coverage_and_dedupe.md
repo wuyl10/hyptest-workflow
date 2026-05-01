@@ -13,7 +13,9 @@
 
 不要把这两类检查混成一件事。
 
-## 2. coverage_scope 口径
+## 2. 覆盖范围口径
+
+普通 prompt 一般不需要手动填写 `coverage_scope`。workflow 会根据任务目的推导覆盖范围：补已有条目走局部测试点检查，新增测试点或跨文件排重走全仓测试点检查。只有在高级排查、复现实验或需要覆盖默认行为时，才显式指定 `coverage_scope=file/repo`。
 
 - `coverage_scope=file`
   - 只检查当前 `test_point_file` 或指定 `### PnX`。
@@ -123,10 +125,10 @@ rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases manual_test_case
 
 ## 6. 输出时至少要说清楚
 
-若做了 repo 级排重，最终摘要里至少应能回答：
+最终摘要里至少应能回答：
 
-- 本轮 `coverage_scope` 是什么
-- 是否做了全仓 `test_point` 覆盖检查
+- 本轮覆盖范围是自动推导还是显式指定
+- 是否做了全仓 `test_point` 覆盖检查；若没有，为什么只做局部检查
 - 是否发现相近旧测试点
 - 是否做了全仓 case 相似检索
 - 唯一性检索证据是什么
@@ -137,16 +139,15 @@ rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases manual_test_case
 ### 补已有测试点
 
 1. 锁定目标 `### PnX`
-2. 用 `coverage_scope=file` 检查当前文件内是否已覆盖
+2. 默认按局部范围检查当前条目/文件内是否已覆盖
 3. 用全仓 `find_similar_cases.py` 检查相似 case
 4. 用 `rg` 检查函数名唯一性
 5. 再决定补 case、复用 case 或不新增
 
 ### 新增测试点
 
-1. 设定 `coverage_scope=repo`
-2. 先扫全仓 `test_point/*.md`
-3. 判断是否已有近似测试点
-4. 再做全仓 case 相似检索
-5. 再做函数名唯一性检索
-6. 只有在“测试点未覆盖 + case 未重复”时才新增
+1. 默认按全仓范围扫描 `test_point/*.md`
+2. 判断是否已有近似测试点
+3. 再做全仓 case 相似检索
+4. 再做函数名唯一性检索
+5. 只有在“测试点未覆盖 + case 未重复”时才新增

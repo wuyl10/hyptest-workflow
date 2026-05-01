@@ -57,7 +57,6 @@ def main() -> int:
                     "spec_profile": profile,
                     "task_mode": "new-case-only",
                     "new_case_count": "1-3",
-                    "coverage_scope": "repo",
                 }
             ),
             encoding="utf-8",
@@ -89,6 +88,9 @@ def main() -> int:
                 failures.append("request-json fixture should include next_commands")
             elif profile not in "\n".join(ok_payload["next_commands"]):
                 failures.append("next_commands should include resolved task profile")
+            normalized = ok_payload.get("normalized", {})
+            if normalized.get("coverage_scope") != "repo":
+                failures.append("new-case-only should infer coverage_scope=repo")
         ok_md = run("--request-md", str(request_md), "--json")
         if ok_md.returncode != 0:
             failures.append("request-md fixture should pass")
@@ -108,6 +110,23 @@ def main() -> int:
             normalized = env_payload.get("normalized", {})
             if normalized.get("repo_root") != str(repo.resolve()):
                 failures.append("env var repo_root should expand to the real repo path")
+        supplement = run(
+            "--repo-root",
+            str(repo),
+            "--test-point-file",
+            str(repo / "test_point/p.md"),
+            "--platform",
+            "spike",
+            "--task-mode",
+            "supplement-existing-point",
+            "--json",
+        )
+        if supplement.returncode != 0:
+            failures.append("supplement-existing-point fixture should pass")
+        else:
+            supplement_payload = json.loads(supplement.stdout)
+            if supplement_payload.get("normalized", {}).get("coverage_scope") != "file":
+                failures.append("supplement-existing-point should infer coverage_scope=file")
         bad_platform = run("--request-json", str(request_json), "--platform", "xiangshan", "--json")
         if bad_platform.returncode == 0 or "platform=xiangshan" not in bad_platform.stdout:
             failures.append("explicit bad platform should fail and override request-json")

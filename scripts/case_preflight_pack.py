@@ -69,7 +69,14 @@ def parse_args() -> argparse.Namespace:
         help="Workflow task mode.",
     )
     parser.add_argument("--new-case-count", default="1", help="New case count or range.")
-    parser.add_argument("--coverage-scope", default="repo", choices=["file", "repo"])
+    parser.add_argument(
+        "--coverage-scope",
+        choices=["file", "repo"],
+        help=(
+            "Coverage scope. Defaults from --task-mode: repo for new-case-only, "
+            "file for supplement-existing-point, otherwise repo."
+        ),
+    )
     parser.add_argument("--case-name", help="Optional target case name.")
     parser.add_argument(
         "--query",
@@ -348,7 +355,20 @@ def env_fingerprint() -> dict[str, Any]:
     }
 
 
-def request_fingerprint(args: argparse.Namespace, repo_root: Path, test_point_file: Path) -> dict[str, Any]:
+def infer_coverage_scope(task_mode: str, explicit_scope: str | None) -> str:
+    if explicit_scope:
+        return explicit_scope
+    if task_mode == "supplement-existing-point":
+        return "file"
+    return "repo"
+
+
+def request_fingerprint(
+    args: argparse.Namespace,
+    repo_root: Path,
+    test_point_file: Path,
+    coverage_scope: str,
+) -> dict[str, Any]:
     return {
         "version": CACHE_VERSION,
         "repo_root": str(repo_root),
@@ -357,7 +377,7 @@ def request_fingerprint(args: argparse.Namespace, repo_root: Path, test_point_fi
         "spec_profile": args.spec_profile,
         "task_mode": args.task_mode,
         "new_case_count": args.new_case_count,
-        "coverage_scope": args.coverage_scope,
+        "coverage_scope": coverage_scope,
         "case_name": args.case_name,
         "query": list(args.query),
         "heading_pattern": args.heading_pattern,
@@ -452,7 +472,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     started = time.monotonic()
     repo_root = resolve_path(args.repo_root)
     test_point_file = resolve_path(args.test_point_file)
-    fingerprint = request_fingerprint(args, repo_root, test_point_file)
+    coverage_scope = infer_coverage_scope(args.task_mode, args.coverage_scope)
+    fingerprint = request_fingerprint(args, repo_root, test_point_file, coverage_scope)
     cache_path = pack_cache_path(repo_root, args, fingerprint)
     if not args.no_pack_cache:
         cached = load_pack_cache(cache_path, fingerprint)
@@ -475,7 +496,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "--new-case-count",
         args.new_case_count,
         "--coverage-scope",
-        args.coverage_scope,
+        coverage_scope,
         "--json",
     ]
     if args.case_name:
@@ -521,7 +542,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "spec_profile": args.spec_profile,
         "task_mode": args.task_mode,
         "new_case_count": args.new_case_count,
-        "coverage_scope": args.coverage_scope,
+        "coverage_scope": coverage_scope,
         "case_name": args.case_name,
         "commands": {},
         "target_test_point_excerpt": read_text(test_point_file),

@@ -118,8 +118,6 @@ def main() -> int:
                 "new-case-only",
                 "--new-case-count",
                 "1",
-                "--coverage-scope",
-                "repo",
                 "--query",
                 "pack smoke",
                 "--json",
@@ -130,6 +128,8 @@ def main() -> int:
         if preflight_payload:
             if not preflight_payload.get("ok"):
                 failures.append("case_preflight_pack ok=false for smoke repo")
+            if preflight_payload.get("coverage_scope") != "repo":
+                failures.append("case_preflight_pack should infer coverage_scope=repo for new-case-only")
             if preflight_payload.get("cache", {}).get("hit"):
                 failures.append("first case_preflight_pack run should not be a pack-cache hit")
             similar = preflight_payload.get("commands", {}).get("similar_cases", {})
@@ -152,8 +152,6 @@ def main() -> int:
                 "new-case-only",
                 "--new-case-count",
                 "1",
-                "--coverage-scope",
-                "repo",
                 "--query",
                 "pack smoke",
                 "--json",
@@ -191,8 +189,6 @@ def main() -> int:
                 "new-case-only",
                 "--new-case-count",
                 "1",
-                "--coverage-scope",
-                "repo",
                 "--query",
                 "pack smoke",
                 "--json",

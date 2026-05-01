@@ -22,6 +22,16 @@ test_point_file: test_point/<xxx>.md
 
 如果 `test_point_file` 写相对路径，按 `repo_root` 下的路径理解；如果写绝对路径，也可以使用 `$HYPTEST_REPO/test_point/<file>.md`。不要在共享文档里写个人绝对路径。
 
+## 规格/平台口径和覆盖范围
+
+`spec_profile` 是“规格/平台口径”的名字，不是功能开关。它告诉 workflow 当前项目按哪套规则判断 Spike gate、PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界，以及 case 是否能进入 `default`。当前 `riscv-hyp-tests-nhv5.1` 常用示例是：
+
+```text
+spec_profile: nhv5_1_ap
+```
+
+如果以后切到其它项目或新增 profile，再把这里换成对应 profile 名。用户通常不需要填写 `coverage_scope`：新增测试点、继续找 suspected bug、跨文件排重时，workflow 自动做全仓 `test_point/*.md` 覆盖检查；补已有 `### PnX` 时，workflow 自动围绕当前条目/文件做局部测试点检查。case 相似检索始终是 repo 级。
+
 ## 高质量默认 Prompt
 
 适合正式新增 case，质量最稳：
@@ -32,17 +42,17 @@ test_point_file: test_point/<xxx>.md
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <spec_profile>
+spec_profile: nhv5_1_ap
 
 task_mode: new-case-only
 new_case_count: 1
 target_policy: default-first
-coverage_scope: repo
 
 要求：
 - 先分析目标模块和 test_point；test_point_file 只当容器，按 `### PnX` 条目处理
-- 先做全仓 test_point 覆盖检查、repo 级 case 相似检索、函数名唯一性检查
-- 写 case 前确认 spec_profile、Spike gate 适用性和模型边界
+- 根据任务目的选择覆盖范围；新增测试点默认先做全仓 test_point 覆盖检查
+- 做 repo 级 case 相似检索、函数名唯一性检查
+- 写 case 前确认规格/平台口径（spec_profile）、Spike gate 适用性和模型边界
 - 如需命名建议，可先用 suggest_case_name；如需骨架，可用 make_case_skeleton，但不能把骨架当完成 case
 - 新增 1 个 ai_* case，更新 test_register.c
 - 非 compile-only 必须单 case 编译并单 case 跑 spike
@@ -60,15 +70,14 @@ coverage_scope: repo
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <spec_profile>
+spec_profile: nhv5_1_ap
 
 task_mode: new-case-only
 new_case_count: 1
 target_policy: default-first
-coverage_scope: repo
 
 提速要求：
-- 优先使用 case_preflight_pack.py 聚合输入、profile、repo evidence index、相似 case reading pack
+- 优先使用 case_preflight_pack.py 聚合输入、规格/平台口径、repo evidence index、相似 case reading pack
 - 用 suggest_case_name.py 生成候选名并检查同名/相似名
 - 如需要 skeleton，用 make_case_skeleton.py 生成保守骨架，再按 test_point 和相似 case 填断言
 - 写完后用 case_gate_pack.py 完成单 case 编译、运行、postcheck 和本轮日志定位
@@ -76,7 +85,8 @@ coverage_scope: repo
 - 用 case_workflow_ledger.py 记录耗时和返工信号
 
 质量要求：
-- 不跳过 spec_profile、repo 级去重、单 case 编译/运行、回填/注册一致性
+- 不跳过规格/平台口径（spec_profile）、repo 级 case 去重、单 case 编译/运行、回填/注册一致性
+- 不需要手动填写 coverage_scope；新增测试点默认全仓 test_point 覆盖检查，补已有条目默认局部测试点检查
 - 不把 skeleton、命名建议、submission draft 或 ledger 当作分层结论
 ```
 
@@ -92,12 +102,11 @@ coverage_scope: repo
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<module>_suspected_bug_corner_points_<n>.md
 platform: spike
-spec_profile: <spec_profile>
+spec_profile: nhv5_1_ap
 
 task_mode: new-case-only
 new_case_count: 1
 target_policy: default-first
-coverage_scope: repo
 target_module: <module>
 
 目标：
@@ -111,7 +120,7 @@ target_module: <module>
 - 新增测试点前，扫描全仓 test_point/*.md，证明类似测试点未覆盖
 - 写 case 前，搜索全仓 ai_test_cases/*.c 和 manual_test_cases/**/*.c，读取 2-5 个相似 case 作为实现参考
 - 同时做精确函数名唯一性检查，不能只凭相似检索未命中
-- 写 case 前确认 spec_profile、Spike gate 适用性和模型边界
+- 写 case 前确认规格/平台口径（spec_profile）、Spike gate 适用性和模型边界
 - 新增 1 个新的 `### PnX` 测试点条目，不复用旧条目
 - 新增 1 个新的 ai_* case，默认放 ai_test_cases 中主题合适的位置；如果已有文件过大或主题不合适，可以新建主题明确的新文件
 - case 必须有可观测断言：数据值、marker progress、guard 不变、异常状态、side effect 边界等按场景选择
@@ -123,7 +132,7 @@ target_module: <module>
 - 回填后检查 test_point 与 test_register.c 一致性
 
 输出要求：
-- 实际使用的 spec_profile
+- 实际使用的规格/平台口径（spec_profile）
 - 新增测试点编号和标题
 - 新增 case 名与文件路径
 - 唯一性证据：repo 级 test_point 覆盖检查、repo 级相似 case 检索 top results、函数名精确唯一性检查
@@ -142,12 +151,11 @@ target_module: <module>
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<module>_suspected_bug_corner_points_<n>.md
 platform: spike
-spec_profile: <spec_profile>
+spec_profile: nhv5_1_ap
 
 task_mode: new-case-only
 new_case_count: 1
 target_policy: default-first
-coverage_scope: repo
 target_module: <module>
 
 目标：
@@ -156,7 +164,7 @@ target_module: <module>
 - 不重复当前文件已实现条目，不把旧条目或旧 case 当新增结果
 
 提速流程：
-- 先用 case_preflight_pack.py 聚合任务输入、profile、repo snapshot、repo evidence index、环境检查、相似 case reading pack 和目标 test_point 摘要
+- 先用 case_preflight_pack.py 聚合任务输入、规格/平台口径、repo snapshot、repo evidence index、环境检查、相似 case reading pack 和目标 test_point 摘要
 - preflight query 至少覆盖：<bug_hunt_focus_terms>
 - 用 repo_evidence_index.py 复用全仓 case/test_point/register 索引缓存，但不能缩小到模块局部范围
 - 用 suggest_case_name.py 生成候选 case 名并检查同名/相似名
@@ -166,7 +174,7 @@ target_module: <module>
 - 用 case_workflow_ledger.py 记录耗时和返工信号
 
 质量要求：
-- 不跳过 spec_profile
+- 不跳过规格/平台口径（spec_profile）
 - 不跳过 repo 级 test_point 覆盖检查
 - 不跳过 repo 级 case 相似检索
 - 不跳过函数名精确唯一性检查
@@ -204,15 +212,15 @@ bug_hunt_focus_terms: memblock, StoreQueue, sbuffer, cmo, cbo.inval, fence, lrsc
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <spec_profile>
+spec_profile: nhv5_1_ap
 
 task_mode: run-only
-coverage_scope: repo
 
 要求：
 - 只做只读分析，不修改文件
 - 跑 case_preflight_pack.py，必要时跑 repo_evidence_index.py 和 find_similar_cases.py
-- 输出目标 test_point 摘要、相似测试点/相似 case、profile/Spike gate 注意点
+- 按“是否要找新增空间”自动选择测试点覆盖范围；如果是跨文件排重，检查全仓 test_point
+- 输出目标 test_point 摘要、相似测试点/相似 case、规格/平台口径和 Spike gate 注意点
 - 给出是否值得新增 case 的建议，但不新增 case、不注册、不编译、不运行
 ```
 
@@ -226,16 +234,16 @@ coverage_scope: repo
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <spec_profile>
+spec_profile: nhv5_1_ap
 
 task_mode: supplement-existing-point
 target_test_point: "### P<id>. <title>"
 new_case_count: 1
-coverage_scope: file
 target_policy: default-first
 
 要求：
 - 只围绕指定 `### P<id>` 补 case，不新增无关测试点
+- 测试点覆盖检查默认围绕该条目/当前文件；case 相似检索仍是 repo 级
 - 仍做 repo 级 case 相似检索和函数名唯一性检查
 - 新增/修改 case 后单 case 编译，非 compile-only 单 case 运行
 - 只在该条目的 `已实现 case` 下轻量回填，并检查 test_register.c 一致性
@@ -250,7 +258,7 @@ target_policy: default-first
 
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 platform: spike
-spec_profile: <spec_profile>
+spec_profile: nhv5_1_ap
 
 task_mode: run-only
 case_name: <case_name>

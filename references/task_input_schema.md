@@ -8,7 +8,7 @@
 | Field | Required When | Value | Notes |
 | --- | --- | --- | --- |
 | `repo_root` | 所有需要读写 hyptest 仓库的任务 | path | 指向 `riscv-hyp-tests-nhv5.1` 仓库根目录。 |
-| `spec_profile` | 可省略 | profile name/path | 默认 profile registry 的 `default_profile`；可显式指定 `references/spec_profiles/<name>.md`。 |
+| `spec_profile` | 可省略 | profile name/path | 规格/平台口径名称；用于判断 Spike gate、模型边界和分层。默认 profile registry 的 `default_profile`；可显式指定 `references/spec_profiles/<name>.md`。 |
 | `platform` | 需要编译/运行/环境检查时 | `spike` / `linknan` | hyptest 平台名只使用这两个值。 |
 | `test_point_file` | 新增/回填测试点时 | path | `test_point` 容器文件；每个 `### PnX` 才是独立测试点。 |
 | `task_mode` | 新增/修改 case 时 | enum | 常用值见下表。 |
@@ -21,7 +21,7 @@
 | --- | --- | --- | --- |
 | `case_name` | none | string | 单 case 编译/运行/定位时建议提供。 |
 | `new_case_count` | `1` | integer/range | `new-case-only` 时建议提供，例如 `1-3`。 |
-| `coverage_scope` | auto | `file` / `repo` | 补已有点优先 `file`；新增测试点或跨文件排重用 `repo`。 |
+| `coverage_scope` | auto | `file` / `repo` | 一般不用填；workflow 根据任务目的推导。补已有点默认 `file`；新增测试点或跨文件排重默认 `repo`。 |
 | `target_policy` | `default-first` | enum | 可选 `default-first`、`manual-ok`、`compile-only-ok`。 |
 | `reason_code` | none | catalog code | 已有结论时可指定；否则由日志/profile 推断。 |
 | `failure_log` | none | path/text | 失败归因或分层初判时提供。 |
@@ -39,10 +39,11 @@
 
 ## Defaults
 
-- 未指定 `spec_profile` 时默认使用 profile registry 中的 `default_profile`。
+- 未指定 `spec_profile` 时默认使用 profile registry 中的 `default_profile`。它表示当前项目的规格/平台口径，不是功能开关；正式新增 case 时建议显式写出当前项目 profile。
 - 未指定 `coverage_scope` 时：
-  - 明确已有 `### PnX` 或补已有点，按 `file`。
-  - `new-case-only` 或要求跨文件排重，按 `repo`。
+  - 明确已有 `### PnX` 或补已有点，自动按 `file`。
+  - `new-case-only`、继续找 suspected bug point 或要求跨文件排重，自动按 `repo`。
+  - case 相似检索始终是 repo 级，不随 `coverage_scope=file` 缩小。
 - 未指定 `target_policy` 时按 `default-first`。
 - `platform=xiangshan` 不是 hyptest 平台名，应改为 `platform=linknan`。
 

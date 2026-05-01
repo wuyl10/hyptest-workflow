@@ -73,10 +73,10 @@ python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-fi
   python3 scripts/repo_evidence_index.py --repo-root <repo_root> --query '<scenario terms>' --json
   ```
 
-- `case-preflight-pack`: 写 case 前聚合任务、profile、环境、repo 快照和相似 case reading pack，并使用保守缓存复用结果。
+- `case-preflight-pack`: 写 case 前聚合任务、规格/平台口径、环境、repo 快照和相似 case reading pack；覆盖范围可按 task_mode 自动推导。
 
   ```bash
-  python3 scripts/case_preflight_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --coverage-scope repo --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
+  python3 scripts/case_preflight_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
   ```
 
 - `case-skeleton`: 从 preflight 证据生成保守 C 骨架，不裁决 case 语义。

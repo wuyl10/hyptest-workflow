@@ -1,6 +1,6 @@
 ---
 name: hyptest-workflow
-description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（nhv5.1 分支目录）的 hyptest 测试点到用例落地工作流。凡是涉及新增/修改 ai_test_cases 或 manual_test_cases 用例、更新 test_register.c、根据 test_point 回填映射、执行 compile_elf.py 和 get_result.py 编译批跑、分析 Spike/LinkNan 日志并做 default/manual/compile-only 分层决策时，都应触发此技能；当用户要求检查“类似测试点是否已经覆盖”“其它文件里有没有重复 case”“跨 test_point 文件排重/扩点”时也必须使用本技能；涉及规格/平台模型边界时通过 spec_profile=<name> 选择 references/spec_profiles/<name>.md。
+description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（nhv5.1 分支目录）的 hyptest 测试点到用例落地工作流。凡是涉及新增/修改 ai_test_cases 或 manual_test_cases 用例、更新 test_register.c、根据 test_point 回填映射、执行 compile_elf.py 和 get_result.py 编译批跑、分析 Spike/LinkNan 日志并做 default/manual/compile-only 分层决策时，都应触发此技能；当用户要求检查“类似测试点是否已经覆盖”“其它文件里有没有重复 case”“跨 test_point 文件排重/扩点”时也必须使用本技能；涉及规格/平台模型边界时通过规格/平台口径 spec_profile=<name> 选择 references/spec_profiles/<name>.md。
 ---
 
 # HYPTEST Workflow
@@ -33,13 +33,13 @@ directories, platform names, and environment variables. The fast anchors are:
 - 项目规则：`test_point/Manual_Reference.md`
 - 历史线索：`test_point/CRITICAL_ISSUES_LOG.md`
 
-## Spec Profile Parameter
+## Spec Profile / 规格平台口径
 
-- `spec_profile=<name>` 选择规格 profile，读取 `references/spec_profiles/<name>.md`。
+- `spec_profile=<name>` 是当前项目的规格/平台口径名称，用来判断 Spike gate、PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界和 default/manual/compile-only/blocked 分层。
 - 示例：`spec_profile=<name>` 对应 `references/spec_profiles/<name>.md`。
 - 若用户给的是 profile 文件路径，按该文件路径读取；若只给名称，按 `references/spec_profiles/<name>.md` 解析。
 - 显式 `spec_profile` 优先；未指定时读取 `references/spec_profiles/index.json` 的 `default_profile`。
-- 最终交付摘要中应记录实际使用的 `spec_profile`。
+- 最终交付摘要中应记录实际使用的规格/平台口径（`spec_profile`）。
 - 需要确认 profile 路径时，使用 `python3 scripts/resolve_spec_profile.py --spec-profile <name>`。
 - 可选 profile 与默认 profile 记录在 `references/spec_profiles/index.json`。
 - `SKILL.md` 不承载 profile 专属规则；no-H、PMP 粒度、PMA/PBMT/MMIO、Spike gate 等具体规格只写在对应 profile 中。
@@ -53,6 +53,9 @@ directories, platform names, and environment variables. The fast anchors are:
 
 ## Coverage Scope
 
+- 普通任务中不要要求用户手动填写 `coverage_scope`；先根据用户目的自动推导覆盖范围。
+- 若用户要求新增测试点、继续找 suspected bug point、跨文件排重或 `task_mode=new-case-only`，默认按 `coverage_scope=repo` 做全仓 `test_point/*.md` 覆盖检查。
+- 若用户明确要求补已有 `### PnX` 或 `task_mode=supplement-existing-point`，默认按 `coverage_scope=file` 围绕当前条目/文件做局部测试点检查。
 - `coverage_scope=file`：仅围绕当前 `test_point_file` 或指定 `### PnX` 做局部测试点排重；适合“补已有测试点模式”。
 - `coverage_scope=repo`：扫描全仓 `test_point/*.md` 做类似测试点覆盖检查；适合“新增测试点模式”和用户明确要求跨文件排重的任务。
 - `case` 去重始终是 repo 级；`find_similar_cases.py` 始终搜索全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。
@@ -71,7 +74,7 @@ directories, platform names, and environment variables. The fast anchors are:
 
 ## Non-Negotiables
 
-- 写新 case 或判断 Spike 结果前，必须先确定 `spec_profile`（未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，明确规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
+- 写新 case 或判断 Spike 结果前，必须先确定规格/平台口径（`spec_profile`；未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，明确规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
 - 一个 case 函数只能有一个 `TEST_END(...)`。
 - 只要本步骤要断言 `excpt.triggered/cause/tval`，都先调用 `TEST_SETUP_EXCEPT()`。
 - 注册统一放在 `test_register.c`，不在 case 源文件末尾注册。
@@ -86,7 +89,7 @@ directories, platform names, and environment variables. The fast anchors are:
 - 严禁文件级误判：不能把整个 `test_point_file` 当成单个测试点，也不能因为文件之前改过，就停止继续处理新条目或误把旧条目当新增结果。
 - `new-case-only` 且未指定已有条目时，默认必须新增新的 `### PnX` 条目和新的 `ai_*` case；若属于补已有测试点模式，则默认优先在指定旧条目下补 case，不强行新增新条目。
 - 若扫描后未发现新的高价值测试点，必须明确说明“未发现新的测试点 / 未新增 case”，不能把旧条目或旧 case 再次作为新增结果交付。
-- 新增测试点前，必须先做测试点覆盖检查；`coverage_scope=repo` 时必须扫描全仓 `test_point/*.md`，不能只看当前文件就声称“全仓未覆盖”。
+- 新增测试点前，必须先做测试点覆盖检查；默认按全仓 `test_point/*.md` 扫描，不能只看当前文件就声称“全仓未覆盖”。
 - 写新 case 前，必须同时做 repo 级 case 相似检索和精确唯一性检索；“相似检索未命中”和“函数名唯一”不是同一件事，两者都要留证据。
 
 ## Source Priority
@@ -121,7 +124,7 @@ directories, platform names, and environment variables. The fast anchors are:
 
 ## Workflow
 
-1. 锁定输入：确认 `repo_root`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）；必要时用 `scripts/check_env.py` 先检查平台环境。
+1. 锁定输入：确认 `repo_root`、`test_point_file`、平台、case 名、目标分层和规格/平台口径（`spec_profile`；未指定则用 profile registry 中的 `default_profile`）；必要时用 `scripts/check_env.py` 先检查平台环境。
    - 若输入字段较多或存在旧平台名/不确定模式，先用 `scripts/validate_task_request.py` 做 preflight。
 2. 区分补已有测试点模式和新增测试点模式；`test_point_file` 是容器文件，每个 `### PnX` 才是独立测试点条目。
 3. 按 `references/coverage_and_dedupe.md` 做测试点覆盖检查、repo 级 case 相似检索和精确唯一性检索。
@@ -145,7 +148,7 @@ directories, platform names, and environment variables. The fast anchors are:
 ## Output Defaults
 
 - 默认最终摘要至少包含：改动文件、case 名、编译结果、运行结果、关键日志路径。
-- 默认最终摘要记录实际使用的 `spec_profile`。
+- 默认最终摘要记录实际使用的规格/平台口径（`spec_profile`）。
 - 只有存在非 pass Gate 或用户明确要求时，才在最终摘要里输出 `[质量门禁结果]`。
 - 只有最终不是 `default`，或用户明确要求时，才在最终摘要里输出 `decision_prelim` / `decision_final` / `reason_code`。
 - `compile-only` 必须显式写 Gate D=`N/A` 与不运行原因。

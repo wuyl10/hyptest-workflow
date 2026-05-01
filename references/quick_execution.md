@@ -30,7 +30,7 @@ Gate 对照（便于与 `references/quality_gate.md` 对齐）：
 - 测试点文件与条目
 - case 名
 - 平台（通常 `spike`）
-- `spec_profile`（可显式指定；未指定时默认 profile registry 的 `default_profile`）
+- 规格/平台口径（`spec_profile`，可显式指定；未指定时默认 profile registry 的 `default_profile`）
 - 分层目标（default/manual/compile-only）
 
 通过标准：
@@ -60,7 +60,6 @@ python3 scripts/case_preflight_pack.py \
   --spec-profile <spec_profile> \
   --task-mode new-case-only \
   --new-case-count 1 \
-  --coverage-scope repo \
   --query '<scenario terms>' \
   --md-out .hyptest_skill_reports/case_preflight.md \
   --json-out .hyptest_skill_reports/case_preflight.json
@@ -68,7 +67,8 @@ python3 scripts/case_preflight_pack.py \
 
 说明：
 
-- `case_preflight_pack.py` 会并行执行输入、profile、repo snapshot、相似 case 和环境检查。
+- `case_preflight_pack.py` 会并行执行输入、规格/平台口径、repo snapshot、相似 case 和环境检查。
+- 未显式传 `--coverage-scope` 时，脚本会按 `--task-mode` 推导：`new-case-only` 默认 repo，`supplement-existing-point` 默认 file；case 相似检索仍始终是 repo 级。
 - `case_preflight_pack.py` 会同时调用 `repo_evidence_index.py`，构建或复用全仓 case、`test_point` 条目和注册状态索引。该索引按文件指纹失效，不按模块裁剪覆盖范围。
 - preflight pack 使用保守缓存；只要输入参数、目标 test_point、`test_point/*.md`、`ai_test_cases/*.c`、`manual_test_cases/**/*.c`、`test_register.c`、关键环境变量、toolchain 命中路径、profile 文件或相关 skill 脚本发生变化，缓存就会失效。
 - 如需强制重跑，加 `--no-pack-cache`。
@@ -77,7 +77,7 @@ python3 scripts/case_preflight_pack.py \
 
 执行：
 
-1. 先按 `references/spec_and_model_limits.md` 选择 `spec_profile`（未指定时默认 profile registry 的 `default_profile`），并按 `references/spec_profiles/<spec_profile>.md` 确认规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
+1. 先按 `references/spec_and_model_limits.md` 选择规格/平台口径（`spec_profile`，未指定时默认 profile registry 的 `default_profile`），并按 `references/spec_profiles/<spec_profile>.md` 确认规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
 2. 再检索 2~5 个相似存量 case，优先复用已有写法中的结构、断言和环境构造。
    如果测试点描述较长、分支较多，优先让脚本先生成 reading pack，再由模型抽象哪些结构值得学、哪些不能照搬。
 3. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
@@ -281,7 +281,7 @@ python3 scripts/check_writeback_format.py \
 最小交付内容：
 
 - 改动文件列表
-- 实际使用的 `spec_profile`
+- 实际使用的规格/平台口径（`spec_profile`）
 - case 列表（默认只列 `case_name`；必要时附短状态）
 - 编译结果
 - 运行结果

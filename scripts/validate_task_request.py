@@ -157,6 +157,16 @@ def normalize_platform(platform_raw: str | None) -> str | None:
     return platform
 
 
+def infer_coverage_scope(task_mode: str | None, explicit_scope: str | None) -> str | None:
+    if explicit_scope:
+        return explicit_scope
+    if task_mode == "new-case-only":
+        return "repo"
+    if task_mode == "supplement-existing-point":
+        return "file"
+    return None
+
+
 def build_next_commands(normalized: dict[str, object]) -> list[str]:
     profile = str(normalized.get("spec_profile") or default_spec_profile())
     repo_root = normalized.get("repo_root")
@@ -289,12 +299,6 @@ def main() -> int:
                 "task_mode=new-case-only requires --new-case-count like 1 or 1-3",
                 "pass --new-case-count 1 or --new-case-count 1-3",
             )
-        if not coverage_scope:
-            add_warning(
-                warnings,
-                "coverage_scope omitted; default workflow will use repo-level coverage",
-                "pass --coverage-scope repo for new test points or --coverage-scope file for local supplements",
-            )
 
     if task_mode in {"fix-case", "run-only"} and not case_name:
         add_warning(
@@ -316,6 +320,7 @@ def main() -> int:
                 "pass --failure-log <log> or --case-name <case_name>",
             )
 
+    inferred_coverage_scope = infer_coverage_scope(task_mode, coverage_scope)
     normalized = {
         "repo_root": str(repo_root) if repo_root else None,
         "test_point_file": str(test_point_file) if test_point_file else None,
@@ -326,7 +331,7 @@ def main() -> int:
         "task_mode": task_mode,
         "case_name": case_name,
         "new_case_count": new_case_count,
-        "coverage_scope": coverage_scope or ("repo" if task_mode == "new-case-only" else None),
+        "coverage_scope": inferred_coverage_scope,
     }
     payload = {
         "ok": not issues,
@@ -346,7 +351,7 @@ def main() -> int:
             "task_mode": task_mode,
             "case_name": case_name,
             "new_case_count": new_case_count,
-            "coverage_scope": coverage_scope,
+            "coverage_scope": inferred_coverage_scope,
         },
     }
 
