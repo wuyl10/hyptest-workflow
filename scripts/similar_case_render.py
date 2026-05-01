@@ -215,7 +215,7 @@ def render_reading_pack(payload: Dict[str, object]) -> str:
     lines: List[str] = []
     lines.append("# Similar Case Reading Pack")
     lines.append("")
-    lines.append(f"repo_root: {payload['repo_root']}")
+    lines.append(f"HYPTEST_HOME: {payload['repo_root']}")
     lines.append(f"query_terms: {summarize_terms(payload['query_terms'])}")
     if payload.get("focus_terms"):
         lines.append(f"focus_terms: {summarize_terms(payload['focus_terms'])}")

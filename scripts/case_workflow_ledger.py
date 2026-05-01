@@ -188,7 +188,7 @@ def render_markdown(ledger: dict[str, Any]) -> str:
         "# hyptest case workflow ledger",
         "",
         f"- case: `{ledger.get('case')}`",
-        f"- repo_root: `{ledger.get('repo_root') or ''}`",
+        f"- HYPTEST_HOME: `{ledger.get('repo_root') or ''}`",
         f"- test_point_file: `{ledger.get('test_point_file') or ''}`",
         f"- platform: `{ledger.get('platform') or ''}`",
         f"- spec_profile: `{ledger.get('spec_profile') or ''}`",

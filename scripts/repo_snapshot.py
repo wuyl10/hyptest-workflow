@@ -9,7 +9,7 @@ import os
 import re
 from pathlib import Path
 
-from skill_config import resolve_path
+from skill_config import CANONICAL_ENV_NAMES, hyptest_env_name, process_env_value, resolve_path
 
 
 CASE_FUNC_RE = re.compile(r"^\s*(?:static\s+)?bool\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", re.MULTILINE)
@@ -108,8 +108,10 @@ def latest_result_logs(root: Path) -> list[str]:
 
 
 def env_summary() -> dict[str, object]:
-    names = ["CROSS_COMPILE", "SPIKE_BIN", "LINKNAN_HOME", "DIFFTEST_REF_SO"]
-    return {name: bool(os.environ.get(name, "").strip()) for name in names}
+    return {
+        hyptest_env_name(name): bool(process_env_value(name))
+        for name in CANONICAL_ENV_NAMES
+    }
 
 
 def build_snapshot(root: Path) -> dict[str, object]:
@@ -143,7 +145,7 @@ def main() -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(("PASS" if ok else "FAIL") + " hyptest repo snapshot")
-        print(f"repo_root: {payload['repo_root']}")
+        print(f"HYPTEST_HOME: {payload['repo_root']}")
         print("anchors:")
         for rel, exists in payload["anchors"].items():
             print(f"  {'ok' if exists else 'missing'}: {rel}")

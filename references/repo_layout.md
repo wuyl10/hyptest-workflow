@@ -41,7 +41,7 @@ Do not introduce the removed legacy name back into scripts or docs.
 
 These helper directories are safe to delete at any time.
 
-Use `python3 scripts/clean_generated.py --repo-root <repo_root>` to remove them.
+Use `python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME` to remove them.
 
 ## Platform Names
 
@@ -58,14 +58,27 @@ references, for example `src/main/scala/xiangshan/...`.
 
 ## Environment Variables
 
-Use explicit environment variables instead of personal absolute paths:
+Use prompt-scoped `HYPTEST_*` environment variables instead of personal
+absolute paths or generic project-wide names:
 
 ```text
-CROSS_COMPILE     RISC-V toolchain prefix, default usually riscv64-unknown-elf-
-SPIKE_BIN         official Spike executable for get_result.py --platform spike
-LINKNAN_HOME      LinkNan workspace root for compile/run on platform linknan
-DIFFTEST_REF_SO   difftest reference shared object for LinkNan runs
+HYPTEST_CROSS_COMPILE    RISC-V toolchain prefix, default usually riscv64-unknown-elf-
+HYPTEST_SPIKE_BIN        community/upstream Spike executable for get_result.py --platform spike
+HYPTEST_LINKNAN_HOME     LinkNan workspace root for compile/run on platform linknan
+HYPTEST_DIFFTEST_REF_SO  difftest reference shared object for LinkNan runs, often from custom Spike
+HYPTEST_TMPDIR           temporary directory when /tmp is too small
 ```
 
 If a required env var is missing, prefer a clear error over silently falling
 back to another user's path.
+
+Keep runner roles separate: use `HYPTEST_SPIKE_BIN` for community/upstream Spike
+architecture gate evidence, and use `HYPTEST_DIFFTEST_REF_SO` for LinkNan/project
+difftest evidence. Nanhu RTL/source evidence is derived only from the
+initialized LinkNan submodule at
+`HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`.
+
+The skill-facing environment uses only `HYPTEST_*` names to avoid collisions
+with other projects. When invoking hyptest repo scripts, the skill maps
+`HYPTEST_SPIKE_BIN` to the runtime `SPIKE_BIN` that `get_result.py` already
+expects.

@@ -230,7 +230,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
 def render_text(report: dict[str, Any]) -> str:
     lines = ["PASS repo evidence index" if report.get("ok") else "FAIL repo evidence index"]
-    lines.append(f"repo_root: {report.get('repo_root')}")
+    lines.append(f"HYPTEST_HOME: {report.get('repo_root')}")
     cache = report.get("cache", {})
     lines.append(f"cache: {'hit' if cache.get('hit') else 'miss'} {cache.get('path') or ''}".rstrip())
     summary = report.get("summary", {})

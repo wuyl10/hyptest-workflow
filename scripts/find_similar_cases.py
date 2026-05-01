@@ -317,7 +317,7 @@ def main() -> int:
         print(payload["reading_pack"])
         return 0
 
-    print(f"repo_root: {payload['repo_root']}")
+    print(f"HYPTEST_HOME: {payload['repo_root']}")
     print(f"query_terms: {summarize_terms(payload['query_terms'])}")
     print(f"focus_terms: {summarize_terms(payload['focus_terms'])}")
     print(f"retrieval_status: {payload['retrieval_status']}")

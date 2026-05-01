@@ -204,16 +204,18 @@ ls result_log/spike | tail
 开始编译/运行前，建议先检查 repo anchors 和平台环境变量：
 
 ```bash
-python3 scripts/check_env.py --repo-root <repo_root> --platform spike
-python3 scripts/check_env.py --repo-root <repo_root> --platform linknan
+python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform spike
+python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform linknan
 ```
 
 `check_env.py` 只检查环境是否足够执行，不会 fallback 到个人路径。
 
+`HYPTEST_SPIKE_BIN` 尽量指向社区版/上游 riscv-isa-sim Spike，用于 `platform=spike` 的 architecture/default gate。后续 LinkNan/difftest 使用 `HYPTEST_DIFFTEST_REF_SO` 指向定制参考模型，不要把定制 difftest Spike 混作 `HYPTEST_SPIKE_BIN`。
+
 需要提示 export 写法时：
 
 ```bash
-python3 scripts/check_env.py --repo-root <repo_root> --platform spike --print-exports
+python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform spike --print-exports
 ```
 
 ## 8. default/manual/compile-only 决策

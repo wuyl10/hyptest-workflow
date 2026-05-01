@@ -33,8 +33,8 @@ def chmod_exec(path: Path) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, capture_output=True, text=True, check=False)
+def run(command: list[str], *, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, capture_output=True, text=True, check=False, env=env)
 
 
 def load_json_output(
@@ -62,6 +62,26 @@ def main() -> int:
     profile = default_spec_profile()
     with tempfile.TemporaryDirectory(prefix="hyptest_case_gate_", dir=temp_parent()) as tmpdir:
         tmp = Path(tmpdir)
+        toolchain = tmp / "toolchain"
+        toolchain.mkdir()
+        write(toolchain / "riscv64-unknown-elf-gcc", "#!/bin/sh\nexit 0\n")
+        chmod_exec(toolchain / "riscv64-unknown-elf-gcc")
+        spike = tmp / "spike"
+        write(spike, "#!/bin/sh\nexit 0\n")
+        chmod_exec(spike)
+        env = os.environ.copy()
+        for name in (
+            "SPIKE_BIN", "LINKNAN_HOME", "NANHU_HOME", "DIFFTEST_REF_SO",
+            "CROSS_COMPILE", "TMPDIR",
+        ):
+            env.pop(name, None)
+        env.update(
+            {
+                "PATH": f"{toolchain}:{os.environ.get('PATH', '')}",
+                "HYPTEST_CROSS_COMPILE": "riscv64-unknown-elf-",
+                "HYPTEST_SPIKE_BIN": str(spike),
+            }
+        )
         repo = tmp / "repo"
         case_name = "ai_arch_gate_smoke_case"
 
@@ -81,7 +101,9 @@ def main() -> int:
             repo / "get_result.py",
             "#!/usr/bin/env python3\n"
             "import argparse\n"
+            "import os\n"
             "from pathlib import Path\n"
+            "assert os.environ.get('SPIKE_BIN'), 'SPIKE_BIN runtime mapping missing'\n"
             "p=argparse.ArgumentParser(); p.add_argument('--platform', default='spike'); p.add_argument('--case', required=True); a=p.parse_args()\n"
             "out=Path('result_log')/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
             "(out/(a.case+'_smoke.log')).write_text('PASSED\\nHIT GOOD TRAP\\n')\n"
@@ -126,7 +148,8 @@ def main() -> int:
                 "--spec-profile",
                 profile,
                 "--json",
-            ]
+            ],
+            env=env,
         )
         payload = load_json_output(completed, failures, "case_gate_pack")
         if payload:
@@ -166,6 +189,8 @@ def main() -> int:
             no_log_repo / "get_result.py",
             "#!/usr/bin/env python3\n"
             "import argparse\n"
+            "import os\n"
+            "assert os.environ.get('SPIKE_BIN'), 'SPIKE_BIN runtime mapping missing'\n"
             "p=argparse.ArgumentParser(); p.add_argument('--platform', default='spike'); p.add_argument('--case', required=True); a=p.parse_args()\n"
             "print('PASSED without log', a.case)\n",
         )
@@ -208,7 +233,8 @@ def main() -> int:
                 "--spec-profile",
                 profile,
                 "--json",
-            ]
+            ],
+            env=env,
         )
         no_log_payload = load_json_output(
             no_log_completed,
@@ -242,7 +268,8 @@ def main() -> int:
                 profile,
                 "--compile-only",
                 "--json",
-            ]
+            ],
+            env=env,
         )
         compile_only_payload = load_json_output(
             compile_only_completed,
@@ -314,7 +341,8 @@ def main() -> int:
                 "--spec-profile",
                 profile,
                 "--json",
-            ]
+            ],
+            env=env,
         )
         compile_fail_payload = load_json_output(
             compile_fail_completed,
@@ -350,7 +378,9 @@ def main() -> int:
             run_fail_repo / "get_result.py",
             "#!/usr/bin/env python3\n"
             "import argparse, sys\n"
+            "import os\n"
             "from pathlib import Path\n"
+            "assert os.environ.get('SPIKE_BIN'), 'SPIKE_BIN runtime mapping missing'\n"
             "p=argparse.ArgumentParser(); p.add_argument('--platform', default='spike'); p.add_argument('--case', required=True); a=p.parse_args()\n"
             "out=Path('result_log')/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
             "(out/(a.case+'_failed.log')).write_text('FAILED\\nassert_site=smoke assert_expr=0\\n')\n"
@@ -395,7 +425,8 @@ def main() -> int:
                 "--spec-profile",
                 profile,
                 "--json",
-            ]
+            ],
+            env=env,
         )
         run_fail_payload = load_json_output(
             run_fail_completed,

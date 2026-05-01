@@ -219,7 +219,7 @@ def render_markdown(card: dict[str, Any]) -> str:
         "# hyptest case submission evidence card",
         "",
         f"- case: `{case}`",
-        f"- repo_root: `{card.get('repo_root') or ''}`",
+        f"- HYPTEST_HOME: `{card.get('repo_root') or ''}`",
         f"- test_point_file: `{card.get('test_point_file') or ''}`",
         f"- platform: `{card.get('platform') or ''}`",
         f"- spec_profile: `{card.get('spec_profile') or ''}`",

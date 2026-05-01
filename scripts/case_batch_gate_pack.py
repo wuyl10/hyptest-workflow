@@ -37,6 +37,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-compile", action="store_true", help="Pass --skip-compile to each gate.")
     parser.add_argument("--skip-run", action="store_true", help="Pass --skip-run to each gate.")
     parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Pass environment override to each case gate, e.g. --env HYPTEST_SPIKE_BIN=/path/to/spike.",
+    )
+    parser.add_argument(
         "--parallel",
         action="store_true",
         help=(
@@ -98,6 +105,8 @@ def run_case(args: argparse.Namespace, case_name: str) -> dict[str, Any]:
         command.append("--skip-compile")
     if args.skip_run:
         command.append("--skip-run")
+    for item in args.env:
+        command.extend(["--env", item])
 
     started = time.monotonic()
     completed = subprocess.run(command, cwd=str(SKILL_ROOT), capture_output=True, text=True, check=False)
@@ -172,7 +181,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# hyptest batch case gate pack",
         "",
-        f"- repo_root: `{report['repo_root']}`",
+        f"- HYPTEST_HOME: `{report['repo_root']}`",
         f"- test_point_file: `{report['test_point_file']}`",
         f"- platform: `{report['platform']}`",
         f"- spec_profile: `{report['spec_profile']}`",

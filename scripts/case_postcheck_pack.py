@@ -337,7 +337,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# hyptest case postcheck pack",
         "",
-        f"- repo_root: `{report['repo_root']}`",
+        f"- HYPTEST_HOME: `{report['repo_root']}`",
         f"- test_point_file: `{report['test_point_file']}`",
         f"- platform: `{report['platform']}`",
         f"- spec_profile: `{report['spec_profile']}`",

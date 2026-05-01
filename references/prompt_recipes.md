@@ -2,29 +2,87 @@
 
 本文放 `hyptest-workflow` 的可复制 prompt 模板。README 只保留快速入口；完整模板放这里，避免 README 过长。
 
-## riscv-hyp-tests 仓库位置
+## 本轮环境变量写法
 
-`repo_root` 是 prompt 字段名，含义是 `riscv-hyp-tests` 仓库根目录。共享文档里建议写成占位符，使用时替换为实际仓库位置：
+日常 prompt 不需要写完整环境清单。规则很简单：当前 Codex/脚本进程已经能读到的变量可以省略；读不到、但本轮必需的变量才写进 prompt。prompt 中显式写的值优先于 shell 环境，并会作为本轮脚本覆盖传入，例如 `--env HYPTEST_SPIKE_BIN=<path>`。
+
+| 字段 | 什么时候需要 | 写法 | 备注 |
+| --- | --- | --- | --- |
+| `HYPTEST_HOME` | 需要读写 `riscv-hyp-tests` 仓库，且当前环境没有 `HYPTEST_HOME` 时 | `<riscv-hyp-tests-nhv5.1 仓库根目录>` 或 `$HYPTEST_HOME` | 目标 `riscv-hyp-tests` 仓库根目录；脚本 CLI 内部仍使用 `--repo-root`。 |
+| `HYPTEST_SPIKE_BIN` | `platform=spike` 且会运行 gate，当前环境没有 `HYPTEST_SPIKE_BIN` 时 | `<community/upstream Spike 可执行文件>` 或 `$HYPTEST_SPIKE_BIN` | 尽量指向社区版/上游 riscv-isa-sim Spike，用于 architecture/default gate。 |
+| `HYPTEST_LINKNAN_HOME` | `platform=linknan`，或需要读取 LinkNan/Nanhu 源码证据，且当前环境没有 `HYPTEST_LINKNAN_HOME` 时 | `<LinkNan 仓库根目录>` 或 `$HYPTEST_LINKNAN_HOME` | Nanhu 源码固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。 |
+| `HYPTEST_DIFFTEST_REF_SO` | `platform=linknan` 且会运行 gate，当前环境没有 `HYPTEST_DIFFTEST_REF_SO` 时 | `<riscv64-spike-so 路径>` 或 `$HYPTEST_DIFFTEST_REF_SO` | 定制 Spike/difftest reference 走这里，不要混作 `HYPTEST_SPIKE_BIN`。 |
+| `HYPTEST_TMPDIR` | `/tmp` 空间不足时 | `/nfs/home/<user>/.tmp` | 只影响本轮临时目录。 |
+
+对外 prompt、共享模板和当前进程环境统一写 `HYPTEST_HOME` 和 `HYPTEST_*`。这些是 workflow 的输入字段；调用 `riscv-hyp-tests` 仓库脚本时需要的运行时适配由 workflow 脚本处理。
+
+复制模板后必须替换所有尖括号占位符，例如 `<xxx>`、`<module>`、`<当前项目 spec_profile>`。preflight 会把未替换占位符当成无效输入，而不是继续猜路径或 profile。
+
+### 日常最短写法
+
+如果环境已经设置好，prompt 里直接从任务字段开始即可：
 
 ```text
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
+platform: spike
+spec_profile: <当前项目 spec_profile>
 ```
 
-如果团队希望少写路径，可以约定一个明确的便利变量：
+如果当前进程看不到必需变量，只补缺的变量。例如 spike-only gate 缺路径时：
 
 ```text
-repo_root: $HYPTEST_REPO
+HYPTEST_HOME: <riscv-hyp-tests-nhv5.1 仓库根目录>
+HYPTEST_SPIKE_BIN: <community/upstream Spike 可执行文件>
 test_point_file: test_point/<xxx>.md
+platform: spike
 ```
 
-仓库路径变量只是个人或团队便利别名，不要求 hyptest 仓库必须提供。脚本入口会展开 `$VAR` 路径，所以 request 文件或命令里可以用团队已有变量名。`SPIKE_BIN`、`LINKNAN_HOME`、`DIFFTEST_REF_SO`、`CROSS_COMPILE` 仍按 hyptest 仓库的编译/运行环境说明设置，这里不复制配置说明。
+围绕模块找 suspected bug 且需要读 Nanhu 源码时，只额外给 LinkNan 根目录；不需要单独给 Nanhu 路径：
 
-如果 `test_point_file` 写相对路径，按 `repo_root` 下的路径理解；如果写绝对路径，也可以使用 `$HYPTEST_REPO/test_point/<file>.md`。不要在共享文档里写个人绝对路径。
+```text
+HYPTEST_HOME: <riscv-hyp-tests-nhv5.1 仓库根目录>
+HYPTEST_SPIKE_BIN: <community/upstream Spike 可执行文件>
+HYPTEST_LINKNAN_HOME: <LinkNan 仓库根目录>
+test_point_file: test_point/<module>_suspected_bug_corner_points_<n>.md
+platform: spike
+```
+
+跑 LinkNan / difftest gate 时给 LinkNan 和 difftest-ref；`HYPTEST_SPIKE_BIN` 与本轮无关，可以省略：
+
+```text
+HYPTEST_HOME: <riscv-hyp-tests-nhv5.1 仓库根目录>
+HYPTEST_LINKNAN_HOME: <LinkNan 仓库根目录>
+HYPTEST_DIFFTEST_REF_SO: <riscv64-spike-so 路径>
+platform: linknan
+```
+
+### 省略规则
+
+workflow 会根据 `platform` 和 `task_mode` 判断本轮真正需要哪些 runner 环境：spike gate 检查 `HYPTEST_SPIKE_BIN`；LinkNan gate 检查 `HYPTEST_LINKNAN_HOME`、`HYPTEST_DIFFTEST_REF_SO` 和 LinkNan submodule 里的 Nanhu 源码；`preflight-only` 不会因为 runner 环境缺失而阻塞。
+
+可以写自然语言说明“本轮只跑 spike，不跑 LinkNan”，也可以完全省略无关组件。
+
+如果团队已经设置好变量，不需要在 prompt 里再写 `$HYPTEST_HOME`、`$HYPTEST_SPIKE_BIN` 这类重复行。只有在共享模板、可移植 request 文件、或需要强调本轮使用哪个变量时，才写 `$VAR`。变量必须能被 Codex/脚本所在的非交互 shell 读到。如果写在 `~/.bashrc`，要放在 `case $-` / `return` 这类保护之前；否则终端里能看到，脚本或 CI 可能看不到。
+
+### 识别不到时怎么提醒
+
+preflight 不会用历史聊天或 PATH 猜关键路径。必需字段缺失时先停下并指出要补哪一项；与本轮平台无关的环境变量不会要求你补。
+
+| 场景 | 提醒类型 | 你需要补什么 |
+| --- | --- | --- |
+| prompt 没写 `HYPTEST_HOME`，当前进程也没有 `HYPTEST_HOME` | issue，不能继续落地/运行 | `HYPTEST_HOME: <riscv-hyp-tests-nhv5.1 仓库根目录>` 或让当前进程可见 `HYPTEST_HOME` |
+| prompt 写了 `$HYPTEST_HOME` / `$HYPTEST_SPIKE_BIN`，但当前进程展开不了 | issue，视为缺失 | 写实际路径，或把对应 `export` 放到 Codex/脚本能读到的位置 |
+| `platform=spike` 且要运行 gate，但没有 `HYPTEST_SPIKE_BIN` | issue，不跑 spike gate | `HYPTEST_SPIKE_BIN: <community/upstream Spike 可执行文件>` 或让当前进程可见 `HYPTEST_SPIKE_BIN` |
+| `platform=linknan` 且要运行 gate，但缺 `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` | issue，不跑 linknan gate | 补缺失字段；Nanhu 源码会从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导 |
+| `platform=linknan` 且 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 不存在 | issue，不跑 linknan gate | 初始化 LinkNan 的 `dependencies/nanhu` submodule，或修正 `HYPTEST_LINKNAN_HOME` |
+
+如果 `test_point_file` 写相对路径，按 `HYPTEST_HOME` 下的路径理解；如果写绝对路径，也可以使用 `$HYPTEST_HOME/test_point/<file>.md`。不要在共享文档里写个人绝对路径。
+
+连续对话里，workflow 可以沿用前文理解任务意图，例如你前面刚指定了 `riscv-hyp-tests` 仓库、测试点文件和平台，后面说“继续新增 1 个用例”通常能被理解。但脚本 preflight 不读聊天历史；真正执行前仍以本轮 prompt、CLI 参数和当前进程环境为准。为了可复现，正式交付或让别人复跑时，建议仍写清 `test_point_file`、`platform`、`spec_profile` 和任务目标；路径变量只在当前环境不可见时补充。
 
 ## 规格/平台口径和覆盖范围
 
-`spec_profile` 是“规格/平台口径”的名字，不是功能开关。它告诉 workflow 当前项目按哪套规则判断 Spike gate、PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界，以及 case 是否能进入 `default`。当前 `riscv-hyp-tests-nhv5.1` 常用示例是：
+`spec_profile` 是“规格/平台口径”的名字，不是功能开关。它告诉 workflow 当前项目按哪套规则判断 Spike gate、PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界，以及 case 是否能进入 `default`。模板里写 `<当前项目 spec_profile>`，使用时替换为当前项目 profile。当前 `riscv-hyp-tests-nhv5.1` 常用示例是：
 
 ```text
 spec_profile: nhv5_1_ap
@@ -39,10 +97,9 @@ spec_profile: nhv5_1_ap
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: nhv5_1_ap
+spec_profile: <当前项目 spec_profile>
 
 task_mode: new-case-only
 new_case_count: 1
@@ -67,10 +124,9 @@ target_policy: default-first
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: nhv5_1_ap
+spec_profile: <当前项目 spec_profile>
 
 task_mode: new-case-only
 new_case_count: 1
@@ -99,10 +155,9 @@ target_policy: default-first
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<module>_suspected_bug_corner_points_<n>.md
 platform: spike
-spec_profile: nhv5_1_ap
+spec_profile: <当前项目 spec_profile>
 
 task_mode: new-case-only
 new_case_count: 1
@@ -148,10 +203,9 @@ target_module: <module>
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<module>_suspected_bug_corner_points_<n>.md
 platform: spike
-spec_profile: nhv5_1_ap
+spec_profile: <当前项目 spec_profile>
 
 task_mode: new-case-only
 new_case_count: 1
@@ -209,12 +263,11 @@ bug_hunt_focus_terms: memblock, StoreQueue, sbuffer, cmo, cbo.inval, fence, lrsc
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: nhv5_1_ap
+spec_profile: <当前项目 spec_profile>
 
-task_mode: run-only
+task_mode: preflight-only
 
 要求：
 - 只做只读分析，不修改文件
@@ -231,10 +284,9 @@ task_mode: run-only
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: nhv5_1_ap
+spec_profile: <当前项目 spec_profile>
 
 task_mode: supplement-existing-point
 target_test_point: "### P<id>. <title>"
@@ -256,9 +308,8 @@ target_policy: default-first
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 platform: spike
-spec_profile: nhv5_1_ap
+spec_profile: <当前项目 spec_profile>
 
 task_mode: run-only
 case_name: <case_name>

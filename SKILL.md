@@ -74,7 +74,13 @@ directories, platform names, and environment variables. The fast anchors are:
 
 ## Non-Negotiables
 
+- 路径字段统一按“环境可见则可省略，否则 prompt 必须写”处理；prompt 写成 `$VAR` 但当前进程无法展开时，视为缺失。需要读写 hyptest 仓库但既没有 prompt `HYPTEST_HOME` 也没有环境 `HYPTEST_HOME` 时，先提醒补齐仓库路径。脚本 CLI 内部的 `--repo-root` 与 prompt 里的 `HYPTEST_HOME` 是同一含义。
+- 每次任务只补当前进程看不到的必需路径，详细字段见 `references/task_input_schema.md`：Spike gate 需要 `HYPTEST_HOME` + `HYPTEST_SPIKE_BIN`；Spike + LinkNan/Nanhu 源码证据还需要 `HYPTEST_LINKNAN_HOME`；LinkNan gate 需要 `HYPTEST_HOME` + `HYPTEST_LINKNAN_HOME` + `HYPTEST_DIFFTEST_REF_SO`。与本轮平台无关的组件直接省略；Nanhu 源码固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。
+- 任何会调用 `get_result.py` 的 `spike` 运行前，必须确认 `HYPTEST_SPIKE_BIN` 在当前进程可见，且指向社区版/上游 riscv-isa-sim Spike 可执行文件；不得用 `which spike` 或 PATH 中的其它 `spike` 替代。若缺失，先提醒并停止运行 gate。
+- 任何会调用 `get_result.py` 的 `linknan` 运行前，必须确认 `HYPTEST_LINKNAN_HOME`、`HYPTEST_DIFFTEST_REF_SO` 以及 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 可用。`HYPTEST_SPIKE_BIN` 只用于 official/community Spike gate；LinkNan/difftest 证据走 `HYPTEST_DIFFTEST_REF_SO`，不要把定制 difftest Spike 当作 default gate 的 `HYPTEST_SPIKE_BIN`。
+- prompt 显式给出的运行环境字段（`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` / `HYPTEST_CROSS_COMPILE` / `HYPTEST_TMPDIR`）必须作为本轮覆盖传给支持 `--env` 的脚本，例如 `--env HYPTEST_SPIKE_BIN=<path>`。脚本调用 hyptest 仓库命令时会把这些字段映射为仓库原本识别的 `SPIKE_BIN` / `LINKNAN_HOME` / `DIFFTEST_REF_SO` 等运行时变量。
 - 写新 case 或判断 Spike 结果前，必须先确定规格/平台口径（`spec_profile`；未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，明确规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
+- 若用户说环境变量写在 `~/.bashrc` 但脚本读不到，优先检查这些 export 是否位于 `case $-` / `return` 这类非交互 shell 提前返回保护之后。
 - 一个 case 函数只能有一个 `TEST_END(...)`。
 - 只要本步骤要断言 `excpt.triggered/cause/tval`，都先调用 `TEST_SETUP_EXCEPT()`。
 - 注册统一放在 `test_register.c`，不在 case 源文件末尾注册。
@@ -124,7 +130,7 @@ directories, platform names, and environment variables. The fast anchors are:
 
 ## Workflow
 
-1. 锁定输入：确认 `repo_root`、`test_point_file`、平台、case 名、目标分层和规格/平台口径（`spec_profile`；未指定则用 profile registry 中的 `default_profile`）；必要时用 `scripts/check_env.py` 先检查平台环境。
+1. 锁定输入：确认 `HYPTEST_HOME` / `--repo-root`、`test_point_file`、平台、case 名、目标分层和规格/平台口径（`spec_profile`；未指定则用 profile registry 中的 `default_profile`）；只要本轮需要运行平台，就先用 `scripts/check_env.py` 检查平台环境。
    - 若输入字段较多或存在旧平台名/不确定模式，先用 `scripts/validate_task_request.py` 做 preflight。
 2. 区分补已有测试点模式和新增测试点模式；`test_point_file` 是容器文件，每个 `### PnX` 才是独立测试点条目。
 3. 按 `references/coverage_and_dedupe.md` 做测试点覆盖检查、repo 级 case 相似检索和精确唯一性检索。
@@ -135,12 +141,12 @@ directories, platform names, and environment variables. The fast anchors are:
    ```bash
    python3 compile_elf.py --plat spike --name <case_name>
    ```
-8. 非 `compile-only` 必须做单 case 运行；`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
+8. 非 `compile-only` 必须做单 case 运行；运行前先确认平台环境变量在当前进程可见。`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
 9. 更新 `test_point`，默认只做轻量回填；详细模板和复用口径见 `references/writing_cases.md`。
 10. 回填后建议执行：
    ```bash
    python3 scripts/check_writeback_format.py \
-     --repo-root <repo_root> \
+     --repo-root $HYPTEST_HOME \
      --file <test_point_file> \
      --check-register
    ```

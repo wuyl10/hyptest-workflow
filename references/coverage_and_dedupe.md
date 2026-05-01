@@ -82,7 +82,7 @@ rg -n "memblock|retry|refault|upper-tail|boundary\\+15|BYTE7|mask" test_point/*.
 
 ```bash
 python3 scripts/find_similar_cases.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query <axis> --query <axis> \
   --show-snippet \
@@ -93,7 +93,7 @@ python3 scripts/find_similar_cases.py \
 
 ```bash
 python3 scripts/find_similar_cases.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query <axis> --query <axis> \
   --assert-only \

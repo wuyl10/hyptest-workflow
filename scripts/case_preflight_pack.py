@@ -15,18 +15,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-from skill_config import default_spec_profile, resolve_path
+from skill_config import (
+    CANONICAL_ENV_NAMES,
+    apply_env_overrides,
+    default_spec_profile,
+    env_override_args,
+    process_env_value,
+    resolve_path,
+)
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_ROOT = SCRIPT_DIR.parent
 CACHE_VERSION = 1
-ENV_FINGERPRINT_KEYS = [
-    "CROSS_COMPILE",
-    "SPIKE_BIN",
-    "LINKNAN_HOME",
-    "DIFFTEST_REF_SO",
-]
+ENV_FINGERPRINT_KEYS = list(CANONICAL_ENV_NAMES)
 SCRIPT_FINGERPRINT_RELS = [
     "case_preflight_pack.py",
     "repo_evidence_index.py",
@@ -61,6 +63,7 @@ def parse_args() -> argparse.Namespace:
         choices=[
             "fix-case",
             "new-case-only",
+            "preflight-only",
             "run-only",
             "supplement-existing-point",
             "triage-only",
@@ -98,6 +101,16 @@ def parse_args() -> argparse.Namespace:
         "--no-env",
         action="store_true",
         help="Skip platform environment check.",
+    )
+    parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help=(
+            "Environment override for nested checks, e.g. --env HYPTEST_SPIKE_BIN=/path/to/spike. "
+            "Can be repeated."
+        ),
     )
     parser.add_argument(
         "--no-pack-cache",
@@ -341,8 +354,8 @@ def script_fingerprint(spec_profile: str) -> dict[str, Any]:
 def env_fingerprint() -> dict[str, Any]:
     values: dict[str, Any] = {}
     for key in ENV_FINGERPRINT_KEYS:
-        values[key] = os.environ.get(key, "")
-    prefix = os.environ.get("CROSS_COMPILE", "").strip() or "riscv64-unknown-elf-"
+        values[key] = process_env_value(key)
+    prefix = process_env_value("CROSS_COMPILE") or "riscv64-unknown-elf-"
     values["toolchain_gcc"] = f"{prefix}gcc"
     values["toolchain_gcc_path"] = shutil.which(f"{prefix}gcc") or ""
     values["PATH_digest"] = hashlib.sha256(os.environ.get("PATH", "").encode("utf-8")).hexdigest()
@@ -360,6 +373,8 @@ def infer_coverage_scope(task_mode: str, explicit_scope: str | None) -> str:
         return explicit_scope
     if task_mode == "supplement-existing-point":
         return "file"
+    if task_mode == "preflight-only":
+        return "repo"
     return "repo"
 
 
@@ -384,6 +399,7 @@ def request_fingerprint(
         "section_index": args.section_index,
         "similar_limit": args.similar_limit,
         "no_env": bool(args.no_env),
+        "env_overrides": dict(args.env_overrides),
         "sources": source_fingerprint(repo_root, test_point_file),
         "skill_scripts": script_fingerprint(args.spec_profile),
         "environment": {} if args.no_env else env_fingerprint(),
@@ -499,6 +515,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         coverage_scope,
         "--json",
     ]
+    validate_cmd.extend(env_override_args(args.env_overrides))
     if args.case_name:
         validate_cmd.extend(["--case-name", args.case_name])
 
@@ -534,6 +551,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.task_mode,
         "--json",
     ]
+    env_cmd.extend(env_override_args(args.env_overrides))
 
     result: dict[str, Any] = {
         "repo_root": str(repo_root),
@@ -640,7 +658,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# hyptest case preflight pack",
         "",
-        f"- repo_root: `{report['repo_root']}`",
+        f"- HYPTEST_HOME: `{report['repo_root']}`",
         f"- test_point_file: `{report['test_point_file']}`",
         f"- platform: `{report['platform']}`",
         f"- spec_profile: `{report['spec_profile']}`",
@@ -709,6 +727,11 @@ def write_outputs(report: dict[str, Any], args: argparse.Namespace) -> None:
 
 def main() -> int:
     args = parse_args()
+    try:
+        args.env_overrides = apply_env_overrides(args.env)
+    except ValueError as exc:
+        print(f"invalid --env: {exc}", file=sys.stderr)
+        return 2
     report = build_report(args)
     write_outputs(report, args)
     if args.json:

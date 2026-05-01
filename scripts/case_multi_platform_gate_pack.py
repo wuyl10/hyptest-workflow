@@ -43,6 +43,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-compile", action="store_true", help="Pass --skip-compile to each gate.")
     parser.add_argument("--skip-run", action="store_true", help="Pass --skip-run to each gate.")
     parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Pass environment override to each platform gate, e.g. --env HYPTEST_SPIKE_BIN=/path/to/spike.",
+    )
+    parser.add_argument(
         "--report-dir",
         default=".hyptest_skill_reports",
         help="Directory for per-platform gate/postcheck reports.",
@@ -91,6 +98,8 @@ def run_platform(args: argparse.Namespace, platform: str) -> dict[str, Any]:
         command.append("--skip-compile")
     if args.skip_run:
         command.append("--skip-run")
+    for item in args.env:
+        command.extend(["--env", item])
 
     started = time.monotonic()
     completed = subprocess.run(
@@ -165,7 +174,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# hyptest multi-platform gate pack",
         "",
-        f"- repo_root: `{report['repo_root']}`",
+        f"- HYPTEST_HOME: `{report['repo_root']}`",
         f"- test_point_file: `{report['test_point_file']}`",
         f"- case: `{report['case']}`",
         f"- platforms: `{', '.join(report['platforms'])}`",

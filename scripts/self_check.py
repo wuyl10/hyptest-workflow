@@ -156,7 +156,7 @@ def write_report_files(payload: dict[str, object], args: argparse.Namespace) -> 
             f"- status: {'PASS' if payload['ok'] else 'FAIL'}",
             f"- failure_count: {payload['failure_count']}",
             f"- spec_profile: {payload['spec_profile']}",
-            f"- repo_root: {payload.get('repo_root') or '-'}",
+            f"- HYPTEST_HOME: {payload.get('repo_root') or '-'}",
             f"- platform: {payload.get('platform') or '-'}",
             f"- mode: {payload['mode']}",
             "",

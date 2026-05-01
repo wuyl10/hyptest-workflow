@@ -77,7 +77,7 @@ python3 scripts/self_check.py --quick --spec-profile <spec_profile>
 修改后至少跑：
 
 ```bash
-python3 scripts/check_hyptest_cli_contract.py --repo-root <repo_root>
+python3 scripts/check_hyptest_cli_contract.py --repo-root $HYPTEST_HOME
 python3 scripts/eval_hyptest_cli_contract.py
 python3 scripts/eval_find_similar_cache.py
 python3 scripts/eval_workflow_smoke.py
@@ -86,8 +86,8 @@ python3 scripts/eval_workflow_smoke.py
 有 hyptest 仓库时再跑：
 
 ```bash
-python3 scripts/eval_find_similar_cases.py --repo-root <repo_root>
-python3 scripts/find_similar_cases.py --repo-root <repo_root> --query "<scenario>" --limit 3 --explain-score
+python3 scripts/eval_find_similar_cases.py --repo-root $HYPTEST_HOME
+python3 scripts/find_similar_cases.py --repo-root $HYPTEST_HOME --query "<scenario>" --limit 3 --explain-score
 ```
 
 ## 修改 Reason Code
@@ -113,15 +113,15 @@ python3 scripts/check_reason_codes.py
 
 ```bash
 python3 scripts/eval_check_case_lint.py
-python3 scripts/check_case_lint.py --repo-root <repo_root> --changed-only --strict-case-end
-python3 scripts/check_case_lint.py --repo-root <repo_root> --changed-only --strict-case-end --warnings-as-errors
-python3 scripts/check_case_lint.py --repo-root <repo_root> --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors
+python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
+python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end --warnings-as-errors
+python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors
 ```
 
 若历史 warning 太多，先生成 baseline，再只关注新增问题：
 
 ```bash
-python3 scripts/check_case_lint.py --repo-root <repo_root> --write-baseline assets/baselines/case_lint_baseline.json
+python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --write-baseline assets/baselines/case_lint_baseline.json
 ```
 
 改 `scripts/check_writeback_format.py` 后跑：
@@ -135,8 +135,8 @@ python3 scripts/eval_check_writeback_format.py
 对真实仓库做快速增量检查：
 
 ```bash
-python3 scripts/check_case_lint.py --repo-root <repo_root> --changed-only --strict-case-end
-python3 scripts/check_writeback_format.py --repo-root <repo_root> --file <test_point_file> --check-register --spec-profile <spec_profile>
+python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
+python3 scripts/check_writeback_format.py --repo-root $HYPTEST_HOME --file <test_point_file> --check-register --spec-profile <spec_profile>
 ```
 
 ## 修改 Preflight/Postcheck Pack
@@ -147,7 +147,7 @@ python3 scripts/check_writeback_format.py --repo-root <repo_root> --file <test_p
 
 ```bash
 python3 scripts/case_preflight_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --platform spike \
   --spec-profile <spec_profile> \
@@ -158,7 +158,7 @@ python3 scripts/case_preflight_pack.py \
   --json
 
 python3 scripts/case_postcheck_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
@@ -166,7 +166,7 @@ python3 scripts/case_postcheck_pack.py \
   --json
 
 python3 scripts/case_gate_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
@@ -174,7 +174,7 @@ python3 scripts/case_gate_pack.py \
   --json
 
 python3 scripts/case_batch_gate_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
@@ -188,13 +188,13 @@ python3 scripts/make_case_submission_card.py \
   --json
 
 python3 scripts/suggest_case_name.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --preflight-json .hyptest_skill_reports/case_preflight.json \
   --prefix ai_micro \
   --json
 
 python3 scripts/case_multi_platform_gate_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
@@ -240,8 +240,8 @@ python3 scripts/case_workflow_ledger.py \
 目录、平台名或生成物命名变更后，检查真实 hyptest 仓库是否还残留旧逻辑：
 
 ```bash
-python3 scripts/check_hyptest_repo_migration.py --repo-root <repo_root>
-python3 scripts/doctor.py --repo-root <repo_root> --check-repo-migration --skip-self-check
+python3 scripts/check_hyptest_repo_migration.py --repo-root $HYPTEST_HOME
+python3 scripts/doctor.py --repo-root $HYPTEST_HOME --check-repo-migration --skip-self-check
 ```
 
 这个检查只用于重构回归。正常规则入口仍是 `references/repo_layout.md`。
@@ -253,7 +253,7 @@ skill eval 和自检产生的中间文件放在 skill root 下的 `.hyptest_skil
 验证结束后跑：
 
 ```bash
-python3 scripts/clean_generated.py --repo-root <repo_root>
+python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME
 ```
 
 ## Cross-Skill Consistency
@@ -287,28 +287,28 @@ python3 scripts/self_check.py --quick --spec-profile <spec_profile>
 带真实 hyptest 仓库但不依赖仿真器环境：
 
 ```bash
-python3 scripts/self_check.py --repo --repo-root <repo_root> --spec-profile <spec_profile>
+python3 scripts/self_check.py --repo --repo-root $HYPTEST_HOME --spec-profile <spec_profile>
 ```
 
 检查平台环境变量：
 
 ```bash
-python3 scripts/self_check.py --platform-check --repo-root <repo_root> --platform spike --spec-profile <spec_profile>
-python3 scripts/self_check.py --platform-check --repo-root <repo_root> --platform linknan --spec-profile <spec_profile>
-python3 scripts/check_env.py --repo-root <repo_root> --platform all --explain --print-exports
+python3 scripts/self_check.py --platform-check --repo-root $HYPTEST_HOME --platform spike --spec-profile <spec_profile>
+python3 scripts/self_check.py --platform-check --repo-root $HYPTEST_HOME --platform linknan --spec-profile <spec_profile>
+python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain --print-exports
 ```
 
 完整检查：
 
 ```bash
-python3 scripts/self_check.py --full --repo-root <repo_root> --spec-profile <spec_profile>
-python3 scripts/self_check.py --full --repo-root <repo_root> --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md
+python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile>
+python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md
 ```
 
 综合健康检查：
 
 ```bash
-python3 scripts/doctor.py --repo-root <repo_root> --pre-submit --strict --platform spike --spec-profile <spec_profile>
+python3 scripts/doctor.py --repo-root $HYPTEST_HOME --pre-submit --strict --platform spike --spec-profile <spec_profile>
 ```
 
 ## 修改 README 命令块
@@ -325,7 +325,7 @@ python3 scripts/list_skill_commands.py --markdown
 任务参数规格入口：
 
 ```bash
-python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3
+python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3
 ```
 
 失败日志分类入口：

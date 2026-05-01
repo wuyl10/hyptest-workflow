@@ -38,6 +38,11 @@ def make_executable(path: Path) -> None:
 
 def run(command: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     merged_env = os.environ.copy()
+    for name in (
+        "SPIKE_BIN", "LINKNAN_HOME", "NANHU_HOME", "DIFFTEST_REF_SO",
+        "CROSS_COMPILE", "TMPDIR",
+    ):
+        merged_env.pop(name, None)
     if env:
         merged_env.update(env)
     return subprocess.run(command, capture_output=True, text=True, check=False, env=merged_env)
@@ -81,8 +86,8 @@ def main() -> int:
 
         env = {
             "PATH": f"{toolchain}:{os.environ.get('PATH', '')}",
-            "CROSS_COMPILE": "riscv64-unknown-elf-",
-            "SPIKE_BIN": str(spike),
+            "HYPTEST_CROSS_COMPILE": "riscv64-unknown-elf-",
+            "HYPTEST_SPIKE_BIN": str(spike),
         }
 
         steps = [

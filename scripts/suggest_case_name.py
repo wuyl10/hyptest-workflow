@@ -249,7 +249,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
 def render_text(report: dict[str, Any]) -> str:
     lines = ["# hyptest case name suggestions", ""]
-    lines.append(f"- repo_root: `{report.get('repo_root')}`")
+    lines.append(f"- HYPTEST_HOME: `{report.get('repo_root')}`")
     lines.append(f"- prefix: `{report.get('prefix')}`")
     lines.append(f"- existing_case_count: `{report.get('existing_case_count')}`")
     cache = report.get("cache") or {}

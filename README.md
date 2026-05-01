@@ -50,51 +50,43 @@
 
 ## 目标仓库和环境
 
-一次任务需要先说明 `riscv-hyp-tests` 仓库位置。推荐直接在 prompt 里填仓库根目录：
+日常 prompt 不需要写完整环境清单。规则是：当前执行环境已经能读到的变量可以省略；读不到、但本轮必需的变量才写进 prompt。对外统一使用 `HYPTEST_HOME` 和 `HYPTEST_*`，不要写个人绝对路径或其它项目的通用变量名。
 
-```text
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
-test_point_file: test_point/<xxx>.md
-```
+常见组合：
 
-如果团队希望少写路径，可以约定一个明确的便利变量：
+| 场景 | 需要当前进程可见 |
+| --- | --- |
+| Spike 编译/运行 gate | `HYPTEST_HOME`、`HYPTEST_SPIKE_BIN` |
+| Spike gate + LinkNan/Nanhu 源码证据 | `HYPTEST_HOME`、`HYPTEST_SPIKE_BIN`、`HYPTEST_LINKNAN_HOME` |
+| LinkNan / difftest gate | `HYPTEST_HOME`、`HYPTEST_LINKNAN_HOME`、`HYPTEST_DIFFTEST_REF_SO` |
+| `/tmp` 空间不足 | 额外设置 `HYPTEST_TMPDIR` |
 
-```text
-repo_root: $HYPTEST_REPO
-test_point_file: test_point/<xxx>.md
-```
+`HYPTEST_SPIKE_BIN` 尽量指向社区版/上游 riscv-isa-sim Spike，用于 architecture/default gate；LinkNan/difftest 证据走 `HYPTEST_DIFFTEST_REF_SO`。Nanhu 源码不单独设置环境变量，固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。
 
-这里的 `repo_root` 只是 prompt 字段名，含义是“`riscv-hyp-tests` 仓库根目录”；它不是 hyptest 平台环境变量。`HYPTEST_REPO` 也只是可选的团队便利别名，不要求 hyptest 仓库必须提供。路径字段支持 shell 风格的 `$VAR` 展开。
+如果没识别到本轮必需路径，preflight 会停下并直接提示要补哪个字段。`preflight-only` 不会因为 runner 环境缺失而阻塞；与本轮平台无关的变量直接省略。
 
-hyptest 编译/运行环境变量仍按 hyptest 仓库既有说明设置，例如：
+变量写在 `~/.bashrc` 时，要确保 Codex/脚本所在的非交互 shell 也能读到。常见问题是 export 放在 `case $-` / `return` 这类保护之后，导致 VS Code 终端能看到，但脚本看不到。
 
-```text
-SPIKE_BIN         official Spike executable
-LINKNAN_HOME      LinkNan repo root
-DIFFTEST_REF_SO   difftest reference shared object
-CROSS_COMPILE     RISC-V toolchain prefix
-```
-
-本 README 不重复展开这些变量的配置方式。需要检查环境时运行：
+需要检查环境时运行：
 
 ```bash
-python3 scripts/check_env.py --repo-root <hyptest_repo> --platform all --explain
+python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain
 ```
 
-平台名只使用 `spike` 或 `linknan`；不要把 `xiangshan` 写成 hyptest 的 `platform` / `--plat` 参数。
+平台名只使用 `spike` 或 `linknan`。
 
 ## Prompt 写法
 
-写 prompt 时不需要把所有字段都填满。先填“最小必填”，再按任务类型补条件字段；其余字段让 workflow 按默认规则推导。下面先给关键词含义，再给最短可用模板。
+写 prompt 时不需要把所有字段都填满。先填“最小必填”，再按任务类型补条件字段；其余字段让 workflow 按默认规则推导。路径字段的省略前提是当前执行环境已经设置好对应变量；否则 prompt 里要写清楚，workflow 也要提醒调用者补齐。历史上下文可以帮助理解任务意图，但 preflight 和脚本只按本轮 prompt、CLI 参数和当前进程环境做硬校验。下面先给关键词含义，再给最短可用模板。
 
 ### 最小必填
 
 | 关键词 | 是否必填 | 含义 | 常见写法 |
 | --- | --- | --- | --- |
-| `repo_root` | 必填 | `riscv-hyp-tests` 仓库根目录。它是 prompt 字段名，不是 hyptest 平台环境变量。 | `<riscv-hyp-tests-nhv5.1 仓库根目录>` 或 `$HYPTEST_REPO` |
-| `task_mode` | 必填 | 本次任务类型，决定是新增、补旧、修 case、只运行还是只回填。 | `new-case-only`、`supplement-existing-point`、`fix-case`、`run-only`、`writeback-only`、`triage-only` |
+| `HYPTEST_HOME` | 未设置 `HYPTEST_HOME` 时必填 | `riscv-hyp-tests` 仓库根目录。脚本 CLI 内部对应 `--repo-root`。 | `<riscv-hyp-tests-nhv5.1 仓库根目录>` 或 `$HYPTEST_HOME` |
+| `task_mode` | 必填 | 本次任务类型，决定是新增、补旧、修 case、只读预检、只运行还是只回填。 | `new-case-only`、`supplement-existing-point`、`fix-case`、`preflight-only`、`run-only`、`writeback-only`、`triage-only` |
 | `platform` | 编译/运行/环境检查时必填 | 目标 hyptest 平台。 | `spike` 或 `linknan` |
-| `test_point_file` | 新增、补点、回填时必填 | 测试点容器文件。相对路径按 `repo_root` 下解析；绝对路径也可以。 | `test_point/<xxx>.md` |
+| `test_point_file` | 新增、补点、回填时必填 | 测试点容器文件。相对路径按 `HYPTEST_HOME` 下解析；绝对路径也可以。 | `test_point/<xxx>.md` |
 
 ### 建议填写
 
@@ -103,6 +95,17 @@ python3 scripts/check_env.py --repo-root <hyptest_repo> --platform all --explain
 | `spec_profile` | 建议填写；未填会用默认 profile | 规格/平台口径，用来判断 Spike gate、PMA/PBMT/MMIO/cache/TLB/CBO 模型边界和最终分层。它不是功能开关。 | `<当前项目 spec_profile>` |
 | `target_policy` | 选填，默认 `default-first` | 分层目标倾向。`default-first` 表示优先争取 default，不是无条件 default。 | `default-first`、`manual-ok`、`compile-only-ok` |
 | `new_case_count` | 新增 case 时建议填写，默认 `1` | 本轮希望新增几个 case。 | `1` 或 `1-3` |
+
+### 运行环境路径字段
+
+| 关键词 | 什么时候填 | 含义 | 常见写法 |
+| --- | --- | --- | --- |
+| `HYPTEST_SPIKE_BIN` | `platform=spike` 且当前执行环境没有设置 `HYPTEST_SPIKE_BIN` 时必填 | `get_result.py --platform spike` 使用的 Spike 可执行文件，用于 architecture/default gate。 | `<community/upstream Spike 可执行文件>` 或 `$HYPTEST_SPIKE_BIN` |
+| `HYPTEST_LINKNAN_HOME` | `platform=linknan`，或需要读取 LinkNan/Nanhu 源码证据，且当前执行环境没有设置 `HYPTEST_LINKNAN_HOME` 时必填 | `get_result.py --platform linknan` 使用的 LinkNan 仓库，也是 Nanhu submodule 源码入口。 | `<LinkNan 仓库根目录>` 或 `$HYPTEST_LINKNAN_HOME` |
+| `HYPTEST_DIFFTEST_REF_SO` | `platform=linknan` 且当前执行环境没有设置 `HYPTEST_DIFFTEST_REF_SO` 时必填 | LinkNan `+diff` 使用的参考模型 so。 | `<riscv64-spike-so 路径>` 或 `$HYPTEST_DIFFTEST_REF_SO` |
+| `HYPTEST_TMPDIR` | `/tmp` 空间不足时 | 编译/运行临时目录。 | `/nfs/home/<user>/.tmp` |
+
+这些字段不是每次都要写。平时可以依赖 shell 环境；但如果当前执行环境没有对应变量，就必须在 prompt 里写清楚。执行脚本时，prompt 中显式给出的运行环境字段应映射成 `--env KEY=VALUE`，例如 `--env HYPTEST_SPIKE_BIN=<path>`。Nanhu 源码是 LinkNan submodule 检查项，不是 prompt 环境字段。
 
 ### 按任务条件填写
 
@@ -113,6 +116,8 @@ python3 scripts/check_env.py --repo-root <hyptest_repo> --platform all --explain
 | `target_module` | 按模块继续找 suspected bug 时 | 指定目标模块，帮助聚焦源码和测试点。 | `memblock` |
 | `bug_hunt_focus` / `bug_hunt_focus_terms` | 按模块找新 bug 点时 | 给 workflow 一组关注方向和检索词，加快 preflight 与相似 case 检索。 | `CMO / LRSC / fence` |
 | `failure_log` | `triage-only` 或失败归因时 | 指定失败日志。若进入 stuck、difftest、FSDB 或疑似 RTL bug，优先转 `hyptest-failure-triage`。 | `result_log/<platform>/<log>` |
+
+`preflight-only` 用于只读分析、找新增空间、准备 prompt 或会议演示；它不会要求 `case_name`，也不会因为 runner 环境缺失而阻塞。`run-only` 用于已有 case 的编译/运行验证，通常必须给 `case_name`。
 
 ### 通常不用填
 
@@ -128,7 +133,6 @@ python3 scripts/check_env.py --repo-root <hyptest_repo> --platform all --explain
 ```text
 使用hyptest-workflow skill
 
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
 spec_profile: <当前项目 spec_profile>
@@ -192,12 +196,12 @@ python3 scripts/list_skill_commands.py
 常用入口：
 
 ```bash
-python3 scripts/validate_task_request.py --repo-root <hyptest_repo> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1
-python3 scripts/case_preflight_pack.py --repo-root <hyptest_repo> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
-python3 scripts/case_gate_pack.py --repo-root <hyptest_repo> --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
+python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1
+python3 scripts/case_preflight_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
+python3 scripts/case_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
 ```
 
-这里的 `<hyptest_repo>` 就是目标 `riscv-hyp-tests-nhv5.1` 仓库根目录；如果使用变量，建议写成 `"$HYPTEST_REPO"`。
+这些命令里的 `--repo-root $HYPTEST_HOME` 对应 prompt 中的 `HYPTEST_HOME`。如果 prompt 里显式写了本轮 runner 路径，例如 `HYPTEST_SPIKE_BIN: <path>`，命令里也加对应 `--env HYPTEST_SPIKE_BIN=<path>`；如果当前进程已经能读到，就不用重复写。
 
 更多命令见 `references/command_index.md`。
 

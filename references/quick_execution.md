@@ -54,7 +54,7 @@ git branch --show-current
 ```bash
 cd /nfs/home/wuyuanlong/.agents/skills/hyptest-workflow
 python3 scripts/case_preflight_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --platform spike \
   --spec-profile <spec_profile> \
@@ -68,6 +68,8 @@ python3 scripts/case_preflight_pack.py \
 说明：
 
 - `case_preflight_pack.py` 会并行执行输入、规格/平台口径、repo snapshot、相似 case 和环境检查。
+- 只补当前进程看不到的必需环境变量。若当前环境没有 `HYPTEST_HOME`，prompt 要写 `HYPTEST_HOME: <riscv-hyp-tests 仓库根目录>`；若 `platform=spike` 且会跑 gate、但当前环境没有 `HYPTEST_SPIKE_BIN`，prompt 要写 `HYPTEST_SPIKE_BIN: <community/upstream Spike 可执行文件>`；若要跑 LinkNan，确认 `HYPTEST_LINKNAN_HOME`、`HYPTEST_DIFFTEST_REF_SO`；若要读 Nanhu 源码，确认 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 存在。与本轮平台无关的组件可以省略。
+- 如果 prompt 显式给了 `HYPTEST_SPIKE_BIN: <path>` / `HYPTEST_LINKNAN_HOME: <path>` / `HYPTEST_DIFFTEST_REF_SO: <path>`，命令里加对应 `--env HYPTEST_*=<path>`；临时目录用 `--env HYPTEST_TMPDIR=<path>`。
 - 未显式传 `--coverage-scope` 时，脚本会按 `--task-mode` 推导：`new-case-only` 默认 repo，`supplement-existing-point` 默认 file；case 相似检索仍始终是 repo 级。
 - `case_preflight_pack.py` 会同时调用 `repo_evidence_index.py`，构建或复用全仓 case、`test_point` 条目和注册状态索引。该索引按文件指纹失效，不按模块裁剪覆盖范围。
 - preflight pack 使用保守缓存；只要输入参数、目标 test_point、`test_point/*.md`、`ai_test_cases/*.c`、`manual_test_cases/**/*.c`、`test_register.c`、关键环境变量、toolchain 命中路径、profile 文件或相关 skill 脚本发生变化，缓存就会失效。
@@ -88,7 +90,7 @@ python3 scripts/case_preflight_pack.py \
 
 ```bash
 python3 scripts/find_similar_cases.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query cross_16b --query retry --query access_fault \
   --show-snippet \
@@ -99,7 +101,7 @@ python3 scripts/find_similar_cases.py \
 
 ```bash
 python3 scripts/find_similar_cases.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query cross_16b --query retry --query access_fault \
   --assert-only \
@@ -111,7 +113,7 @@ python3 scripts/find_similar_cases.py \
 
 ```bash
 python3 scripts/repo_evidence_index.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --query '<scenario terms>' \
   --json
 ```
@@ -131,7 +133,7 @@ python3 scripts/make_case_skeleton.py \
 
 ```bash
 python3 scripts/suggest_case_name.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --preflight-json .hyptest_skill_reports/case_preflight.json \
   --prefix ai_micro \
   --json
@@ -172,7 +174,7 @@ python3 compile_elf.py --plat spike --name <case_name>
 ```bash
 cd /nfs/home/wuyuanlong/.agents/skills/hyptest-workflow
 python3 scripts/case_gate_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
@@ -184,6 +186,8 @@ python3 scripts/case_gate_pack.py \
 ```
 
 该命令只聚合执行和证据，不替代 profile/tiering 规则裁决。它的 PASS 还要求 postcheck 能看到目标 ELF；非 `--compile-only` / 非 `--skip-run` 时，还要求能看到目标 case 的最新运行日志。
+
+如果本轮 prompt 指定了 runner，例如 `HYPTEST_SPIKE_BIN: <path>`，在 `case_gate_pack.py` 命令中加 `--env HYPTEST_SPIKE_BIN=<path>`。如果 prompt 没写 runner，就必须先确认当前执行环境已有对应变量；缺失时先提醒调用者补齐，不运行 gate。
 
 补充：
 
@@ -267,7 +271,7 @@ python3 get_result.py --platform spike --case <case_name>
 
 ```bash
 python3 scripts/check_writeback_format.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --file <test_point_file> \
   --check-register
 ```
@@ -303,7 +307,7 @@ python3 scripts/check_writeback_format.py \
 ```bash
 cd /nfs/home/wuyuanlong/.agents/skills/hyptest-workflow
 python3 scripts/case_gate_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
@@ -330,7 +334,7 @@ python3 scripts/make_case_submission_card.py \
 
 ```bash
 python3 scripts/case_batch_gate_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case1> \
   --case <case2> \
@@ -359,7 +363,7 @@ python3 scripts/make_case_submission_card.py \
 
 ```bash
 python3 scripts/case_multi_platform_gate_pack.py \
-  --repo-root <repo_root> \
+  --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \

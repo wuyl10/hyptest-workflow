@@ -90,7 +90,7 @@
 - `scripts/make_triage_handoff.py`
   - 从失败日志生成 workflow-to-triage handoff JSON。
 - `scripts/validate_task_request.py`
-  - 校验 `repo_root`、`test_point_file`、`platform`、`spec_profile`、`task_mode` 等任务输入；支持 CLI、`--request-json`、`--request-md`。
+  - 校验 prompt 中的 `HYPTEST_HOME`（脚本 CLI 参数为 `--repo-root`）、`test_point_file`、`platform`、`spec_profile`、`task_mode` 等任务输入；支持 CLI、`--request-json`、`--request-md`。
 - `scripts/check_case_lint.py`
   - 检查 case 源文件结构问题；支持 `--changed-only`、`--strict-case-end`、`--warnings-as-errors`、`--baseline`、`--write-baseline`，并提示弱断言文案/缺少断言。
 - `scripts/case_lint_baseline_diff.py`
@@ -116,7 +116,7 @@
 - `scripts/check_spec_profile.py`
   - 校验 profile 必备结构和机器可读 PMA/PBMT/MMIO 表。
 - `scripts/check_env.py`
-  - 检查 repo anchors、工具链和 `SPIKE_BIN` / `LINKNAN_HOME` / `DIFFTEST_REF_SO` 等平台环境变量；支持 `--platform all` 和 `--explain`。
+  - 检查 repo anchors、工具链、`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` 等平台环境变量，以及 LinkNan submodule 中的 Nanhu source；支持 `--platform all` 和 `--explain`。
 - `scripts/new_spec_profile.py`
   - 从 profile template 创建新 profile skeleton，可同步更新 profile registry。
 - `scripts/check_hyptest_repo_migration.py`

@@ -75,8 +75,9 @@ python3 compile_elf.py --plat linknan --include-commented --name <case_name>
 
 ### 5.2 `get_result.py`
 
-- 运行 LinkNan 前确认环境变量已设置：`LINKNAN_HOME`、`DIFFTEST_REF_SO`。
-- 运行 Spike 前确认 `SPIKE_BIN` 已设置。
+- 运行 LinkNan 前确认环境变量已设置：`HYPTEST_LINKNAN_HOME`、`HYPTEST_DIFFTEST_REF_SO`；需要 Nanhu 源码证据时确认 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 存在。
+- 运行 Spike 前确认 `HYPTEST_SPIKE_BIN` 已设置，并尽量指向社区版/上游 riscv-isa-sim Spike；后续 LinkNan/difftest 使用 `HYPTEST_DIFFTEST_REF_SO` 的定制参考模型，不混用 runner 角色。
+- 如果这些变量放在 `~/.bashrc`，不要放在非交互 shell 提前 `return` 的保护之后；自动化脚本常常不是交互 shell，放错位置会导致 `which spike` 命中旧版本而 `get_result.py` 读不到正确的 `HYPTEST_SPIKE_BIN`。
 - 非 `compile-only` case 必须有单 case 运行证据。
 - wall-clock timeout 不是 stuck 结论；需要内部 watchdog/no-commit 或波形/日志证据。
 

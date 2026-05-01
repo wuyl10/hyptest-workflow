@@ -19,12 +19,12 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
             },
             {
                 "name": "repo",
-                "cmd": "python3 scripts/self_check.py --repo --repo-root <repo_root> --spec-profile <spec_profile>",
+                "cmd": "python3 scripts/self_check.py --repo --repo-root $HYPTEST_HOME --spec-profile <spec_profile>",
                 "desc": "Skill checks plus repo migration, CLI contract, and lint-baseline checks.",
             },
             {
                 "name": "full",
-                "cmd": "python3 scripts/self_check.py --full --repo-root <repo_root> --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md",
+                "cmd": "python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md",
                 "desc": "Full checks including real-repo similar-case eval, with saved reports.",
             },
         ],
@@ -34,22 +34,22 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
         "commands": [
             {
                 "name": "repo-health",
-                "cmd": "python3 scripts/doctor.py --repo-root <repo_root> --pre-submit --strict --spec-profile <spec_profile>",
+                "cmd": "python3 scripts/doctor.py --repo-root $HYPTEST_HOME --pre-submit --strict --spec-profile <spec_profile>",
                 "desc": "Grouped profile, skill, repo, CLI contract, lint-baseline, env and self-check health report.",
             },
             {
                 "name": "task-request",
-                "cmd": "python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3",
-                "desc": "Validate task inputs before editing or running cases.",
+                "cmd": "python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3",
+                "desc": "Validate task inputs before editing or running cases; add --env HYPTEST_SPIKE_BIN=<path> only when the prompt explicitly overrides the runner path.",
             },
             {
                 "name": "platform-env",
-                "cmd": "python3 scripts/check_env.py --repo-root <repo_root> --platform all --explain --print-exports",
-                "desc": "Check Spike and LinkNan environment variables and explain what each one is used for.",
+                "cmd": "python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain --print-exports",
+                "desc": "Check hyptest, Spike, LinkNan and difftest-ref environment variables, plus the Nanhu source path derived from the LinkNan submodule.",
             },
             {
                 "name": "doctor-all",
-                "cmd": "python3 scripts/doctor.py --repo-root <repo_root> --platform all --pre-submit --spec-profile <spec_profile>",
+                "cmd": "python3 scripts/doctor.py --repo-root $HYPTEST_HOME --platform all --pre-submit --spec-profile <spec_profile>",
                 "desc": "Run grouped doctor checks including both Spike and LinkNan env checks.",
             },
         ],
@@ -59,18 +59,18 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
         "commands": [
             {
                 "name": "similar-cases",
-                "cmd": "python3 scripts/find_similar_cases.py --repo-root <repo_root> --query '<scenario terms>' --limit 5 --explain-score",
+                "cmd": "python3 scripts/find_similar_cases.py --repo-root $HYPTEST_HOME --query '<scenario terms>' --limit 5 --explain-score",
                 "desc": "Search existing ai/manual case sources before writing a new case.",
             },
             {
                 "name": "repo-evidence-index",
-                "cmd": "python3 scripts/repo_evidence_index.py --repo-root <repo_root> --query '<scenario terms>' --json",
+                "cmd": "python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --query '<scenario terms>' --json",
                 "desc": "Build or reuse a repo-wide cached evidence index for cases, test_points and register status.",
             },
             {
                 "name": "case-preflight-pack",
-                "cmd": "python3 scripts/case_preflight_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json",
-                "desc": "Collect task/profile/env/repo/similar-case context before writing a case, with conservative pack caching.",
+                "cmd": "python3 scripts/case_preflight_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json",
+                "desc": "Collect task/profile/env/repo/similar-case context before writing a case, with conservative pack caching; add --env only for prompt-provided runner overrides.",
             },
             {
                 "name": "case-skeleton",
@@ -79,27 +79,27 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
             },
             {
                 "name": "case-name-suggest",
-                "cmd": "python3 scripts/suggest_case_name.py --repo-root <repo_root> --preflight-json .hyptest_skill_reports/case_preflight.json --prefix ai_micro --json",
+                "cmd": "python3 scripts/suggest_case_name.py --repo-root $HYPTEST_HOME --preflight-json .hyptest_skill_reports/case_preflight.json --prefix ai_micro --json",
                 "desc": "Suggest case names from preflight/test_point terms and check repo-wide exact/similar name conflicts.",
             },
             {
                 "name": "case-lint",
-                "cmd": "python3 scripts/check_case_lint.py --repo-root <repo_root> --changed-only --strict-case-end --warnings-as-errors",
+                "cmd": "python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end --warnings-as-errors",
                 "desc": "Lint changed case sources for harness-shape mistakes.",
             },
             {
                 "name": "case-lint-baseline",
-                "cmd": "python3 scripts/check_case_lint.py --repo-root <repo_root> --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors",
+                "cmd": "python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors",
                 "desc": "Fail only on active lint issues not covered by the known baseline.",
             },
             {
                 "name": "cli-contract",
-                "cmd": "python3 scripts/check_hyptest_cli_contract.py --repo-root <repo_root>",
+                "cmd": "python3 scripts/check_hyptest_cli_contract.py --repo-root $HYPTEST_HOME",
                 "desc": "Check compile/run script platform names, case_elf_asm, required env vars and personal-path regressions.",
             },
             {
                 "name": "repo-snapshot",
-                "cmd": "python3 scripts/repo_snapshot.py --repo-root <repo_root>",
+                "cmd": "python3 scripts/repo_snapshot.py --repo-root $HYPTEST_HOME",
                 "desc": "Print a read-only snapshot of case sources, register state, test_point coverage, artifacts and latest logs.",
             },
             {
@@ -109,27 +109,27 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
             },
             {
                 "name": "writeback-check",
-                "cmd": "python3 scripts/check_writeback_format.py --repo-root <repo_root> --file <test_point_file> --check-register --spec-profile <spec_profile>",
+                "cmd": "python3 scripts/check_writeback_format.py --repo-root $HYPTEST_HOME --file <test_point_file> --check-register --spec-profile <spec_profile>",
                 "desc": "Validate lightweight test_point writeback and registration consistency.",
             },
             {
                 "name": "case-postcheck-pack",
-                "cmd": "python3 scripts/case_postcheck_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_postcheck.md --json-out .hyptest_skill_reports/case_postcheck.json",
+                "cmd": "python3 scripts/case_postcheck_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_postcheck.md --json-out .hyptest_skill_reports/case_postcheck.json",
                 "desc": "Collect lint/writeback/register/artifact/log evidence after editing a case.",
             },
             {
                 "name": "case-gate-pack",
-                "cmd": "python3 scripts/case_gate_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json",
-                "desc": "Compile/run one case, early-stop after compile failure, capture direct run logs, classify failures, and collect postcheck evidence with timing.",
+                "cmd": "python3 scripts/case_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json",
+                "desc": "Compile/run one case, early-stop after compile failure, capture direct run logs, classify failures, and collect postcheck evidence with timing; add --env only for prompt-provided runner overrides.",
             },
             {
                 "name": "batch-gate-pack",
-                "cmd": "python3 scripts/case_batch_gate_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case1> --case <case2> --platform spike --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_batch_gate.json --md-out .hyptest_skill_reports/case_batch_gate.md",
+                "cmd": "python3 scripts/case_batch_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case1> --case <case2> --platform spike --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_batch_gate.json --md-out .hyptest_skill_reports/case_batch_gate.md",
                 "desc": "Run independent gate packs for multiple cases while keeping per-case evidence and tier decisions separate.",
             },
             {
                 "name": "multi-platform-gate-pack",
-                "cmd": "python3 scripts/case_multi_platform_gate_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case_name> --platform spike --platform linknan --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_multi_platform_gate.json --md-out .hyptest_skill_reports/case_multi_platform_gate.md",
+                "cmd": "python3 scripts/case_multi_platform_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --platform linknan --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_multi_platform_gate.json --md-out .hyptest_skill_reports/case_multi_platform_gate.md",
                 "desc": "Run case_gate_pack.py for one case across multiple platforms in parallel without merging tier decisions.",
             },
             {
@@ -244,7 +244,7 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
         "commands": [
             {
                 "name": "clean-generated",
-                "cmd": "python3 scripts/clean_generated.py --repo-root <repo_root>",
+                "cmd": "python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME",
                 "desc": "Remove skill-local temporary/cache files.",
             },
         ],
@@ -267,7 +267,7 @@ README_DESC_ZH: dict[str, str] = {
     "full": "完整检查，包含真实仓库相似 case eval，并保存报告。",
     "repo-health": "按 profile、skill、repo、CLI、lint baseline、环境和 self-check 分组输出健康报告。",
     "task-request": "修改或运行 case 前校验任务输入参数。",
-    "platform-env": "检查 Spike 和 LinkNan 环境变量，并说明各变量用途。",
+    "platform-env": "检查 hyptest、Spike、LinkNan、difftest-ref 环境变量，以及从 LinkNan submodule 推导出的 Nanhu 源码路径。",
     "doctor-all": "运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。",
     "similar-cases": "写新 case 前搜索已有 ai/manual case 源文件。",
     "repo-evidence-index": "构建或复用全仓 case、test_point、注册状态证据索引缓存。",

@@ -5,13 +5,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-from skill_config import default_spec_profile, resolve_path
+from skill_config import (
+    apply_env_overrides,
+    default_spec_profile,
+    env_override_args,
+    resolve_path,
+    runtime_env_overrides,
+)
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -48,6 +56,21 @@ def parse_args() -> argparse.Namespace:
         help="Skip get_result.py even when not compile-only.",
     )
     parser.add_argument(
+        "--skip-env-check",
+        action="store_true",
+        help="Skip check_env.py. Use only when environment has already been checked in the same run context.",
+    )
+    parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help=(
+            "Environment override for check_env.py, compile_elf.py, and get_result.py, "
+            "e.g. --env HYPTEST_SPIKE_BIN=/path/to/spike. Can be repeated."
+        ),
+    )
+    parser.add_argument(
         "--postcheck-md-out",
         help="Optional Markdown output path for the nested case_postcheck_pack.py run.",
     )
@@ -68,16 +91,24 @@ def summarize_text(text: str, limit: int = 1600) -> str:
     return stripped[:limit].rstrip() + "\n..."
 
 
-def run_command(command: list[str], *, cwd: Path) -> dict[str, Any]:
+def run_command(
+    command: list[str],
+    *,
+    cwd: Path,
+    env_overrides: dict[str, str] | None = None,
+) -> dict[str, Any]:
     started = time.monotonic()
+    env = os.environ.copy()
+    env.update(runtime_env_overrides(env_overrides))
     completed = subprocess.run(
         command,
         cwd=str(cwd),
+        env=env,
         capture_output=True,
         text=True,
         check=False,
     )
-    return {
+    result = {
         "ok": completed.returncode == 0,
         "returncode": completed.returncode,
         "duration_seconds": round(time.monotonic() - started, 3),
@@ -85,6 +116,53 @@ def run_command(command: list[str], *, cwd: Path) -> dict[str, Any]:
         "stdout_summary": summarize_text(completed.stdout),
         "stderr_summary": summarize_text(completed.stderr),
     }
+    log_file = extract_log_file(completed.stdout)
+    if log_file:
+        result["log_file"] = log_file
+    return result
+
+
+def extract_log_file(text: str) -> str | None:
+    match = re.search(r"(?m)^log_file=(.+?)\s*$", text)
+    return match.group(1).strip() if match else None
+
+
+def run_env_check(args: argparse.Namespace, repo_root: Path, *, run_required: bool) -> dict[str, Any]:
+    command = [
+        sys.executable,
+        str(SCRIPT_DIR / "check_env.py"),
+        "--repo-root",
+        str(repo_root),
+        "--platform",
+        args.platform,
+        "--task-mode",
+        "run-only" if run_required else "writeback-only",
+        "--json",
+    ]
+    if not run_required:
+        command.append("--platform-env-optional")
+    command.extend(env_override_args(args.env_overrides))
+    started = time.monotonic()
+    completed = subprocess.run(
+        command,
+        cwd=str(SKILL_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    result: dict[str, Any] = {
+        "ok": completed.returncode == 0,
+        "returncode": completed.returncode,
+        "duration_seconds": round(time.monotonic() - started, 3),
+        "command": " ".join(command),
+        "stdout_summary": summarize_text(completed.stdout),
+        "stderr_summary": summarize_text(completed.stderr),
+    }
+    try:
+        result["payload"] = json.loads(completed.stdout) if completed.stdout.strip() else {}
+    except json.JSONDecodeError:
+        result["payload"] = {}
+    return result
 
 
 def collect_log_snapshot(repo_root: Path, platform: str, case_name: str) -> dict[str, float]:
@@ -95,8 +173,6 @@ def collect_log_snapshot(repo_root: Path, platform: str, case_name: str) -> dict
         return {}
     snapshot: dict[str, float] = {}
     for path in base.rglob("*.log"):
-        if case_name not in path.name and case_name not in str(path):
-            continue
         try:
             snapshot[str(path.resolve())] = path.stat().st_mtime
         except OSError:
@@ -130,6 +206,8 @@ def discover_run_logs(
             for path in base.rglob("*.log")
             if path.is_file() and (case_name in path.name or case_name in str(path))
         ]
+    if not candidates:
+        candidates = [path for path in base.rglob("*.log") if path.is_file()]
     found: list[tuple[int, float, Path]] = []
     for path in candidates:
         try:
@@ -139,7 +217,16 @@ def discover_run_logs(
             continue
         before = before_snapshot.get(resolved)
         changed = before is None or mtime > before
-        found.append((1 if changed else 0, mtime, path))
+        if not changed and case_name not in path.name and case_name not in str(path):
+            continue
+        contains_case = case_name in path.name or case_name in str(path)
+        if changed and not contains_case:
+            try:
+                contains_case = case_name in path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                contains_case = False
+        if changed or contains_case:
+            found.append((1 if changed else 0, mtime, path))
     found.sort(key=lambda item: (item[0], item[1]), reverse=True)
     logs: list[dict[str, Any]] = []
     for changed, _mtime, path in found[:limit]:
@@ -149,6 +236,24 @@ def discover_run_logs(
             rel = str(path)
         logs.append({"path": rel, "new_or_updated": bool(changed)})
     return logs
+
+
+def add_run_log_from_command(
+    repo_root: Path,
+    run_log_evidence: list[dict[str, Any]],
+    run_result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    raw = run_result.get("log_file")
+    if not raw:
+        return run_log_evidence
+    path = Path(str(raw))
+    try:
+        rel = str(path.relative_to(repo_root)) if path.is_absolute() else str(path)
+    except ValueError:
+        rel = str(path)
+    if not any(item.get("path") == rel for item in run_log_evidence):
+        run_log_evidence.insert(0, {"path": rel, "new_or_updated": True})
+    return run_log_evidence
 
 
 def run_postcheck(args: argparse.Namespace, repo_root: Path) -> dict[str, Any]:
@@ -288,6 +393,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     commands: dict[str, Any] = {}
     skipped: dict[str, str] = {}
     run_log_evidence: list[dict[str, Any]] = []
+    run_requested = not args.compile_only and not args.skip_run
+
+    if args.skip_env_check:
+        skipped["env"] = "--skip-env-check"
+    else:
+        commands["env"] = run_env_check(args, repo_root, run_required=run_requested)
 
     if args.skip_compile:
         skipped["compile"] = "--skip-compile"
@@ -302,10 +413,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 args.case,
             ],
             cwd=repo_root,
+            env_overrides=args.env_overrides,
         )
 
     compile_ok = args.skip_compile or commands.get("compile", {}).get("ok", False)
-    should_run = not args.compile_only and not args.skip_run and compile_ok
+    env_ok = args.skip_env_check or commands.get("env", {}).get("ok", False)
+    should_run = run_requested and compile_ok and env_ok
     if should_run:
         before_logs = collect_log_snapshot(repo_root, args.platform, args.case)
         commands["run"] = run_command(
@@ -318,8 +431,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 args.case,
             ],
             cwd=repo_root,
+            env_overrides=args.env_overrides,
         )
         run_log_evidence = discover_run_logs(repo_root, args.platform, args.case, before_logs)
+        run_log_evidence = add_run_log_from_command(
+            repo_root,
+            run_log_evidence,
+            commands["run"],
+        )
     else:
         if args.compile_only:
             skipped["run"] = "--compile-only"
@@ -327,6 +446,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             skipped["run"] = "--skip-run"
         elif not compile_ok:
             skipped["run"] = "compile failed; run skipped"
+        elif not env_ok:
+            skipped["run"] = "environment check failed; run skipped"
 
     commands["postcheck"] = run_postcheck(args, repo_root)
     evidence_requirements = build_evidence_requirements(
@@ -344,6 +465,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         )
 
     required_steps = ["postcheck"]
+    if not args.skip_env_check:
+        required_steps.append("env")
     if not args.skip_compile:
         required_steps.append("compile")
     if should_run:
@@ -357,6 +480,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "platform": args.platform,
         "spec_profile": args.spec_profile,
         "compile_only": bool(args.compile_only),
+        "env_overrides": dict(args.env_overrides),
         "commands": commands,
         "skipped": skipped,
         "run_log_evidence": run_log_evidence,
@@ -426,6 +550,13 @@ def build_next_steps(
     evidence_requirements: dict[str, Any],
 ) -> list[str]:
     steps: list[str] = []
+    if commands.get("env") and not commands["env"].get("ok"):
+        payload = commands["env"].get("payload", {})
+        issues = payload.get("issues", []) if isinstance(payload, dict) else []
+        if issues:
+            steps.append("Fix platform environment before running get_result.py: " + "; ".join(str(issue) for issue in issues[:3]))
+        else:
+            steps.append("Fix platform environment before running get_result.py.")
     if commands.get("compile") and not commands["compile"].get("ok"):
         steps.append("Fix compile_elf.py failure before running or tiering the case.")
     if commands.get("run") and not commands["run"].get("ok"):
@@ -447,7 +578,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# hyptest case gate pack",
         "",
-        f"- repo_root: `{report['repo_root']}`",
+        f"- HYPTEST_HOME: `{report['repo_root']}`",
         f"- test_point_file: `{report['test_point_file']}`",
         f"- case: `{report['case']}`",
         f"- platform: `{report['platform']}`",
@@ -542,6 +673,11 @@ def write_outputs(report: dict[str, Any], args: argparse.Namespace) -> None:
 
 def main() -> int:
     args = parse_args()
+    try:
+        args.env_overrides = apply_env_overrides(args.env)
+    except ValueError as exc:
+        print(f"invalid --env: {exc}", file=sys.stderr)
+        return 2
     report = build_report(args)
     write_outputs(report, args)
     if args.json:

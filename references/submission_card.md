@@ -6,7 +6,7 @@
 
 ```bash
 python3 scripts/self_check.py --quick
-python3 scripts/self_check.py --full --repo-root <repo_root>
+python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME
 ```
 
 ## A. 输入锁定

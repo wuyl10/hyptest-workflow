@@ -29,6 +29,27 @@ LEGACY_SPIKE_BIN_FIELD = "spike" + "_bin"
 LEGACY_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
 LEGACY_XIANGSHAN_PLAT = "--plat " + "xiangshan"
 DEFAULT_PROFILE_LITERAL = "nhv5" + "_1_ap"
+PUBLIC_ENV_DOCS = [
+    "README.md",
+    "SKILL.md",
+    "references/prompt_recipes.md",
+    "references/task_input_schema.md",
+    "references/quick_execution.md",
+    "references/repo_layout.md",
+]
+REMOVED_PROMPT_ENV_TERMS = [
+    ("HYPTEST_REPO", "old repo environment variable"),
+    ("HYPTEST_NANHU_HOME", "standalone Nanhu environment variable"),
+    ("NANHU_HOME", "standalone Nanhu environment variable"),
+    ("ignored legacy", "legacy migration warning text"),
+    ("accepted for compatibility", "legacy prompt compatibility text"),
+]
+REMOVED_PROMPT_FIELD_PATTERNS = [
+    (re.compile(r"(?mi)^\s*(?:[-*]\s*)?repo_root\s*:"), "old prompt field `repo_root:`"),
+    (re.compile(r"(?mi)^\s*(?:[-*]\s*)?SPIKE_BIN\s*:"), "bare prompt field `SPIKE_BIN:`"),
+    (re.compile(r"(?mi)^\s*(?:[-*]\s*)?LINKNAN_HOME\s*:"), "bare prompt field `LINKNAN_HOME:`"),
+    (re.compile(r"(?mi)^\s*(?:[-*]\s*)?DIFFTEST_REF_SO\s*:"), "bare prompt field `DIFFTEST_REF_SO:`"),
+]
 
 
 def skill_root() -> Path:
@@ -127,6 +148,25 @@ def main() -> int:
     for rel in generic_docs:
         if DEFAULT_PROFILE_LITERAL in read(root, rel):
             issues.append(f"generic skill entry contains concrete default profile `{DEFAULT_PROFILE_LITERAL}`: `{rel}`")
+
+    for rel in PUBLIC_ENV_DOCS:
+        text = read(root, rel)
+        for needle, label in REMOVED_PROMPT_ENV_TERMS:
+            if needle in text:
+                issues.append(f"public docs still mention {label}: `{needle}` in `{rel}`")
+        for pattern, label in REMOVED_PROMPT_FIELD_PATTERNS:
+            if pattern.search(text):
+                issues.append(f"public docs still contain {label} in `{rel}`")
+
+    prompt_recipes_text = read(root, "references/prompt_recipes.md")
+    profile_lines = re.findall(r"(?m)^\s*spec_profile:\s*(.+?)\s*$", prompt_recipes_text)
+    concrete_default_lines = [line for line in profile_lines if line == DEFAULT_PROFILE_LITERAL]
+    if len(concrete_default_lines) != 1:
+        issues.append(
+            "prompt_recipes.md should keep exactly one concrete default profile example "
+            f"`spec_profile: {DEFAULT_PROFILE_LITERAL}`; reusable templates should use "
+            "`spec_profile: <当前项目 spec_profile>`"
+        )
 
     for platform in ("spike", "linknan"):
         if not re.search(rf"(?m)^({platform})$", repo_layout_text):

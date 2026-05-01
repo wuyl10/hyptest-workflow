@@ -93,11 +93,16 @@ def main() -> int:
         write(repo / f"result_log/spike/{case_name}_smoke.log", "PASS\nHIT GOOD TRAP\n")
 
         env = os.environ.copy()
+        for name in (
+            "SPIKE_BIN", "LINKNAN_HOME", "NANHU_HOME", "DIFFTEST_REF_SO",
+            "CROSS_COMPILE", "TMPDIR",
+        ):
+            env.pop(name, None)
         env.update(
             {
                 "PATH": f"{toolchain}:{os.environ.get('PATH', '')}",
-                "CROSS_COMPILE": "riscv64-unknown-elf-",
-                "SPIKE_BIN": str(spike),
+                "HYPTEST_CROSS_COMPILE": "riscv64-unknown-elf-",
+                "HYPTEST_SPIKE_BIN": str(spike),
             }
         )
 
@@ -171,7 +176,7 @@ def main() -> int:
                 failures.append("cached case_preflight_pack missing reading_pack")
 
         env_changed = env.copy()
-        env_changed["SPIKE_BIN"] = str(tmp / "different_spike")
+        env_changed["HYPTEST_SPIKE_BIN"] = str(tmp / "different_spike")
         make_executable(tmp / "different_spike")
         preflight_env_changed = run(
             [
@@ -203,7 +208,7 @@ def main() -> int:
         if preflight_env_changed_payload:
             cache = preflight_env_changed_payload.get("cache", {})
             if cache.get("hit"):
-                failures.append("case_preflight_pack cache must miss after SPIKE_BIN changes")
+                failures.append("case_preflight_pack cache must miss after HYPTEST_SPIKE_BIN changes")
             if not cache.get("environment_digest"):
                 failures.append("case_preflight_pack cache should expose environment_digest")
             if not cache.get("script_digest"):
@@ -242,6 +247,38 @@ def main() -> int:
                 strategy = cases[0]["latest_logs"][0].get("search_strategy")
                 if strategy != "fast-glob":
                     failures.append(f"case_postcheck_pack should use fast-glob for exact log names, got {strategy}")
+
+        preflight_only = run(
+            [
+                sys.executable,
+                str(SCRIPT_DIR / "case_preflight_pack.py"),
+                "--repo-root",
+                str(repo),
+                "--test-point-file",
+                str(test_point),
+                "--platform",
+                "spike",
+                "--spec-profile",
+                profile,
+                "--task-mode",
+                "preflight-only",
+                "--query",
+                "pack smoke",
+                "--no-pack-cache",
+                "--json",
+            ],
+            env=env,
+        )
+        preflight_only_payload = load_json_output(
+            preflight_only,
+            failures,
+            "case_preflight_pack_preflight_only",
+        )
+        if preflight_only_payload:
+            if not preflight_only_payload.get("ok"):
+                failures.append("case_preflight_pack preflight-only ok=false for smoke repo")
+            if preflight_only_payload.get("coverage_scope") != "repo":
+                failures.append("case_preflight_pack preflight-only should infer coverage_scope=repo")
 
     if failures:
         print("FAIL case pack workflow eval")
