@@ -165,7 +165,8 @@ target_policy: default-first
 | 用途 | 推荐模板 |
 | --- | --- |
 | 正式新增 1 个高质量 case | 高质量默认 Prompt |
-| 想缩短单 case 生成时间 | 更快 Prompt |
+| 想缩短单 case 实际完成时间 | 轻量快速 Prompt |
+| 想要标准报告和复盘证据 | 自动化证据 Prompt |
 | 围绕某个模块继续找 suspected bug | 按模块找 suspected bug Prompt |
 | 先只看有没有新增空间 | 只读预检 Prompt |
 | 补已有 `### PnX` | 补已有测试点 Prompt |
