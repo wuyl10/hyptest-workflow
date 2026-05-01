@@ -157,7 +157,7 @@ target_policy: default-first
 target_module: <module>
 
 目标：
-- 继续围绕 <module> 找 1 个高价值 suspected bug corner point，并新增 1 个对应 ai_* case
+- 继续围绕 target_module 找 1 个高价值 suspected bug corner point，并新增 1 个对应 ai_* case
 - 当前 test_point_file 只当容器，文件里已有 `### PnX` 和“已实现 case”不能重复当成本轮新增结果
 - 优先从 <bug_hunt_focus> 等共享路径里找未覆盖的边界
 - 不要按模块目录做局部捷径；必须做 repo 级 test_point 覆盖检查和 repo 级 case 去重
