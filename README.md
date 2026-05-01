@@ -17,7 +17,7 @@
 | 文件 | 作用 |
 | --- | --- |
 | `SKILL.md` | Codex 触发和执行入口，包含硬规则、流程、分层和最终答复要求 |
-| `references/prompt_recipes.md` | 高质量 prompt、更快 prompt、模块 suspected bug prompt、只读预检等可复制模板 |
+| `references/prompt_recipes.md` | 高质量、轻量快速、可复盘证据、模块 suspected bug、只读预检等可复制模板 |
 | `references/command_index.md` | 完整命令索引，由 `scripts/list_skill_commands.py --markdown` 生成 |
 | `references/quick_execution.md` | 从 preflight 到 gate、postcheck、submission card 的快速闭环 |
 | `references/task_input_schema.md` | 目标仓库、测试点文件、平台、任务模式等输入字段 |
@@ -125,7 +125,7 @@ python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain
 | `bug_hunt_focus` / `bug_hunt_focus_terms` | 按模块找新 bug 点时 | 给 workflow 一组关注方向和检索词，加快 preflight 与相似 case 检索。 | `CMO / LRSC / fence` |
 | `failure_log` | `triage-only` 或失败归因时 | 指定失败日志。若进入 stuck、difftest、FSDB 或疑似 RTL bug，优先转 `hyptest-failure-triage`。 | `result_log/<platform>/<log>` |
 
-`preflight-only` 用于只读分析、找新增空间、准备 prompt 或会议演示；它不会要求 `case_name`，也不会因为 runner 环境缺失而阻塞。`run-only` 用于已有 case 的编译/运行验证，通常必须给 `case_name`。
+`preflight-only` 用于开写前只读摸底：判断是否还有新增空间、是否重复、优先补哪个方向。它不会要求 `case_name`，也不会因为 runner 环境缺失而阻塞。`run-only` 用于已有 case 的编译/运行验证，通常必须给 `case_name`。
 
 ### 通常不用填
 
@@ -143,7 +143,7 @@ python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain
 
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <当前项目 spec_profile> (标明该skill针对的项目spec，如果不填则默认为nhv5_1_ap)
+spec_profile: <当前项目 spec_profile>
 task_mode: new-case-only
 new_case_count: 1
 target_policy: default-first
@@ -168,7 +168,7 @@ target_policy: default-first
 | 想缩短单 case 实际完成时间 | 轻量快速 Prompt |
 | 想要标准报告和复盘证据 | 自动化证据 Prompt |
 | 围绕某个模块继续找 suspected bug | 按模块找 suspected bug Prompt |
-| 先只看有没有新增空间 | 只读预检 Prompt |
+| 开写前只读摸底 | 只读预检 Prompt |
 | 补已有 `### PnX` | 补已有测试点 Prompt |
 | 只跑已有 case | 只跑验证 Prompt |
 

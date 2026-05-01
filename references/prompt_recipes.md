@@ -91,7 +91,7 @@ spec_profile: nhv5_1_ap
 | `高质量默认 Prompt` | 正式新增 case，想稳妥覆盖全部质量门禁 | 默认推荐，质量最稳 |
 | `轻量快速 Prompt` | 单次只新增 1 个 case，希望 wall-clock 尽量短 | 不强制跑报告/ledger，保留质量底线 |
 | `自动化证据 Prompt` | 连续多 case、多人复盘、需要标准报告路径 | 优化证据标准化和返工成本，不承诺单次最快 |
-| `只读预检 Prompt` | 先判断有没有新增空间或准备会议材料 | 只读，最快给方向 |
+| `只读预检 Prompt` | 开写前只读摸底：判断是否还有新增空间、是否重复、优先补哪个方向 | 不改文件，最快给方向 |
 
 ## 高质量默认 Prompt
 
@@ -364,7 +364,7 @@ bug_hunt_focus_terms: memblock, StoreQueue, sbuffer, cmo, cbo.inval, fence, lrsc
 
 ## 只读预检 Prompt
 
-适合先判断有没有新增空间、准备任务或会议演示：
+适合开写前先摸底：不改文件，只判断当前 test_point 是否还有新增空间、哪些方向重复、哪个方向最值得优先补。
 
 ```text
 使用hyptest-workflow skill
@@ -379,7 +379,7 @@ task_mode: preflight-only
 - 只做只读分析，不修改文件
 - 跑 case_preflight_pack.py，必要时跑 repo_evidence_index.py 和 find_similar_cases.py
 - 按“是否要找新增空间”自动选择测试点覆盖范围；如果是跨文件排重，检查全仓 test_point
-- 输出目标 test_point 摘要、相似测试点/相似 case、规格/平台口径和 Spike gate 注意点
+- 输出目标 test_point 摘要、相似测试点/相似 case、规格/平台口径、Spike gate 注意点和建议优先级
 - 给出是否值得新增 case 的建议，但不新增 case、不注册、不编译、不运行
 ```
 
