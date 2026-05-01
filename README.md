@@ -83,9 +83,9 @@ python3 scripts/check_env.py --repo-root <hyptest_repo> --platform all --explain
 
 平台名只使用 `spike` 或 `linknan`；不要把 `xiangshan` 写成 hyptest 的 `platform` / `--plat` 参数。
 
-## Prompt 关键词速查
+## Prompt 写法
 
-写 prompt 时不需要把所有字段都填满。先填“最小必填”，再按任务类型补条件字段；其余字段让 workflow 按默认规则推导。
+写 prompt 时不需要把所有字段都填满。先填“最小必填”，再按任务类型补条件字段；其余字段让 workflow 按默认规则推导。下面先给关键词含义，再给最短可用模板。
 
 ### 最小必填
 
@@ -121,9 +121,13 @@ python3 scripts/check_env.py --repo-root <hyptest_repo> --platform all --explain
 | `coverage_scope` | workflow 根据目的自动推导：新增测试点 / 找 suspected bug / 跨文件排重 -> `repo`；补已有 `### PnX` -> `file`。case 相似检索始终是 repo 级。 | 只有高级排查、复现实验或需要覆盖默认行为时才显式写 `file` / `repo`。 |
 | `reason_code` | 通常由运行结果、profile 和分层规则推断。 | 已经有明确非 default 结论，希望保留或复核原因码时。 |
 
-最常见的新增 case prompt 只需要这些字段：
+### 最短可用模板
+
+最常见的新增 case prompt 只需要这些字段和要求：
 
 ```text
+使用hyptest-workflow skill
+
 repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
 test_point_file: test_point/<xxx>.md
 platform: spike
@@ -132,9 +136,29 @@ spec_profile: <当前项目 spec_profile>
 task_mode: new-case-only
 new_case_count: 1
 target_policy: default-first
+
+要求：
+- 先分析目标模块和 test_point，再新增 1 个 ai_* case
+- 根据任务目的选择覆盖检查范围；新增测试点默认做全仓 test_point 覆盖检查
+- 做 repo 级 case 相似检索和函数名唯一性检查
+- 写 case 前确认规格/平台口径和 Spike gate 适用性
+- 非 compile-only 必须单 case 编译并单 case 跑目标平台
+- 回填 test_point，并与 test_register.c 一致
+- 输出新增 case、唯一性证据、编译/运行结果、关键日志路径和最终决策
 ```
 
-更完整的字段说明见 `references/task_input_schema.md`，可复制 prompt 模板见 `references/prompt_recipes.md`。
+### 更多模板
+
+更完整的字段说明见 `references/task_input_schema.md`，可复制 prompt 模板见 `references/prompt_recipes.md`：
+
+| 用途 | 推荐模板 |
+| --- | --- |
+| 正式新增 1 个高质量 case | 高质量默认 Prompt |
+| 想缩短单 case 生成时间 | 更快 Prompt |
+| 围绕某个模块继续找 suspected bug | 按模块找 suspected bug Prompt |
+| 先只看有没有新增空间 | 只读预检 Prompt |
+| 补已有 `### PnX` | 补已有测试点 Prompt |
+| 只跑已有 case | 只跑验证 Prompt |
 
 ## 标准流程
 
@@ -176,43 +200,6 @@ python3 scripts/case_gate_pack.py --repo-root <hyptest_repo> --test-point-file <
 这里的 `<hyptest_repo>` 就是目标 `riscv-hyp-tests-nhv5.1` 仓库根目录；如果使用变量，建议写成 `"$HYPTEST_REPO"`。
 
 更多命令见 `references/command_index.md`。
-
-## Prompt 模板
-
-最短可用 prompt：
-
-```text
-使用hyptest-workflow skill
-
-repo_root: <riscv-hyp-tests-nhv5.1 仓库根目录>
-test_point_file: test_point/<xxx>.md
-platform: spike
-spec_profile: <当前项目 spec_profile>
-
-task_mode: new-case-only
-new_case_count: 1
-target_policy: default-first
-
-要求：
-- 先分析目标模块和 test_point，再新增 1 个 ai_* case
-- 根据任务目的选择覆盖检查范围；新增测试点默认做全仓 test_point 覆盖检查
-- 做 repo 级 case 相似检索和函数名唯一性检查
-- 写 case 前确认规格/平台口径和 Spike gate 适用性
-- 非 compile-only 必须单 case 编译并单 case 跑目标平台
-- 回填 test_point，并与 test_register.c 一致
-- 输出新增 case、唯一性证据、编译/运行结果、关键日志路径和最终决策
-```
-
-更完整的模板见 `references/prompt_recipes.md`：
-
-| 用途 | 推荐模板 |
-| --- | --- |
-| 正式新增 1 个高质量 case | 高质量默认 Prompt |
-| 想缩短单 case 生成时间 | 更快 Prompt |
-| 围绕某个模块继续找 suspected bug | 按模块找 suspected bug Prompt |
-| 先只看有没有新增空间 | 只读预检 Prompt |
-| 补已有 `### PnX` | 补已有测试点 Prompt |
-| 只跑已有 case | 只跑验证 Prompt |
 
 ## 分层口径
 
