@@ -51,6 +51,15 @@
 ## 目标仓库和环境
 
 日常 prompt 不需要写完整环境清单。规则是：当前执行环境已经能读到的变量可以省略；读不到、但本轮必需的变量才写进 prompt。对外统一使用 `HYPTEST_HOME` 和 `HYPTEST_*`，不要写个人绝对路径或其它项目的通用变量名。
+使用前需要配置对应环境变量：
+| 变量名 | 路径 |
+| --- | --- |
+| `HYPTEST_HOME` | 对应riscv-hyp-tests的仓库路径 |
+| `HYPTEST_SPIKE_BIN` | 单跑ELF的spike bin路径（建议使用社区版spike）|
+| `HYPTEST_LINKNAN_HOME` | Linknan仓库路径 |
+| `HYPTEST_DIFFTEST_REF_SO` | Linknan跑difftest时用的golden ref路径 （使用对应Linknan维护的spike仓库riscv64-spike-so）|
+Nanhu 源码不单独设置环境变量，固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。
+
 
 常见组合：
 
@@ -61,11 +70,9 @@
 | LinkNan / difftest gate | `HYPTEST_HOME`、`HYPTEST_LINKNAN_HOME`、`HYPTEST_DIFFTEST_REF_SO` |
 | `/tmp` 空间不足 | 额外设置 `HYPTEST_TMPDIR` |
 
-`HYPTEST_SPIKE_BIN` 尽量指向社区版/上游 riscv-isa-sim Spike，用于 architecture/default gate；LinkNan/difftest 证据走 `HYPTEST_DIFFTEST_REF_SO`。Nanhu 源码不单独设置环境变量，固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。
 
 如果没识别到本轮必需路径，preflight 会停下并直接提示要补哪个字段。`preflight-only` 不会因为 runner 环境缺失而阻塞；与本轮平台无关的变量直接省略。
 
-变量写在 `~/.bashrc` 时，要确保 Codex/脚本所在的非交互 shell 也能读到。常见问题是 export 放在 `case $-` / `return` 这类保护之后，导致 VS Code 终端能看到，但脚本看不到。
 
 需要检查环境时运行：
 
@@ -135,8 +142,7 @@ python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain
 
 test_point_file: test_point/<xxx>.md
 platform: spike
-spec_profile: <当前项目 spec_profile>
-
+spec_profile: <当前项目 spec_profile> (标明该skill针对的项目spec，如果不填则默认为nhv5_1_ap)
 task_mode: new-case-only
 new_case_count: 1
 target_policy: default-first
