@@ -3,14 +3,56 @@
   "description": "Machine-readable script inventory for hyptest-workflow consistency checks.",
   "scripts": [
     {
+      "path": "scripts/case_batch_gate_pack.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
       "path": "scripts/case_extractor.py",
       "group": "similar-search",
       "public": true,
       "self_check": false
     },
     {
+      "path": "scripts/case_gate_pack.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
       "path": "scripts/case_lint_baseline_diff.py",
       "group": "case-workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/case_multi_platform_gate_pack.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/case_postcheck_pack.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/case_preflight_pack.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/case_timing_summary.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/case_workflow_ledger.py",
+      "group": "workflow",
       "public": true,
       "self_check": false
     },
@@ -117,6 +159,18 @@
       "self_check": false
     },
     {
+      "path": "scripts/eval_case_batch_gate_pack.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_gate_pack.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
       "path": "scripts/eval_case_generation_contract.py",
       "group": "eval",
       "public": true,
@@ -124,6 +178,42 @@
     },
     {
       "path": "scripts/eval_case_lint_baseline_diff.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_multi_platform_gate_pack.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_pack_workflow.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_skeleton_and_submission_draft.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_submission_card.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_timing_summary.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_case_workflow_ledger.py",
       "group": "eval",
       "public": true,
       "self_check": true
@@ -207,6 +297,12 @@
       "self_check": true
     },
     {
+      "path": "scripts/eval_repo_evidence_index.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
       "path": "scripts/eval_spec_profile.py",
       "group": "eval",
       "public": true,
@@ -214,6 +310,12 @@
     },
     {
       "path": "scripts/eval_spec_profile_registry.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_suggest_case_name.py",
       "group": "eval",
       "public": true,
       "self_check": true
@@ -261,6 +363,18 @@
       "self_check": false
     },
     {
+      "path": "scripts/make_case_skeleton.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/make_case_submission_card.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
       "path": "scripts/make_triage_handoff.py",
       "group": "workflow",
       "public": true,
@@ -287,6 +401,12 @@
     {
       "path": "scripts/query_spec_profile.py",
       "group": "profile",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/repo_evidence_index.py",
+      "group": "workflow",
       "public": true,
       "self_check": false
     },
@@ -347,6 +467,12 @@
     {
       "path": "scripts/skill_summary.py",
       "group": "maintenance",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/suggest_case_name.py",
+      "group": "workflow",
       "public": true,
       "self_check": false
     },

@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from skill_config import resolve_path
 from writeback_register import load_registration_status
 
 
@@ -108,13 +109,13 @@ def collect_files(args: argparse.Namespace) -> List[Path]:
     seen = set()
 
     for raw in args.file:
-        path = Path(raw).expanduser().resolve()
+        path = resolve_path(raw)
         if path.is_file() and path not in seen:
             seen.add(path)
             files.append(path)
 
     if args.glob:
-        base = Path(args.repo_root).expanduser().resolve() if args.repo_root else Path.cwd()
+        base = resolve_path(args.repo_root) if args.repo_root else Path.cwd()
         for pattern in args.glob:
             for path in sorted(base.glob(pattern)):
                 resolved = path.resolve()
@@ -125,7 +126,7 @@ def collect_files(args: argparse.Namespace) -> List[Path]:
     if args.all_test_points:
         if not args.repo_root:
             raise ValueError("--all-test-points requires --repo-root")
-        base = Path(args.repo_root).expanduser().resolve()
+        base = resolve_path(args.repo_root)
         for path in sorted((base / "test_point").glob("*.md")):
             resolved = path.resolve()
             if resolved.is_file() and resolved not in seen:
@@ -388,7 +389,7 @@ def main() -> int:
         if not args.repo_root:
             print("--check-register requires --repo-root.", file=sys.stderr)
             return 2
-        register_status = load_registration_status(Path(args.repo_root).expanduser().resolve())
+        register_status = load_registration_status(resolve_path(args.repo_root))
 
     results = [
         validate_file(path, register_status, args.check_register, profile_text)

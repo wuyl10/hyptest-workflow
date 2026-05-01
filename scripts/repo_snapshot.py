@@ -9,6 +9,8 @@ import os
 import re
 from pathlib import Path
 
+from skill_config import resolve_path
+
 
 CASE_FUNC_RE = re.compile(r"^\s*(?:static\s+)?bool\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", re.MULTILINE)
 REGISTER_RE = re.compile(r"TEST_REGISTER\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)")
@@ -132,7 +134,7 @@ def build_snapshot(root: Path) -> dict[str, object]:
 
 def main() -> int:
     args = parse_args()
-    root = Path(args.repo_root).expanduser().resolve()
+    root = resolve_path(args.repo_root)
     payload = build_snapshot(root)
     ok = bool(payload["repo_exists"]) and all(payload["anchors"].values())
     payload["ok"] = ok

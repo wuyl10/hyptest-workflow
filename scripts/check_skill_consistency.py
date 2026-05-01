@@ -65,6 +65,7 @@ def main() -> int:
 
     skill_text = read(root, "SKILL.md")
     readme_text = read(root, "README.md")
+    command_index_text = read(root, "references/command_index.md")
     gitignore_text = read(root, ".gitignore")
     repo_layout_text = read(root, "references/repo_layout.md")
     self_check_text = read(root, "scripts/self_check.py")
@@ -106,8 +107,8 @@ def main() -> int:
         issues.append("repo_layout.md missing generated directory `case_elf_asm/`")
     if "references/task_input_schema.md" not in readme_text + skill_text:
         issues.append("task input schema missing from README/SKILL entry points")
-    if "<!-- BEGIN GENERATED COMMANDS -->" not in readme_text:
-        issues.append("README missing generated command block markers")
+    if "<!-- BEGIN GENERATED COMMANDS -->" not in command_index_text:
+        issues.append("command_index.md missing generated command block markers")
     if LEGACY_CASE_DIR in "\n".join([skill_text, readme_text, repo_layout_text]):
         issues.append(f"skill docs still mention removed legacy directory `{LEGACY_CASE_DIR}`")
     generic_docs = [

@@ -45,6 +45,7 @@ from similar_case_terms import (
     extract_terms_from_file,
     summarize_terms,
 )
+from skill_config import resolve_path
 
 QUERY_UNIT_RE = re.compile(r"[a-z0-9][a-z0-9_+-]*")
 
@@ -173,12 +174,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    repo_root = Path(args.repo_root).expanduser().resolve()
+    repo_root = resolve_path(args.repo_root)
 
     explicit_terms = expand_query_terms(args.query)
     terms = list(explicit_terms)
     if args.from_file:
-        from_file = Path(args.from_file).expanduser().resolve()
+        from_file = resolve_path(args.from_file)
         if not from_file.is_file():
             print(f"from-file not found: {from_file}", file=sys.stderr)
             return 2

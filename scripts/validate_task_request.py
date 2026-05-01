@@ -10,7 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from skill_config import default_spec_profile
+from skill_config import default_spec_profile, expand_path, resolve_path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -87,13 +87,13 @@ def load_request_overrides(args: argparse.Namespace) -> dict[str, object]:
     if args.request_json and args.request_md:
         raise ValueError("use only one of --request-json or --request-md")
     if args.request_json:
-        path = Path(args.request_json).expanduser()
+        path = expand_path(args.request_json)
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise ValueError("--request-json must contain a JSON object")
         return payload
     if args.request_md:
-        return parse_request_md(Path(args.request_md).expanduser())
+        return parse_request_md(expand_path(args.request_md))
     return {}
 
 
@@ -219,11 +219,11 @@ def main() -> int:
     new_case_count = pick(args, overrides, "new_case_count")
     coverage_scope = pick(args, overrides, "coverage_scope")
 
-    repo_root = Path(repo_root_raw).expanduser().resolve() if repo_root_raw else None
+    repo_root = resolve_path(repo_root_raw) if repo_root_raw else None
     test_point_file = (
-        Path(test_point_file_raw).expanduser().resolve() if test_point_file_raw else None
+        resolve_path(test_point_file_raw) if test_point_file_raw else None
     )
-    failure_log = Path(failure_log_raw).expanduser().resolve() if failure_log_raw else None
+    failure_log = resolve_path(failure_log_raw) if failure_log_raw else None
 
     profile_ok, profile_detail = resolve_profile(spec_profile)
     if not profile_ok:

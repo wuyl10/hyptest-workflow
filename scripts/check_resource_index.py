@@ -20,6 +20,8 @@ KEY_ASSETS = [
     "assets/reason_codes.json",
     "assets/script_manifest.json",
     "assets/triage_handoff_schema.json",
+    "references/command_index.md",
+    "references/prompt_recipes.md",
 ]
 
 

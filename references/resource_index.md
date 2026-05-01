@@ -42,11 +42,27 @@
   - 提交前复核卡片。
 - `references/maintainer_guide.md`
   - skill 维护、新增 profile、脚本/eval 变更的检查清单。
+- `references/prompt_recipes.md`
+  - 可复制 prompt 模板；README 只保留快速入口，长 prompt 放这里维护。
+- `references/command_index.md`
+  - 完整命令索引；生成命令块由 `scripts/update_readme_commands.py` 刷新。
 
 ## Public Scripts
 
 - `scripts/find_similar_cases.py`
   - 检索相似存量 case；搜索范围是全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。
+- `scripts/case_preflight_pack.py`
+  - 写 case 前聚合任务输入、repo snapshot、profile 解析、平台环境和相似 case reading pack，减少重复检索和路径切换。
+- `scripts/case_postcheck_pack.py`
+  - 写 case 后聚合 case lint、回填/注册一致性、函数定义唯一性、ELF/ASM 产物和最新运行日志证据。
+- `scripts/case_gate_pack.py`
+  - 单 case 编译、运行并调用 postcheck 收口证据，同时输出 compile/run/postcheck 分步耗时。
+- `scripts/case_multi_platform_gate_pack.py`
+  - 对同一 case 并行调用多个平台的 `case_gate_pack.py`，保留每个平台独立证据，不合并为最终分层。
+- `scripts/make_case_submission_card.py`
+  - 将 preflight/gate/postcheck JSON 汇总成最终交付证据卡；只整理证据，不自动裁决分层。
+- `scripts/case_timing_summary.py`
+  - 汇总 workflow pack JSON 的 `timing` 和 cache hit/miss，辅助定位耗时瓶颈。
 - `scripts/case_extractor.py`
   - `find_similar_cases.py` 的 case 提取、注册状态读取和缓存 builder。
 - `scripts/similar_case_ranker.py`
@@ -86,7 +102,7 @@
 - `scripts/check_docs_links.py`
   - 检查 skill 文档中的本地文件引用是否存在。
 - `scripts/check_readme_commands.py`
-  - 检查 README 生成命令块是否与 `list_skill_commands.py --markdown` 一致。
+  - 检查 `references/command_index.md` 生成命令块是否与 `list_skill_commands.py --markdown` 一致。
 - `scripts/check_skill_consistency.py`
   - 检查 `SKILL.md`、README、resource index、`.gitignore`、self-check 脚本之间的维护一致性。
 - `scripts/check_cross_skill_consistency.py`
@@ -122,7 +138,7 @@
 - `scripts/list_skill_commands.py`
   - 打印常用 skill 维护/使用命令，支持 `--json` 和 `--markdown`。
 - `scripts/update_readme_commands.py`
-  - 从 `list_skill_commands.py --markdown` 刷新 README 的生成命令块。
+  - 从 `list_skill_commands.py --markdown` 刷新 `references/command_index.md` 的生成命令块。
 - `scripts/update_script_manifest.py`
   - 扫描 `scripts/*.py` 并刷新 `assets/script_manifest.json`，避免新增脚本漏登记。
 - `scripts/update_resource_index.py`
@@ -180,6 +196,16 @@
   - 回归检查 profile-local 决策事实和默认 profile 关键 gate 口径。
 - `scripts/eval_case_generation_contract.py`
   - 静态回归检查写 case 前必须查 profile、排重、平台名纠偏等生成契约。
+- `scripts/eval_case_pack_workflow.py`
+  - 回归检查 `case_preflight_pack.py` 和 `case_postcheck_pack.py` 的核心输出 contract。
+- `scripts/eval_case_gate_pack.py`
+  - 回归检查 `case_gate_pack.py` 的 compile/run/postcheck/timing 输出 contract。
+- `scripts/eval_case_multi_platform_gate_pack.py`
+  - 回归检查 `case_multi_platform_gate_pack.py` 的并行多平台输出 contract。
+- `scripts/eval_case_submission_card.py`
+  - 回归检查 `make_case_submission_card.py` 的 evidence-only 输出 contract。
+- `scripts/eval_case_timing_summary.py`
+  - 回归检查 `case_timing_summary.py` 的 timing/cache 汇总 contract。
 
 ## Assets
 
@@ -221,8 +247,17 @@
 - `assets/reason_codes.json`
 - `assets/script_manifest.json`
 - `assets/triage_handoff_schema.json`
+- `references/command_index.md`
+- `references/prompt_recipes.md`
+- `scripts/case_batch_gate_pack.py`
 - `scripts/case_extractor.py`
+- `scripts/case_gate_pack.py`
 - `scripts/case_lint_baseline_diff.py`
+- `scripts/case_multi_platform_gate_pack.py`
+- `scripts/case_postcheck_pack.py`
+- `scripts/case_preflight_pack.py`
+- `scripts/case_timing_summary.py`
+- `scripts/case_workflow_ledger.py`
 - `scripts/check_case_lint.py`
 - `scripts/check_cross_skill_consistency.py`
 - `scripts/check_docs_links.py`
@@ -240,8 +275,16 @@
 - `scripts/classify_failure_log.py`
 - `scripts/clean_generated.py`
 - `scripts/doctor.py`
+- `scripts/eval_case_batch_gate_pack.py`
+- `scripts/eval_case_gate_pack.py`
 - `scripts/eval_case_generation_contract.py`
 - `scripts/eval_case_lint_baseline_diff.py`
+- `scripts/eval_case_multi_platform_gate_pack.py`
+- `scripts/eval_case_pack_workflow.py`
+- `scripts/eval_case_skeleton_and_submission_draft.py`
+- `scripts/eval_case_submission_card.py`
+- `scripts/eval_case_timing_summary.py`
+- `scripts/eval_case_workflow_ledger.py`
 - `scripts/eval_check_case_lint.py`
 - `scripts/eval_check_env.py`
 - `scripts/eval_check_writeback_format.py`
@@ -255,8 +298,10 @@
 - `scripts/eval_profile_decisions.py`
 - `scripts/eval_profile_portability.py`
 - `scripts/eval_reason_code_suggestions.py`
+- `scripts/eval_repo_evidence_index.py`
 - `scripts/eval_spec_profile.py`
 - `scripts/eval_spec_profile_registry.py`
+- `scripts/eval_suggest_case_name.py`
 - `scripts/eval_triage_handoff.py`
 - `scripts/eval_validate_task_request.py`
 - `scripts/eval_workflow_smoke.py`
@@ -264,11 +309,14 @@
 - `scripts/eval_workflow_transcripts.py`
 - `scripts/find_similar_cases.py`
 - `scripts/list_skill_commands.py`
+- `scripts/make_case_skeleton.py`
+- `scripts/make_case_submission_card.py`
 - `scripts/make_triage_handoff.py`
 - `scripts/markdown_sections.py`
 - `scripts/new_spec_profile.py`
 - `scripts/profile_utils.py`
 - `scripts/query_spec_profile.py`
+- `scripts/repo_evidence_index.py`
 - `scripts/repo_snapshot.py`
 - `scripts/resolve_spec_profile.py`
 - `scripts/self_check.py`
@@ -279,6 +327,7 @@
 - `scripts/similar_case_terms.py`
 - `scripts/skill_config.py`
 - `scripts/skill_summary.py`
+- `scripts/suggest_case_name.py`
 - `scripts/suggest_reason_code.py`
 - `scripts/term_aliases.py`
 - `scripts/update_readme_commands.py`

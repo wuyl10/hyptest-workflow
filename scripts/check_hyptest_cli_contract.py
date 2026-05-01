@@ -9,6 +9,8 @@ import re
 import sys
 from pathlib import Path
 
+from skill_config import resolve_path
+
 
 LEGACY_CASE_DIR = "individual" + "_tests"
 LEGACY_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
@@ -40,7 +42,7 @@ def has_regex(text: str, pattern: str) -> bool:
 
 def main() -> int:
     args = parse_args()
-    repo_root = Path(args.repo_root).expanduser().resolve()
+    repo_root = resolve_path(args.repo_root)
     issues: list[str] = []
     warnings: list[str] = []
 

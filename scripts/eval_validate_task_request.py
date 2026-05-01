@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -70,6 +71,15 @@ def main() -> int:
             "case_name: ai_smoke\n",
             encoding="utf-8",
         )
+        env_request_md = tmp / "request_env.md"
+        env_request_md.write_text(
+            "repo_root: $HYPTEST_EVAL_REPO\n"
+            "test_point_file: $HYPTEST_EVAL_REPO/test_point/p.md\n"
+            "platform: spike\n"
+            "task_mode: run-only\n"
+            "case_name: ai_smoke\n",
+            encoding="utf-8",
+        )
         ok_json = run("--request-json", str(request_json), "--json")
         if ok_json.returncode != 0:
             failures.append("request-json fixture should pass")
@@ -82,6 +92,22 @@ def main() -> int:
         ok_md = run("--request-md", str(request_md), "--json")
         if ok_md.returncode != 0:
             failures.append("request-md fixture should pass")
+        old_env = os.environ.get("HYPTEST_EVAL_REPO")
+        os.environ["HYPTEST_EVAL_REPO"] = str(repo)
+        try:
+            ok_env_md = run("--request-md", str(env_request_md), "--json")
+        finally:
+            if old_env is None:
+                os.environ.pop("HYPTEST_EVAL_REPO", None)
+            else:
+                os.environ["HYPTEST_EVAL_REPO"] = old_env
+        if ok_env_md.returncode != 0:
+            failures.append("request-md fixture with env var paths should pass")
+        else:
+            env_payload = json.loads(ok_env_md.stdout)
+            normalized = env_payload.get("normalized", {})
+            if normalized.get("repo_root") != str(repo.resolve()):
+                failures.append("env var repo_root should expand to the real repo path")
         bad_platform = run("--request-json", str(request_json), "--platform", "xiangshan", "--json")
         if bad_platform.returncode == 0 or "platform=xiangshan" not in bad_platform.stdout:
             failures.append("explicit bad platform should fail and override request-json")

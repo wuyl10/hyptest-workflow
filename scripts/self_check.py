@@ -282,6 +282,19 @@ def main() -> int:
     record("eval_hyptest_cli_contract", [sys.executable, "scripts/eval_hyptest_cli_contract.py"])
     record("eval_case_generation_contract", [sys.executable, "scripts/eval_case_generation_contract.py"])
     record("eval_workflow_smoke", [sys.executable, "scripts/eval_workflow_smoke.py"])
+    record("eval_repo_evidence_index", [sys.executable, "scripts/eval_repo_evidence_index.py"])
+    record("eval_case_pack_workflow", [sys.executable, "scripts/eval_case_pack_workflow.py"])
+    record("eval_case_gate_pack", [sys.executable, "scripts/eval_case_gate_pack.py"])
+    record("eval_case_batch_gate_pack", [sys.executable, "scripts/eval_case_batch_gate_pack.py"])
+    record("eval_case_multi_platform_gate_pack", [sys.executable, "scripts/eval_case_multi_platform_gate_pack.py"])
+    record("eval_case_submission_card", [sys.executable, "scripts/eval_case_submission_card.py"])
+    record(
+        "eval_case_skeleton_and_submission_draft",
+        [sys.executable, "scripts/eval_case_skeleton_and_submission_draft.py"],
+    )
+    record("eval_case_workflow_ledger", [sys.executable, "scripts/eval_case_workflow_ledger.py"])
+    record("eval_suggest_case_name", [sys.executable, "scripts/eval_suggest_case_name.py"])
+    record("eval_case_timing_summary", [sys.executable, "scripts/eval_case_timing_summary.py"])
     record("doctor_skip_self", [sys.executable, "scripts/doctor.py", "--skip-self-check", "--strict"])
     record("list_skill_commands_markdown", [sys.executable, "scripts/list_skill_commands.py", "--markdown"])
     record("eval_listed_commands_help", [sys.executable, "scripts/eval_listed_commands_help.py"])

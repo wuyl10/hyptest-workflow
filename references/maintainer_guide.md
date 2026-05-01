@@ -139,6 +139,102 @@ python3 scripts/check_case_lint.py --repo-root <repo_root> --changed-only --stri
 python3 scripts/check_writeback_format.py --repo-root <repo_root> --file <test_point_file> --check-register --spec-profile <spec_profile>
 ```
 
+## 修改 Preflight/Postcheck Pack
+
+`scripts/repo_evidence_index.py`、`scripts/case_preflight_pack.py`、`scripts/case_postcheck_pack.py`、`scripts/case_gate_pack.py`、`scripts/case_batch_gate_pack.py`、`scripts/case_multi_platform_gate_pack.py`、`scripts/make_case_skeleton.py`、`scripts/suggest_case_name.py`、`scripts/make_case_submission_card.py`、`scripts/case_timing_summary.py` 和 `scripts/case_workflow_ledger.py` 是保质量提速入口，只聚合现有检查、执行、耗时、骨架、命名建议和证据，不重新定义质量口径。
+
+修改后至少跑：
+
+```bash
+python3 scripts/case_preflight_pack.py \
+  --repo-root <repo_root> \
+  --test-point-file <test_point_file> \
+  --platform spike \
+  --spec-profile <spec_profile> \
+  --task-mode new-case-only \
+  --new-case-count 1 \
+  --coverage-scope repo \
+  --query memblock \
+  --json
+
+python3 scripts/case_postcheck_pack.py \
+  --repo-root <repo_root> \
+  --test-point-file <test_point_file> \
+  --case <case_name> \
+  --platform spike \
+  --spec-profile <spec_profile> \
+  --json
+
+python3 scripts/case_gate_pack.py \
+  --repo-root <repo_root> \
+  --test-point-file <test_point_file> \
+  --case <case_name> \
+  --platform spike \
+  --spec-profile <spec_profile> \
+  --json
+
+python3 scripts/case_batch_gate_pack.py \
+  --repo-root <repo_root> \
+  --test-point-file <test_point_file> \
+  --case <case_name> \
+  --platform spike \
+  --spec-profile <spec_profile> \
+  --json
+
+python3 scripts/make_case_submission_card.py \
+  --preflight-json .hyptest_skill_reports/case_preflight.json \
+  --gate-json .hyptest_skill_reports/case_gate.json \
+  --emit-final-draft \
+  --json
+
+python3 scripts/suggest_case_name.py \
+  --repo-root <repo_root> \
+  --preflight-json .hyptest_skill_reports/case_preflight.json \
+  --prefix ai_micro \
+  --json
+
+python3 scripts/case_multi_platform_gate_pack.py \
+  --repo-root <repo_root> \
+  --test-point-file <test_point_file> \
+  --case <case_name> \
+  --platform spike \
+  --platform linknan \
+  --spec-profile <spec_profile> \
+  --json
+
+python3 scripts/case_timing_summary.py \
+  --reports '.hyptest_skill_reports/*.json' \
+  --json
+
+python3 scripts/case_workflow_ledger.py \
+  --case <case_name> \
+  --preflight-json .hyptest_skill_reports/case_preflight.json \
+  --gate-json .hyptest_skill_reports/case_gate.json \
+  --submission-json .hyptest_skill_reports/submission_card.json \
+  --json
+```
+
+维护原则：
+
+- 不在 pack 脚本里复制 `validate_task_request.py`、`find_similar_cases.py`、`check_case_lint.py`、`check_writeback_format.py` 的规则。
+- `repo_evidence_index.py` 只能做 repo-wide 缓存索引，不能按模块缩小覆盖检查口径；缓存必须随 case 源、`test_point/*.md` 和 `test_register.c` 变化失效。
+- pack 脚本可以整理证据、执行单 case gate 和给出 next steps，但最终分层仍以 profile、tiering decision 和日志证据为准。
+- `case_gate_pack.py` 可调用 `compile_elf.py` / `get_result.py` / `case_postcheck_pack.py`，但不能把 runner returncode 直接等同于 default 分层。
+- `case_gate_pack.py` 编译失败时可以跳过运行，但必须继续保留 postcheck 证据，并在 skipped/next_steps 中说明原因。
+- `case_gate_pack.py` 可以优先使用本轮 run 后新出现/更新的日志做证据和分类；如果直接日志定位失败，仍要保留 postcheck/latest-log fallback。
+- `case_gate_pack.py` 可以调用 `classify_failure_log.py` 辅助归因，但 classification 只能作为候选证据，不能作为最终分层。
+- `case_batch_gate_pack.py` 必须保留每个 case 的独立 gate payload；默认应保守串行，只有用户或维护者明确确认产物隔离时才使用并行。
+- `case_multi_platform_gate_pack.py` 必须保留每个平台的独立 gate payload，不能合并成最终 default/manual/compile-only 结论。
+- `make_case_skeleton.py` 只能生成 TODO 骨架和参考线索，不能生成看似通过的断言，不能让 skeleton 绕过相似检索、profile 判断、编译运行或回填。
+- `suggest_case_name.py` 只能建议命名和暴露同名/相似名风险，不能把“命名可用”当作 case 唯一性证明；repo 级相似 case 检索仍然必须执行。
+- `case_preflight_pack.py` 的缓存必须保守失效；只要输入参数、目标 test_point、case 源、`test_register.c`、`test_point/*.md`、关键环境变量、toolchain 命中路径、profile 文件或相关 skill 脚本变化，就不能复用旧报告。
+- `case_postcheck_pack.py` 的日志 fast path 必须保留 fallback；不能因为精确 glob 未命中就声称没有日志。
+- `make_case_submission_card.py` 只能生成 evidence card 和 final summary draft，不能输出或暗示最终分层；`decision_final` 必须显式留给 workflow 最终确认。
+- `case_timing_summary.py` 只能统计耗时和 cache hit/miss，不能作为质量门禁。
+- `case_workflow_ledger.py` 只能统计端到端耗时、cache 命中和返工信号，不能作为质量门禁或最终分层依据。
+- 三个 pack 脚本都应保留 `timing.total_seconds` 和 `timing.by_step`，便于长期观察耗时瓶颈。
+- 新增输出字段时，同步 README 命令清单、resource index 和公共指南中的提速章节。
+
 ## Repo Migration Checks
 
 目录、平台名或生成物命名变更后，检查真实 hyptest 仓库是否还残留旧逻辑：

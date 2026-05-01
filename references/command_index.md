@@ -1,0 +1,287 @@
+# Command Index
+
+本文是 `hyptest-workflow` 的常用命令索引。README 只保留最高频入口；完整命令由 `scripts/list_skill_commands.py --markdown` 生成到这里。
+
+命令中的 `<repo_root>` 表示 `riscv-hyp-tests-nhv5.1` 仓库根目录，`<test_point_file>` 表示测试点文件路径。可以直接替换为实际路径，也可以使用当前 shell 已有的路径变量：
+
+```bash
+python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-file <repo_root>/test_point/<file>.md ...
+```
+
+如果团队习惯在 shell 中设置某个仓库路径变量，也可以写成 `--repo-root "$REPO_ROOT"`。这只是命令书写便利，变量名不由 workflow 或 hyptest 强制规定。
+
+所有带 `--spec-profile <spec_profile>` 的命令都可以省略该参数；省略时使用 `references/spec_profiles/index.json` 中的 `default_profile`。需要复核实际解析结果时，先跑 `python3 scripts/resolve_spec_profile.py --spec-profile <spec_profile>`。
+
+<!-- BEGIN GENERATED COMMANDS -->
+### self-check
+
+- `quick`: 快速检查 skill 本身；不需要模拟器环境。
+
+  ```bash
+  python3 scripts/self_check.py --quick --spec-profile <spec_profile>
+  ```
+
+- `repo`: 在 quick 基础上检查仓库迁移、CLI 约定和 lint baseline。
+
+  ```bash
+  python3 scripts/self_check.py --repo --repo-root <repo_root> --spec-profile <spec_profile>
+  ```
+
+- `full`: 完整检查，包含真实仓库相似 case eval，并保存报告。
+
+  ```bash
+  python3 scripts/self_check.py --full --repo-root <repo_root> --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md
+  ```
+
+### doctor
+
+- `repo-health`: 按 profile、skill、repo、CLI、lint baseline、环境和 self-check 分组输出健康报告。
+
+  ```bash
+  python3 scripts/doctor.py --repo-root <repo_root> --pre-submit --strict --spec-profile <spec_profile>
+  ```
+
+- `task-request`: 修改或运行 case 前校验任务输入参数。
+
+  ```bash
+  python3 scripts/validate_task_request.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3
+  ```
+
+- `platform-env`: 检查 Spike 和 LinkNan 环境变量，并说明各变量用途。
+
+  ```bash
+  python3 scripts/check_env.py --repo-root <repo_root> --platform all --explain --print-exports
+  ```
+
+- `doctor-all`: 运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。
+
+  ```bash
+  python3 scripts/doctor.py --repo-root <repo_root> --platform all --pre-submit --spec-profile <spec_profile>
+  ```
+
+### case-workflow
+
+- `similar-cases`: 写新 case 前搜索已有 ai/manual case 源文件。
+
+  ```bash
+  python3 scripts/find_similar_cases.py --repo-root <repo_root> --query '<scenario terms>' --limit 5 --explain-score
+  ```
+
+- `repo-evidence-index`: 构建或复用全仓 case、test_point、注册状态证据索引缓存。
+
+  ```bash
+  python3 scripts/repo_evidence_index.py --repo-root <repo_root> --query '<scenario terms>' --json
+  ```
+
+- `case-preflight-pack`: 写 case 前聚合任务、profile、环境、repo 快照和相似 case reading pack，并使用保守缓存复用结果。
+
+  ```bash
+  python3 scripts/case_preflight_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --coverage-scope repo --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
+  ```
+
+- `case-skeleton`: 从 preflight 证据生成保守 C 骨架，不裁决 case 语义。
+
+  ```bash
+  python3 scripts/make_case_skeleton.py --case <case_name> --preflight-json .hyptest_skill_reports/case_preflight.json --test-point-id <PnX>
+  ```
+
+- `case-name-suggest`: 根据 preflight/test_point 术语建议 case 名，并做全仓精确/相似命名冲突检查。
+
+  ```bash
+  python3 scripts/suggest_case_name.py --repo-root <repo_root> --preflight-json .hyptest_skill_reports/case_preflight.json --prefix ai_micro --json
+  ```
+
+- `case-lint`: 检查已改 case 源文件的测试框架结构问题。
+
+  ```bash
+  python3 scripts/check_case_lint.py --repo-root <repo_root> --changed-only --strict-case-end --warnings-as-errors
+  ```
+
+- `case-lint-baseline`: 只对不在已知 baseline 内的活跃 lint 问题报错。
+
+  ```bash
+  python3 scripts/check_case_lint.py --repo-root <repo_root> --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors
+  ```
+
+- `cli-contract`: 检查编译/运行脚本的平台名、case_elf_asm、必需环境变量和个人路径回归。
+
+  ```bash
+  python3 scripts/check_hyptest_cli_contract.py --repo-root <repo_root>
+  ```
+
+- `repo-snapshot`: 只读汇总 case 源、注册状态、test_point 覆盖、产物和最新日志。
+
+  ```bash
+  python3 scripts/repo_snapshot.py --repo-root <repo_root>
+  ```
+
+- `baseline-diff`: 接受新 baseline 前查看新增/删除的 lint baseline 问题。
+
+  ```bash
+  python3 scripts/case_lint_baseline_diff.py --old <old_baseline.json> --new <new_baseline.json>
+  ```
+
+- `writeback-check`: 检查 test_point 轻量回填格式和注册一致性。
+
+  ```bash
+  python3 scripts/check_writeback_format.py --repo-root <repo_root> --file <test_point_file> --check-register --spec-profile <spec_profile>
+  ```
+
+- `case-postcheck-pack`: 写 case 后聚合 lint、回填、注册、产物和最新日志证据。
+
+  ```bash
+  python3 scripts/case_postcheck_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_postcheck.md --json-out .hyptest_skill_reports/case_postcheck.json
+  ```
+
+- `case-gate-pack`: 单 case 编译、运行并聚合 postcheck 证据；编译失败会跳过运行，本轮运行日志会直接捕获，失败日志会自动分类，同时记录每步耗时。
+
+  ```bash
+  python3 scripts/case_gate_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
+  ```
+
+- `batch-gate-pack`: 对多个 case 分别跑 gate pack，保留每个 case 独立证据和独立分层边界。
+
+  ```bash
+  python3 scripts/case_batch_gate_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case1> --case <case2> --platform spike --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_batch_gate.json --md-out .hyptest_skill_reports/case_batch_gate.md
+  ```
+
+- `multi-platform-gate-pack`: 对同一个 case 并行跑多个平台的 gate pack，但不合并成最终分层裁决。
+
+  ```bash
+  python3 scripts/case_multi_platform_gate_pack.py --repo-root <repo_root> --test-point-file <test_point_file> --case <case_name> --platform spike --platform linknan --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_multi_platform_gate.json --md-out .hyptest_skill_reports/case_multi_platform_gate.md
+  ```
+
+- `submission-card`: 把 preflight/gate/postcheck 证据整理成最终交付卡片和可选交付草稿，但不自动裁决分层。
+
+  ```bash
+  python3 scripts/make_case_submission_card.py --preflight-json .hyptest_skill_reports/case_preflight.json --gate-json .hyptest_skill_reports/case_gate.json --emit-final-draft --json-out .hyptest_skill_reports/submission_card.json --md-out .hyptest_skill_reports/submission_card.md
+  ```
+
+- `timing-summary`: 汇总 workflow pack 报告中的耗时和缓存命中率，用于观察瓶颈。
+
+  ```bash
+  python3 scripts/case_timing_summary.py --reports '.hyptest_skill_reports/*.json' --json-out .hyptest_skill_reports/timing_summary.json --md-out .hyptest_skill_reports/timing_summary.md
+  ```
+
+- `workflow-ledger`: 汇总单个 case 的端到端耗时、缓存命中和返工信号，不裁决分层。
+
+  ```bash
+  python3 scripts/case_workflow_ledger.py --case <case_name> --preflight-json .hyptest_skill_reports/case_preflight.json --gate-json .hyptest_skill_reports/case_gate.json --submission-json .hyptest_skill_reports/submission_card.json --json-out .hyptest_skill_reports/workflow_ledger.json --md-out .hyptest_skill_reports/workflow_ledger.md
+  ```
+
+### profile-and-tiering
+
+- `profile-query`: 按地址汇总 PMA/PBMT/MMIO profile 规则。
+
+  ```bash
+  python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --address <pa> --summary
+  ```
+
+- `profile-registry`: 检查 profile 注册表和默认 profile 映射。
+
+  ```bash
+  python3 scripts/check_spec_profile_registry.py
+  ```
+
+- `new-profile`: 基于模板创建新的 spec profile 骨架并写入注册表。
+
+  ```bash
+  python3 scripts/new_spec_profile.py --name <profile_name> --title '<project/core title>' --update-registry
+  ```
+
+- `profile-decision`: 只输出匹配地址的 profile default_decision。
+
+  ```bash
+  python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --address <pa> --decision-only
+  ```
+
+- `reason-code`: 根据失败现象给出候选 reason_code。
+
+  ```bash
+  python3 scripts/suggest_reason_code.py --symptom '<failure symptom>'
+  ```
+
+- `reason-code-eval`: 检查失败现象到 reason_code 建议的 eval 样例。
+
+  ```bash
+  python3 scripts/eval_reason_code_suggestions.py
+  ```
+
+- `failure-log`: 从失败日志提取场景、错误点、候选 reason_code 和下一步动作。
+
+  ```bash
+  python3 scripts/classify_failure_log.py --log-file <log> --json
+  ```
+
+- `triage-handoff`: 生成 workflow 交给 failure-triage 深入分析的交接卡片。
+
+  ```bash
+  python3 scripts/make_triage_handoff.py --log-file <log> --platform linknan --spec-profile <spec_profile> --json
+  ```
+
+### maintenance
+
+- `readme-check`: 检查 README 生成命令块是否同步。
+
+  ```bash
+  python3 scripts/check_readme_commands.py
+  ```
+
+- `readme-update`: 刷新 README 生成命令块。
+
+  ```bash
+  python3 scripts/update_readme_commands.py
+  ```
+
+- `resource-index-check`: 检查 resource_index.md 是否覆盖 public scripts 和关键资产。
+
+  ```bash
+  python3 scripts/check_resource_index.py
+  ```
+
+- `manifest-check`: 检查 assets/script_manifest.json 是否与 scripts/*.py 同步。
+
+  ```bash
+  python3 scripts/update_script_manifest.py --check
+  ```
+
+- `manifest-update`: 新增或删除脚本后刷新 assets/script_manifest.json。
+
+  ```bash
+  python3 scripts/update_script_manifest.py --write
+  ```
+
+- `resource-index-update`: 刷新 resource_index.md 中的资源覆盖生成块。
+
+  ```bash
+  python3 scripts/update_resource_index.py --write
+  ```
+
+- `profile-portability`: 检查通用 skill 入口没有写死具体默认 profile。
+
+  ```bash
+  python3 scripts/eval_profile_portability.py
+  ```
+
+- `listed-command-help`: 检查 README/命令清单里的脚本仍然支持 --help。
+
+  ```bash
+  python3 scripts/eval_listed_commands_help.py
+  ```
+
+### cleanup
+
+- `clean-generated`: 删除 skill 本地临时文件和缓存文件。
+
+  ```bash
+  python3 scripts/clean_generated.py --repo-root <repo_root>
+  ```
+
+### summary
+
+- `skill-summary`: 汇总 profiles、references、scripts、eval assets 和推荐检查命令。
+
+  ```bash
+  python3 scripts/skill_summary.py
+  ```
+<!-- END GENERATED COMMANDS -->

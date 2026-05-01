@@ -12,6 +12,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from skill_config import expand_path, resolve_path
+
 
 REQUIRED_REPO_FILES = [
     "compile_elf.py",
@@ -137,7 +139,7 @@ def check_env_path(
     file_only: bool = False,
 ) -> dict[str, object]:
     value = env_value(name)
-    path = Path(value).expanduser() if value else None
+    path = expand_path(value) if value else None
     exists = bool(path and path.exists())
     is_file = bool(path and path.is_file())
     ok = bool(
@@ -312,7 +314,7 @@ def print_explanations(report: dict[str, object]) -> None:
 
 def main() -> int:
     args = parse_args()
-    repo_root = Path(args.repo_root).expanduser().resolve()
+    repo_root = resolve_path(args.repo_root)
     report = build_report(repo_root, args.platform, args.task_mode)
 
     if args.json:

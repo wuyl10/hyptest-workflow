@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,16 @@ JOINT_HANDOFF_CONTRACT = SKILL_ROOT / "assets/joint_handoff_contract.json"
 
 def load_json_file(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def expand_path(value: str | Path) -> Path:
+    """Expand shell-style environment variables and ~ in user-supplied paths."""
+    return Path(os.path.expandvars(str(value))).expanduser()
+
+
+def resolve_path(value: str | Path) -> Path:
+    """Expand a user-supplied path and resolve it to an absolute path."""
+    return expand_path(value).resolve()
 
 
 def load_profile_registry() -> dict[str, Any]:

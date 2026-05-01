@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh the generated command section in README.md."""
+"""Refresh the generated command section in references/command_index.md."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_ROOT = SCRIPT_DIR.parent
-README = SKILL_ROOT / "README.md"
+COMMAND_INDEX = SKILL_ROOT / "references" / "command_index.md"
 BEGIN = "<!-- BEGIN GENERATED COMMANDS -->"
 END = "<!-- END GENERATED COMMANDS -->"
 
@@ -23,9 +23,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     parse_args()
-    text = README.read_text(encoding="utf-8")
+    text = COMMAND_INDEX.read_text(encoding="utf-8")
     if BEGIN not in text or END not in text:
-        print(f"README.md missing {BEGIN}/{END} markers", file=sys.stderr)
+        print(f"references/command_index.md missing {BEGIN}/{END} markers", file=sys.stderr)
         return 2
     completed = subprocess.run(
         [sys.executable, str(SCRIPT_DIR / "list_skill_commands.py"), "--markdown"],
@@ -40,8 +40,8 @@ def main() -> int:
     generated = completed.stdout.rstrip() + "\n"
     before, rest = text.split(BEGIN, 1)
     _old, after = rest.split(END, 1)
-    README.write_text(f"{before}{BEGIN}\n{generated}{END}{after}", encoding="utf-8")
-    print("PASS update README commands")
+    COMMAND_INDEX.write_text(f"{before}{BEGIN}\n{generated}{END}{after}", encoding="utf-8")
+    print("PASS update command index")
     return 0
 
 
