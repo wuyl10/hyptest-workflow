@@ -86,7 +86,7 @@ python3 scripts/case_preflight_pack.py \
 - 如果 prompt 显式给了 `HYPTEST_SPIKE_BIN: <path>` / `HYPTEST_LINKNAN_HOME: <path>` / `HYPTEST_DIFFTEST_REF_SO: <path>`，命令里加对应 `--env HYPTEST_*=<path>`；临时目录用 `--env HYPTEST_TMPDIR=<path>`。
 - 未显式传 `--coverage-scope` 时，脚本会按 `--task-mode` 推导：`new-case-only` 默认 repo，`supplement-existing-point` 默认 file；case 相似检索仍始终是 repo 级。
 - `case_preflight_pack.py` 会同时调用 `repo_evidence_index.py`，构建或复用全仓 case、`test_point` 条目和注册状态索引。该索引按文件指纹失效，不按模块裁剪覆盖范围。
-- preflight pack 使用保守缓存；只要输入参数、目标 test_point、`test_point/*.md`、`ai_test_cases/*.c`、`manual_test_cases/**/*.c`、`test_register.c`、关键环境变量、toolchain 命中路径、profile 文件或相关 skill 脚本发生变化，缓存就会失效。
+- preflight pack 使用保守缓存；只要输入参数、目标 test_point、`test_point/**/*.md`、`ai_test_cases/*.c`、`manual_test_cases/**/*.c`、`test_register.c`、关键环境变量、toolchain 命中路径、profile 文件或相关 skill 脚本发生变化，缓存就会失效。
 - 如需强制重跑，加 `--no-pack-cache`。
 
 ## 2. 用例落地（Gate-1）

@@ -19,6 +19,9 @@ from workflow_paths import cache_file
 CACHE_VERSION = 1
 HEADING_RE = re.compile(r"^(###\s+P[0-9A-Za-z][^\n]*)", re.MULTILINE)
 IMPLEMENTED_CASE_RE = re.compile(r"^\s*-\s*`([A-Za-z_][A-Za-z0-9_]*)`", re.MULTILINE)
+# Reference files and subdirs under test_point/ that do not carry PnX entries.
+NON_ENTRY_REFERENCE_STEMS = frozenset({"manual_reference", "critical_issues_log"})
+NON_ENTRY_REFERENCE_DIRS = frozenset({"reference_tables"})
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,7 +96,15 @@ def build_test_point_entries(repo_root: Path) -> list[dict[str, Any]]:
     if not base.is_dir():
         return []
     entries: list[dict[str, Any]] = []
-    for path in sorted(base.glob("*.md")):
+    for path in sorted(base.rglob("*.md")):
+        if path.stem.lower() in NON_ENTRY_REFERENCE_STEMS:
+            continue
+        try:
+            top = path.relative_to(base).parts[0] if path.relative_to(base).parts else ""
+        except ValueError:
+            top = ""
+        if top in NON_ENTRY_REFERENCE_DIRS:
+            continue
         text = read_text(path)
         for heading, line, section in split_heading_sections(text):
             implemented = IMPLEMENTED_CASE_RE.findall(section)

@@ -9,9 +9,9 @@ Agent 被触发后执行的硬规则和流程步骤在 `SKILL.md`；本文件讲
 触发场景：
 
 - 新增、补充或修复 hyptest case（`ai_test_cases/` 或 `manual_test_cases/`）
-- 新增或回填 `test_point/*.md` 的 `### PnX` 条目
+- 新增或回填 `test_point/**/*.md` 的 `### PnX` 条目
 - 更新 `test_register.c` 注册状态
-- 跨 `test_point/*.md` 排重、扩点
+- 跨 `test_point/**/*.md` 排重、扩点
 - 围绕某模块找 suspected bug point 并写新测试点
 - 编译单 case、小批量 case
 - 跑 Spike / LinkNan 并输出运行日志
@@ -186,6 +186,8 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 | `blocked` | 编译、运行、规则、证据或注册一致性存在阻塞 | 不作为完成落位 |
 
 `default-first` 的意思是优先争取 default，不是无条件放 default。PMA/PBMT/MMIO/cache/TLB/CBO 等场景必须先看 profile；如果 `spike_gate_applicable=false`，不能只凭 official Spike 结果作为 default gate。
+
+**`manual` / `blocked` 会自动写回 Manual_Reference**：如果分层落到 `manual` 或 `blocked` 且原因涉及**新的模型边界 / Spike nongate / 待人工规则裁定**（不是 profile §5 已收录的场景），skill 会在 `test_point/Manual_Reference.md` 对应 section 末尾 append 一条 `#### <id>.（**自动生成，待人工确认**）`，含涉及文件、涉及用例、怀疑点源码引用、本轮 Spike 观察和 3 条待人工确认问题。下次遇到相同 topic 时，人工确认结论会自动同步回 memory（`status=fixed`）和 Manual_Reference 条目（加 `> 已解决` 行）。
 
 ## 目标仓库和环境
 

@@ -44,7 +44,7 @@ python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME
 
 ## E. 回填与交付
 
-- [ ] `test_point/*` 已按轻量格式回填 case 与状态（仅 case 名 + 必要短状态，无额外 workflow 块）
+- [ ] `test_point/**/*.md` 已按轻量格式回填 case 与状态（仅 case 名 + 必要短状态，无额外 workflow 块）
 - [ ] 改动文件清单已整理
 - [ ] 编译/运行统计已整理
 - [ ] 非 default / blocked 时，分层结论与依据已整理

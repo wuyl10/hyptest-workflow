@@ -48,6 +48,7 @@ def main() -> int:
             'TEST_REGISTER_RE = r"\\s*(?://.*)?$"\n'
             'parser.add_argument("--plat")\n'
             'parser.add_argument("--cross-compile")\n'
+            'parser.add_argument("--include-commented")\n'
             'VALID_PLATS = ["spike", "nemu", "linknan"]\n'
             'ARTIFACT_MAP_FILE = "artifact_name_map.json"\n',
         )

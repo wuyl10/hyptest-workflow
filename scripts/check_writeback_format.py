@@ -25,6 +25,9 @@ from writeback_register import load_registration_status
 
 ENTRY_HEADER_RE = re.compile(r"^###\s+P[0-9A-Za-z]")
 CASE_NAME_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)`")
+# Reference files and subdirs under test_point/ that do not carry PnX entries.
+NON_ENTRY_REFERENCE_STEMS = frozenset({"manual_reference", "critical_issues_log"})
+NON_ENTRY_REFERENCE_DIRS = frozenset({"reference_tables"})
 DEPENDENCY_STATUS_RE = re.compile(r"^（依赖[^）]+，未跑Spike）$")
 PROFILE_NONGATE_RE = re.compile(
     r"PMA|PBMT|MMIO|Device|cache|TLB|refill|replay|CBO|sbuffer|MSHR|PMAADDR|PMACFG",
@@ -129,7 +132,16 @@ def collect_files(args: argparse.Namespace) -> List[Path]:
         if not args.repo_root:
             raise ValueError("--all-test-points requires --repo-root")
         base = resolve_path(args.repo_root)
-        for path in sorted((base / "test_point").glob("*.md")):
+        tp_base = base / "test_point"
+        for path in sorted(tp_base.rglob("*.md")):
+            if path.stem.lower() in NON_ENTRY_REFERENCE_STEMS:
+                continue
+            try:
+                top = path.relative_to(tp_base).parts[0] if path.relative_to(tp_base).parts else ""
+            except ValueError:
+                top = ""
+            if top in NON_ENTRY_REFERENCE_DIRS:
+                continue
             resolved = path.resolve()
             if resolved.is_file() and resolved not in seen:
                 seen.add(resolved)

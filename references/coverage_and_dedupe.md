@@ -5,7 +5,7 @@
 ## 1. 两类问题要分开看
 
 - `test_point` 级覆盖检查：
-  - 关注仓库里的 `test_point/*.md` 是否已经存在相近测试点。
+  - 关注仓库里的 `test_point/**/*.md` 是否已经存在相近测试点。
   - 判断对象是“怀疑点 / 场景轴 / 断言目标”。
 - `case` 级去重检查：
   - 关注仓库里的 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c` 是否已经有相近或重复实现。
@@ -21,7 +21,7 @@
   - 只检查当前 `test_point_file` 或指定 `### PnX`。
   - 适合“补已有测试点模式”。
 - `coverage_scope=repo`
-  - 除当前目标外，还要扫描全仓 `test_point/*.md`。
+  - 除当前目标外，还要扫描全仓 `test_point/**/*.md`。
   - 适合“新增测试点模式”以及用户明确要求“查类似测试点有没有覆盖 / 其它文件里有没有重复”。
 
 默认规则：
@@ -44,13 +44,13 @@
 推荐命令：
 
 ```bash
-rg -n "<axis1>|<axis2>|<axis3>" test_point/*.md
+rg -n "<axis1>|<axis2>|<axis3>" test_point/
 ```
 
 必要时再补更具体的组合词，例如：
 
 ```bash
-rg -n "memblock|retry|refault|upper-tail|boundary\\+15|BYTE7|mask" test_point/*.md
+rg -n "memblock|retry|refault|upper-tail|boundary\\+15|BYTE7|mask" test_point/
 ```
 
 命中后至少比较这三项：
@@ -164,7 +164,7 @@ rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases manual_test_case
 
 ### 新增测试点
 
-1. 默认按全仓范围扫描 `test_point/*.md`
+1. 默认按全仓范围扫描 `test_point/**/*.md`
 2. 判断是否已有近似测试点
 3. 再做全仓 case 相似检索
 4. 再做函数名唯一性检索；命名确定后先用 `check_case_uniqueness.py --expect absent`

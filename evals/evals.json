@@ -4,11 +4,11 @@
     {
       "id": 1,
       "name": "new-case-memblock-cross16b-boundary",
-      "prompt": "使用 hyptest-workflow skill。test_point_file=test_point/memblock_suspected_bug_corner_points_14.md, platform=spike, spec_profile=nhv5_1_ap, task_mode=new-case-only, new_case_count=1, target_policy=default-first, target_module=memblock。要求：新增 1 个 ### PnX 测试点，检查 same-page cross-16B `sd(1B+7B)` 在 repeated SAF → repair → upper-half aligned `sd(8B)` success → refault SAF → repair → retried `sd(1B+7B)` success 序列下，boundary image（guard_before/boundary/guard_after）是否保持。新增 1 个 ai_micro_* case，走预热+轻量直通路径；Spike 跑通按 default 落位。",
+      "prompt": "使用 hyptest-workflow skill。test_point_file=test_point/suspected/memblock/memblock_suspected_bug_corner_points_14.md, platform=spike, spec_profile=nhv5_1_ap, task_mode=new-case-only, new_case_count=1, target_policy=default-first, target_module=memblock。要求：新增 1 个 ### PnX 测试点，检查 same-page cross-16B `sd(1B+7B)` 在 repeated SAF → repair → upper-half aligned `sd(8B)` success → refault SAF → repair → retried `sd(1B+7B)` success 序列下，boundary image（guard_before/boundary/guard_after）是否保持。新增 1 个 ai_micro_* case，走预热+轻量直通路径；Spike 跑通按 default 落位。",
       "expected_output": "新 ### PnX 条目 + 新 ai_micro_* case + Spike 编译/运行通过 + test_register.c 启用 + test_point 轻量回填 + test_point → case 映射表 + 最终决策写在摘要",
       "files": [],
       "expectations": [
-        "The output adds a new `### P` entry under test_point/memblock_suspected_bug_corner_points_14.md that did not exist before",
+        "The output adds a new `### P` entry under test_point/suspected/memblock/memblock_suspected_bug_corner_points_14.md that did not exist before",
         "The new test point is NOT a copy of an existing one in the same file",
         "A new ai_micro_* case function is added to ai_test_cases/*.c",
         "The new case function contains exactly one TEST_END(...)",
@@ -29,7 +29,7 @@
     {
       "id": 2,
       "name": "supplement-existing-p6b-assert",
-      "prompt": "使用 hyptest-workflow skill。test_point_file=test_point/memblock_suspected_bug_corner_points_14.md, platform=spike, spec_profile=nhv5_1_ap, task_mode=supplement-existing-point, target_test_point=\"### P6B\" (or whichever existing ### PnX entry is in that file — pick the first one that lacks a boundary assertion)。要求：在指定旧条目下，给已有的 ai_micro_* case 补充 1 条面向邻接地址 preserve 的断言（用 adjacent / guard / boundary 作为断言文案关键词），不新增测试点，不改变 case 函数名。写完后单 case 编译 + 运行。",
+      "prompt": "使用 hyptest-workflow skill。test_point_file=test_point/suspected/memblock/memblock_suspected_bug_corner_points_14.md, platform=spike, spec_profile=nhv5_1_ap, task_mode=supplement-existing-point, target_test_point=\"### P6B\" (or whichever existing ### PnX entry is in that file — pick the first one that lacks a boundary assertion)。要求：在指定旧条目下，给已有的 ai_micro_* case 补充 1 条面向邻接地址 preserve 的断言（用 adjacent / guard / boundary 作为断言文案关键词），不新增测试点，不改变 case 函数名。写完后单 case 编译 + 运行。",
       "expected_output": "修改已有 ai_micro_* case 添加邻接断言 + 未新增 ### PnX 条目 + 未改 test_register.c（case 名不变）+ Spike 跑通 + test_point → case 映射表更新体现新断言",
       "files": [],
       "expectations": [
@@ -50,7 +50,7 @@
     {
       "id": 3,
       "name": "bug-hunt-storequeue-uncovered-neighbor",
-      "prompt": "使用 hyptest-workflow skill。target_module=StoreQueue, platform=spike, spec_profile=nhv5_1_ap, task_mode=new-case-only, new_case_count=1, target_policy=default-first, test_point_file=test_point/StoreQueue_suspected_bug_corner_points_1.md（若不存在则创建）。要求：围绕 StoreQueue 模块找 1 个高价值 suspected bug 点。按 SKILL.md Bug Hunt Evidence 段的三类资料定位可疑点：profile §5 高风险类别 + target_module 的 RTL 源码 anti-pattern + 现有 test_point 覆盖空隙。新增 1 个 ### PnX 条目和 1 个 ai_micro_* case，怀疑点段用自然语言说明"为什么可疑"并给出 `<file>.scala:<line>` 线索。",
+      "prompt": "使用 hyptest-workflow skill。target_module=StoreQueue, platform=spike, spec_profile=nhv5_1_ap, task_mode=new-case-only, new_case_count=1, target_policy=default-first, test_point_file=test_point/suspected/backend/StoreQueue_suspected_bug_corner_points_1.md（若不存在则创建）。要求：围绕 StoreQueue 模块找 1 个高价值 suspected bug 点。按 SKILL.md Bug Hunt Evidence 段的三类资料定位可疑点：profile §5 高风险类别 + target_module 的 RTL 源码 anti-pattern + 现有 test_point 覆盖空隙。新增 1 个 ### PnX 条目和 1 个 ai_micro_* case，怀疑点段用自然语言说明"为什么可疑"并给出 `<file>.scala:<line>` 线索。",
       "expected_output": "选点所用的证据来源（profile §5 哪条 / 源码哪个 anti-pattern / 现有 test_point 覆盖空隙）+ 新 ### PnX（含 `<file>.scala:<line>` 怀疑点）+ 新 ai_micro_* case + 编译运行 + 映射表",
       "files": [],
       "expectations": [

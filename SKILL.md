@@ -1,13 +1,13 @@
 ---
 name: hyptest-workflow
-description: hyptest 测试点到用例落地 skill。**必须触发**：新增/改 ai_test_cases 或 manual_test_cases、新增/回填 test_point/*.md `### PnX`、更新 test_register.c、跨 test_point 排重或 case 去重、按模块找 suspected bug 并写新测试点、default/manual/compile-only/blocked 初判分层、test_point↔断言映射核对、涉及 hyptest harness (TEST_START/TEST_END/TEST_ASSERT/TEST_SETUP_EXCEPT/TEST_REGISTER) 的 case 编写。spec_profile 路由到 references/spec_profiles/<name>.md。**不触发**：只看 Spike/LinkNan 失败日志不落新 case、FSDB/stuck/50000 cycles/difftest mismatch/suspected RTL bug 深挖 → hyptest-failure-triage；波形协议分析 → waveform-debug；纯 RISC-V 知识问答/Spike 工具链参数/解析 ELF/通用代码 review。
+description: hyptest 测试点到用例落地 skill。**必须触发**：新增/改 ai_test_cases 或 manual_test_cases、新增/回填 test_point/**/*.md `### PnX`、更新 test_register.c、跨 test_point 排重或 case 去重、按模块找 suspected bug 并写新测试点、default/manual/compile-only/blocked 初判分层、test_point↔断言映射核对、涉及 hyptest harness (TEST_START/TEST_END/TEST_ASSERT/TEST_SETUP_EXCEPT/TEST_REGISTER) 的 case 编写。spec_profile 路由到 references/spec_profiles/<name>.md。**不触发**：只看 Spike/LinkNan 失败日志不落新 case、FSDB/stuck/50000 cycles/difftest mismatch/suspected RTL bug 深挖 → hyptest-failure-triage；波形协议分析 → waveform-debug；纯 RISC-V 知识问答/Spike 工具链参数/解析 ELF/通用代码 review。
 ---
 
 # HYPTEST Workflow
 
 Agent 执行入口。触发后按以下优先级执行：
 
-1. **Workflow**（下文）是默认 13 步流程；每步都要遵守 **Non-Negotiables** 的 4 组硬规则
+1. **Workflow**（下文）是默认 14 步流程；每步都要遵守 **Non-Negotiables** 的 4 组硬规则
 2. 规则冲突按 **Source Priority** 裁决
 3. bug hunt 场景在 Workflow 步骤 3 的"选点"环节用 **Bug Hunt Evidence** 的三类资料替代普通相似检索；其它步骤（唯一性 / profile 标记 / 写 case / 编译运行 / 回填）仍按 Workflow 正常执行
 4. 输出必满足 **Output Defaults**
@@ -52,12 +52,12 @@ Agent 执行入口。触发后按以下优先级执行：
 
 - **`test_point_file` 是容器，`### PnX` 才是独立测试点**。去重、扩写、复用、完成判定都按条目级进行；不能把整个文件当单个测试点，也不能因为文件之前改过就停止处理新条目或误把旧条目当新增结果。Why: `test_point_file` 里可能有十几个 `### PnX`，"文件改过"≠"每个条目都处理过"；把旧条目包装成新增是**虚假交付**。
 - **两种任务模式**：
-  - **新增测试点模式**（`task_mode=new-case-only` 或未指定条目）：默认 `coverage_scope=repo` 做全仓 `test_point/*.md` 覆盖检查，必须新增新的 `### PnX` 条目和新的 `ai_*` case。新条目编号沿当前文件前缀继续递增（如 `*_points_7.md` 继续补 `P7D/P7E`）。
+  - **新增测试点模式**（`task_mode=new-case-only` 或未指定条目）：默认 `coverage_scope=repo` 做全仓 `test_point/**/*.md` 覆盖检查，必须新增新的 `### PnX` 条目和新的 `ai_*` case。新条目编号沿当前文件前缀继续递增（如 `*_points_7.md` 继续补 `P7D/P7E`）。
   - **补已有测试点模式**（`task_mode=supplement-existing-point` 或用户明确指定 `### PnX`）：默认 `coverage_scope=file` 围绕该条目/文件做局部测试点检查，优先在旧条目下补 case，不强行新增新条目。
 - **写新 case 或判断 Spike 结果前必须先确定规格/平台口径 `spec_profile`**（未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，**标记**规格来源、平台模型边界、`spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位，见 `Source Priority`）。Why: 同一个断言在不同 profile 下的结论可能相反（例如 PMA=IO 非对齐在某些 profile 下走 AF，通用 RISC-V 走 AM）。不定口径就判 Spike 结果会把"profile 限制"误认为"RTL bug"。
 - **写新 case 前先检索 2~5 个相似存量 case**；模板只作骨架提醒，不替代存量 case 学习。Why: 模板只给形状，存量 case 含本 repo 的**特权态切换顺序、页表/PMP 处理习惯、断言文案风格**。跳过学习容易写出和仓库风格脱节的 case，review 阶段被打回。
 - **写新 case 前必须同时做 repo 级 case 相似检索 + 精确唯一性检索**；"相似检索未命中"和"函数名唯一"不是同一件事，两者都要留证据。命名确定后优先用 `scripts/check_case_uniqueness.py --expect absent` 走缓存索引快路径；缓存由 `scripts/repo_evidence_index.py` 预热（见 Workflow 步骤 1），**没预热时脚本会 fallback 到全仓 rg，等于违反此条**。写完后的 postcheck 只作复核，不能替代写前唯一性拦截。`case` 去重始终是 repo 级；`find_similar_cases.py` 始终搜索全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。详见 `references/coverage_and_dedupe.md`。
-- **新增测试点前必须先做测试点覆盖检查**；默认按全仓 `test_point/*.md` 扫描，不能只看当前文件就声称"全仓未覆盖"。Why: test_point 按模块分文件但**同一怀疑点可能散落在多个文件**。只看当前文件就声称"新点"会造成跨文件重复。
+- **新增测试点前必须先做测试点覆盖检查**；默认按全仓 `test_point/**/*.md` 扫描，不能只看当前文件就声称"全仓未覆盖"。Why: test_point 按模块分文件但**同一怀疑点可能散落在多个文件**。只看当前文件就声称"新点"会造成跨文件重复。
 - **若扫描后未发现新的高价值测试点，必须明确说明"未发现新的测试点 / 未新增 case"**，不能把旧条目或旧 case 再次作为新增结果交付。Why: LLM 为了"完成任务"有凑数倾向。硬规则强制承认"这次没找到"，避免把旧成果包装成本轮新增污染历史。
 - **case 独立性**：新 case 必须能单跑通过（不依赖前面 case 的 CSR/TLB/cache/reservation 残留）。prepare 段应显式清理本 case 会用到的状态（相关 CSR 位、`sfence_vma`、`TEST_SETUP_EXCEPT()` 等）。Why: 批跑顺序会变（新增/移除 case 影响 `test_register.c` 注册位置；全局 `.data`/`.bss` 段 layout 也会变）。默认只要求单跑通过 + prepare 段显式清理状态即可落 `default`；怀疑有顺序依赖时可手工跑一次窄范围 `get_result.py --platform <plat> --range <本 case 前后几条>` 补对比证据，但不作为硬门禁。
 
@@ -112,6 +112,7 @@ Agent 执行入口。触发后按以下优先级执行：
      --check-register
    ```
 13. **memory append 自问**（仅 bug hunt / 新增测试点 / `fix-case` 发现工具坑 / 非预期运行结果等场景）：按 `Workflow Memory` 段的 3 门槛处理。其它任务类型跳过。
+14. **Manual_Reference 写回**（仅分层落到 `manual` / `blocked` 且原因涉及**新的模型边界 / Spike nongate / 待人工规则裁定**，不是 profile §5 / `reason_code_catalog` 已明确收录的场景时）：在 `test_point/Manual_Reference.md` 对应 section 末尾 append 一条 `#### <id>. <title>（**自动生成，待人工确认**）`，含涉及文件 / 涉及用例 / 怀疑点源码引用 / 本轮 Spike 观察 / 三条待人工确认问题（是否补入 profile、是否 LinkNan 复核、`reason_code` 确认）。`default` / `compile-only` 不触发本步。**人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status fixed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。
 
 ## Workflow Memory
 
@@ -125,6 +126,7 @@ Agent 执行入口。触发后按以下优先级执行：
 | 新增测试点 `new-case-only`（有明确模块特征的 `test_point_file`） | ✓ 按 test_point 文件名模块部分 | ✓ |
 | `fix-case` 遇到非平凡失败 | ✓ 按 `case_name` / `cause` | ✓ |
 | 用户明确提到"以前的 XX 问题 / 复盘 / 历史问题" | 强制查 | 强制自问 |
+| **用户本轮给出 Manual_Reference 条目的人工确认结论 / LinkNan 复核结果** | 强制查同 topic 历史 | ✓ 强制 append（`--status fixed`，附结论） |
 | 补已有 `### PnX` 小改 / `run-only` / `preflight-only` / `writeback-only` | ✗ | ✗ |
 | `triage-only` | triage skill 自决 | triage skill 自决 |
 
@@ -192,7 +194,7 @@ ls $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main 2>/dev/null \
      - 粘性 CSR（trigger/pmp/mstatus）未清
      - 特权态切换时状态未重置
 
-3. **现有 `test_point/*.md` 覆盖情况**
+3. **现有 `test_point/**/*.md` 覆盖情况**
    - 用 `rg` 或 `find_similar_cases` 查 target_module 相关 test_point 已覆盖哪些场景
    - 找"profile 关心但 test_point 未覆盖"的交集——这是确认的未覆盖区域
 
@@ -224,6 +226,7 @@ Bug hunt 场景最终交付摘要额外包含：
 - `compile-only` 时显式写 Gate D=`N/A` 与不运行原因。
 - 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须明确说明原因，不能把旧条目或旧 case 当成"新增结果"。
 - **memory 动作**（仅在 Workflow 步骤 13 触发的任务类型输出）：列本轮 query 了哪些 topic（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 13 的任务不用列。
+- **Manual_Reference 动作**（仅在 Workflow 步骤 14 触发时输出）：说明是否在 `test_point/Manual_Reference.md` 对应 section append 了 `#### <id>.（**自动生成，待人工确认**）` 条目 + 附的 3 条待人工确认问题；或本轮收到人工 / LinkNan 复核结论、给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status fixed`。`default` / `compile-only` 不触发本步，摘要里明确"未触发"。
 
 ## What To Read
 

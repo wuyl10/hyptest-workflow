@@ -29,6 +29,10 @@ from workflow_paths import cache_file
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_ROOT = SCRIPT_DIR.parent
 CACHE_VERSION = 1
+# Reference files and subdirs under test_point/ that do not carry PnX entries
+# and should be excluded from the source fingerprint.
+NON_ENTRY_REFERENCE_STEMS = frozenset({"manual_reference", "critical_issues_log"})
+NON_ENTRY_REFERENCE_DIRS = frozenset({"reference_tables"})
 ENV_FINGERPRINT_KEYS = list(CANONICAL_ENV_NAMES)
 SCRIPT_FINGERPRINT_RELS = [
     "case_preflight_pack.py",
@@ -256,7 +260,17 @@ def source_fingerprint(repo_root: Path, test_point_file: Path) -> dict[str, Any]
     for rel in ("ai_test_cases", "manual_test_cases", "test_point"):
         root = repo_root / rel
         if root.is_dir():
-            paths.extend(sorted(root.rglob("*.c" if rel != "test_point" else "*.md")))
+            for path in sorted(root.rglob("*.c" if rel != "test_point" else "*.md")):
+                if rel == "test_point":
+                    if path.stem.lower() in NON_ENTRY_REFERENCE_STEMS:
+                        continue
+                    try:
+                        top = path.relative_to(root).parts[0] if path.relative_to(root).parts else ""
+                    except ValueError:
+                        top = ""
+                    if top in NON_ENTRY_REFERENCE_DIRS:
+                        continue
+                paths.append(path)
     for rel in ("test_register.c",):
         path = repo_root / rel
         if path.is_file():

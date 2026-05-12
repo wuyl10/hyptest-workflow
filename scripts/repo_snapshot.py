@@ -16,6 +16,9 @@ CASE_FUNC_RE = re.compile(r"^\s*(?:static\s+)?bool\s+([A-Za-z_][A-Za-z0-9_]*)\s*
 REGISTER_RE = re.compile(r"TEST_REGISTER\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)")
 ENTRY_RE = re.compile(r"^###\s+P[0-9A-Za-z]", re.MULTILINE)
 IMPLEMENTED_CASE_RE = re.compile(r"^\s*-\s*`([A-Za-z_][A-Za-z0-9_]*)`", re.MULTILINE)
+# Reference files and subdirs under test_point/ that do not carry PnX entries.
+NON_ENTRY_REFERENCE_STEMS = frozenset({"manual_reference", "critical_issues_log"})
+NON_ENTRY_REFERENCE_DIRS = frozenset({"reference_tables"})
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,7 +71,18 @@ def registration_counts(root: Path) -> dict[str, object]:
 
 def test_point_counts(root: Path) -> dict[str, object]:
     base = root / "test_point"
-    files = sorted(base.glob("*.md")) if base.is_dir() else []
+    files: list[Path] = []
+    if base.is_dir():
+        for p in sorted(base.rglob("*.md")):
+            if p.stem.lower() in NON_ENTRY_REFERENCE_STEMS:
+                continue
+            try:
+                top = p.relative_to(base).parts[0] if p.relative_to(base).parts else ""
+            except ValueError:
+                top = ""
+            if top in NON_ENTRY_REFERENCE_DIRS:
+                continue
+            files.append(p)
     entry_count = 0
     implemented_case_count = 0
     for path in files:

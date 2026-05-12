@@ -64,6 +64,7 @@ def main() -> int:
             ("compile_elf.py should persist artifact_name_map.json", "ARTIFACT_MAP_FILE"),
             ("compile_elf.py should default compile temp files under .tmp/hyptest_compile", 'REPO_ROOT / ".tmp" / "hyptest_compile"'),
             ("compile_elf.py should allow overriding CROSS_COMPILE", "--cross-compile"),
+            ("compile_elf.py should expose --include-commented", "--include-commented"),
             ("compile_elf.py should parse TEST_REGISTER lines with trailing comments", r"\s*(?://.*)?$"),
         ]
         for label, needle in checks:

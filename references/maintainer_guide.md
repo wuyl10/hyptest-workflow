@@ -231,7 +231,7 @@ python3 scripts/case_workflow_ledger.py \
 维护原则：
 
 - 不在 pack 脚本里复制 `validate_task_request.py`、`find_similar_cases.py`、`check_case_lint.py`、`check_writeback_format.py` 的规则。
-- `repo_evidence_index.py` 只能做 repo-wide 缓存索引，不能按模块缩小覆盖检查口径；缓存必须随 case 源、`test_point/*.md` 和 `test_register.c` 变化失效。
+- `repo_evidence_index.py` 只能做 repo-wide 缓存索引，不能按模块缩小覆盖检查口径；缓存必须随 case 源、`test_point/**/*.md` 和 `test_register.c` 变化失效。
 - pack 脚本可以整理证据、执行单 case gate 和给出 next steps，但最终分层仍以 profile、tiering decision 和日志证据为准。
 - `case_gate_pack.py` 可调用 `compile_elf.py` / `get_result.py` / `case_postcheck_pack.py`，但不能把 runner returncode 直接等同于 default 分层。
 - `case_gate_pack.py` 编译失败时可以跳过运行，但必须继续保留 postcheck 证据，并在 skipped/next_steps 中说明原因。
@@ -241,7 +241,7 @@ python3 scripts/case_workflow_ledger.py \
 - `case_multi_platform_gate_pack.py` 必须保留每个平台的独立 gate payload，不能合并成最终 default/manual/compile-only 结论。
 - `make_case_skeleton.py` 只能生成 TODO 骨架和参考线索，不能生成看似通过的断言，不能让 skeleton 绕过相似检索、profile 判断、编译运行或回填。
 - `suggest_case_name.py` 只能建议命名和暴露同名/相似名风险，不能把“命名可用”当作 case 唯一性证明；repo 级相似 case 检索仍然必须执行。
-- `case_preflight_pack.py` 的缓存必须保守失效；只要输入参数、目标 test_point、case 源、`test_register.c`、`test_point/*.md`、关键环境变量、toolchain 命中路径、profile 文件或相关 skill 脚本变化，就不能复用旧报告。
+- `case_preflight_pack.py` 的缓存必须保守失效；只要输入参数、目标 test_point、case 源、`test_register.c`、`test_point/**/*.md`、关键环境变量、toolchain 命中路径、profile 文件或相关 skill 脚本变化，就不能复用旧报告。
 - `case_postcheck_pack.py` 的日志 fast path 必须保留 fallback；不能因为精确 glob 未命中就声称没有日志。
 - `make_case_submission_card.py` 只能生成 evidence card 和 final summary draft，不能输出或暗示最终分层；`decision_final` 必须显式留给 workflow 最终确认。
 - `case_timing_summary.py` 只能统计耗时和 cache hit/miss，不能作为质量门禁。
@@ -360,5 +360,5 @@ python3 scripts/eval_failure_log_workflow.py
 更新 `evals/evals.json` 时需要保持：
 
 - `id` 唯一递增
-- expectations 里的宏名（`CAUSE_*` / `TEST_*` / `TEST_REGISTER`）、路径（`test_point/*`、`ai_test_cases/*.c`、`references/spec_profiles/*`）和 skill 当前实际一致
+- expectations 里的宏名（`CAUSE_*` / `TEST_*` / `TEST_REGISTER`）、路径（`test_point/**/*.md`、`ai_test_cases/*.c`、`references/spec_profiles/*`）和 skill 当前实际一致
 - 引用的 spec_profile 应和 `references/spec_profiles/index.json` 的 `default_profile` 一致

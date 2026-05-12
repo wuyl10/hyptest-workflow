@@ -9,18 +9,28 @@ ownership, generated directories, or platform environment variables.
 src/                 framework C sources
 asm/                 framework assembly entry/handlers
 inc/                 public headers and test macros
-ai_test_cases/       AI or bulk-generated cases
+ai_test_cases/       AI or bulk-generated cases (recursive; grouped by module/topic)
 manual_test_cases/   human-maintained cases, grouped by module
 test_register.c      single registration/status source
 compile_elf.py       single-case and batch compile entry
 get_result.py        Spike/LinkNan run entry
 Makefile             low-level build recipe
 linker.ld            linker script
-test_point/          test point documents and mapping notes
+test_point/                             test point documents and mapping notes
+├── CRITICAL_ISSUES_LOG.md               known issues narrative (non-PnX)
+├── Manual_Reference.md                  human-confirmed rules + pending manual items (non-PnX)
+├── suspected/<module>/*.md              PnX test-point entries (organized by module)
+└── reference_tables/<module>/*          machine-readable reference tables (non-PnX)
 ```
 
-`manual_test_cases/` is recursive. Keep module-owned manual cases under
-`manual_test_cases/<module>/`; do not move them back to the repo root.
+`ai_test_cases/` and `manual_test_cases/` are recursive; keep module-owned cases
+under `<dir>/<module>/`. Do not move them back to the repo root.
+
+`test_point/` is recursive. Only files under `test_point/suspected/**/*.md`
+carry `### PnX` entries and are indexed by the skill; files under
+`test_point/reference_tables/` and the two root-level files
+(`Manual_Reference.md` / `CRITICAL_ISSUES_LOG.md`) are non-entry reference
+material and are skipped by coverage / uniqueness checks.
 
 ## Generated Directories
 
