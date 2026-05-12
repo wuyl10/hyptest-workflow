@@ -417,20 +417,8 @@
       "self_check": false
     },
     {
-      "path": "scripts/query_rtl_bug_history.py",
-      "group": "workflow",
-      "public": true,
-      "self_check": false
-    },
-    {
       "path": "scripts/query_spec_profile.py",
       "group": "profile",
-      "public": true,
-      "self_check": false
-    },
-    {
-      "path": "scripts/query_uncovered_bug_neighbors.py",
-      "group": "workflow",
       "public": true,
       "self_check": false
     },
@@ -460,12 +448,6 @@
     },
     {
       "path": "scripts/similar_case_cache.py",
-      "group": "similar-search",
-      "public": true,
-      "self_check": false
-    },
-    {
-      "path": "scripts/similar_case_core.py",
       "group": "similar-search",
       "public": true,
       "self_check": false

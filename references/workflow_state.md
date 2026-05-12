@@ -75,6 +75,26 @@ python3 scripts/workflow_memory.py summarize \
 python3 scripts/workflow_paths.py --repo-root $HYPTEST_HOME
 ```
 
+## 按需 audit（用户 prompt 触发）
+
+用户发 "audit workflow memory" / "清理一下过时的 memory" / "memory 体检" 这类 prompt 时，agent 按以下步骤做：
+
+1. 跑 `scripts/workflow_memory.py summarize --repo-root $HYPTEST_HOME` 拿所有 entry 概览
+2. 按以下启发式标记**候选过时 entry**（不直接改，先列给用户确认）：
+   - 含"可能 / 也许 / 感觉 / 估计"等模糊词（违反 3 门槛"可验证事实"）
+   - 未带日期标签（违反补充准入）
+   - 一条内容同时讲多件事（违反"一条一事"）
+   - 日期早于 6 个月，但 topic 近期没被任何任务 query 命中（低复用）
+   - 内容已在 SKILL.md / references / test_point 中正式文档化（不符合"非平凡"）
+3. 把候选清单列给用户：`topic / 写入日期 / note 摘要 / 可疑原因`
+4. 用户**逐条确认**后，agent 跑 `workflow_memory.py append --topic <t> --status obsolete --note "<废弃原因>"` 标记
+5. 完成后给用户出**audit 报告**：保留 X 条、标 obsolete Y 条、建议重写 Z 条
+
+**约束**：
+- **不直接删除 memory 文件**（append obsolete 是可逆的，delete 不是）
+- **不自动判定**过时，只列候选 + 让用户决定
+- 建议频次：每积累 50 条 entry 或每 3 个月手工触发一次，不定时
+
 ## 与 Claude auto memory 的分工
 
 本 workflow memory 只覆盖**本 repo 范围内**的经验。跨项目/用户偏好类信息（例如"用户是验证工程师，偏好简洁回答"）属于 Claude harness 级别的 auto memory，不应写入 workflow memory。

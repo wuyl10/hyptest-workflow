@@ -87,7 +87,6 @@ python3 scripts/self_check.py --quick --spec-profile <spec_profile>
 - `scripts/markdown_sections.py`：Markdown heading section split/filter/index 选择。
 - `scripts/similar_case_ranker.py`：相似度排序、多样性选择、retrieval assessment。
 - `scripts/similar_case_render.py`：snippet、match note、reading pack。
-- `scripts/similar_case_core.py`：re-export 模块；新逻辑不要继续堆到这里。
 
 修改后至少跑：
 

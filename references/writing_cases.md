@@ -244,8 +244,8 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 怀疑点：
 
-- [evidence=commit] `<RTL/path/File.scala:line>`（commit `<hash>`，`git log` 查到的已修复 bug，当前场景在其邻域但未直接覆盖）
-- [evidence=speculation] `<RTL/path/Other.scala:line>` 描述与本测试点相关的可疑交互点（仅源码阅读推测，无已知 commit / 无复现日志）
+- `<RTL/path/File.scala:line>` 描述与本测试点相关的可疑交互点（源码阅读得到的 anti-pattern / profile 已知高风险类别）
+- `<RTL/path/Other.scala:line>` 其它与本测试点相关的线索
 
 对应场景：
 
@@ -257,14 +257,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 - `ai_micro_xxx_width_switch_case`（default，已启用）
 ```
 
-怀疑点证据分级（在 `[evidence=<level>]` 方括号标签中写明）：
-
-- `commit`：有 git log 的 RTL fix commit 明确指向该路径（最强证据，优先追问；可用 `scripts/query_rtl_bug_history.py` 交叉验证）。
-- `log-confirmed`：有当前项目可复现的失败日志指向该路径。
-- `suggestive`：RTL 代码中该段逻辑有已知 anti-pattern（例如 always-true 默认值、不对称的 ready/valid、resource 被共用但无退场信号）。
-- `speculation`：单纯源码阅读推测，没有 commit/日志/已知 pattern 支撑。
-
-同一测试点可以列多个怀疑点，按 `commit > log-confirmed > suggestive > speculation` 排序，让审阅者一眼看出最硬的证据。`speculation` 级可以保留但不应作为"这条 case 一定能抓 bug"的理由。
+写怀疑点时用自然语言说明"为什么可疑"：源码里哪一段 anti-pattern、profile §5 标出的哪类高风险、现有 test_point 的覆盖空隙在哪。推测就是推测，不要包装成已验证的 bug。
 
 - 复用已有 case 时，才追加固定四行 `复用依据`：
 
@@ -290,7 +283,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 - `new-case-only` 场景通常只写到 `已实现 case` 即可；只有复用已有 case 时才出现 `复用依据` 四行。
 - `已实现 case` 段只放与该测试点一一对应的 case；默认只写 `case_name`，只有确有必要时才附短状态说明；不要在这里写文件名、函数签名、日志、Gate 结果或分层块。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
 - 若复用已有 case，必须补"复用依据"，且固定为四行字段：`顺序一致性`、`断言一致性`、`关键变量一致性`、`覆盖粒度一致性`。任一行差异非"无"，就不能把旧 case 当作复用，应新增 case 或标 `blocked`。
-- `test_point` 回填到 `已实现 case` / `复用依据` 即结束；除非用户明确要求，不再追加 `[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等块。
+- `test_point` 回填到 `已实现 case` / `复用依据` 即结束；`[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等块放最终交付摘要，不写进 `test_point`（除非用户明确要求）。
 
 ### 7.2 测试点与 case 必须一一映射
 

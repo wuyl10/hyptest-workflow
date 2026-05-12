@@ -5,7 +5,14 @@ description: hyptest 测试点到用例落地 skill。**必须触发**：新增/
 
 # HYPTEST Workflow
 
-Agent 执行入口。从 `test_point/*.md` 分析，到 `ai_test_cases/*.c` 或 `manual_test_cases/**/*.c` 落地、`test_register.c` 注册、单 case 编译/运行、日志归因、分层决策和轻量回填。用户面向的用法、环境变量、字段速查、触发范例在 `README.md`；本文件只管 agent 被触发后要遵守的规则和执行步骤。
+Agent 执行入口。触发后按以下优先级执行：
+
+1. **Workflow**（下文）是默认 13 步流程；每步都要遵守 **Non-Negotiables** 的 4 组硬规则
+2. 规则冲突按 **Source Priority** 裁决
+3. bug hunt 场景在 Workflow 步骤 3 的"选点"环节用 **Bug Hunt Evidence** 的三类资料替代普通相似检索；其它步骤（唯一性 / profile 标记 / 写 case / 编译运行 / 回填）仍按 Workflow 正常执行
+4. 输出必满足 **Output Defaults**
+
+用户面向的用法/字段表/触发范例在 `README.md`——agent 不用看 README，只管按本文件执行。
 
 ## Source Priority
 
@@ -53,13 +60,11 @@ Agent 执行入口。从 `test_point/*.md` 分析，到 `ai_test_cases/*.c` 或 
 - **新增测试点前必须先做测试点覆盖检查**；默认按全仓 `test_point/*.md` 扫描，不能只看当前文件就声称"全仓未覆盖"。Why: test_point 按模块分文件但**同一怀疑点可能散落在多个文件**。只看当前文件就声称"新点"会造成跨文件重复。
 - **若扫描后未发现新的高价值测试点，必须明确说明"未发现新的测试点 / 未新增 case"**，不能把旧条目或旧 case 再次作为新增结果交付。Why: LLM 为了"完成任务"有凑数倾向。硬规则强制承认"这次没找到"，避免把旧成果包装成本轮新增污染历史。
 - **case 独立性**：新 case 必须能单跑通过（不依赖前面 case 的 CSR/TLB/cache/reservation 残留）。prepare 段应显式清理本 case 会用到的状态（相关 CSR 位、`sfence_vma`、`TEST_SETUP_EXCEPT()` 等）。Why: 批跑顺序会变（新增/移除 case 影响 `test_register.c` 注册位置；全局 `.data`/`.bss` 段 layout 也会变）。默认只要求单跑通过 + prepare 段显式清理状态即可落 `default`；怀疑有顺序依赖时可手工跑一次窄范围 `get_result.py --platform <plat> --range <本 case 前后几条>` 补对比证据，但不作为硬门禁。
-- **workflow memory 不默认查询**。`$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是本地经验记录，不替代本轮证据。只在用户明确要求复盘历史、任务明确涉及已知历史问题（如"还是那个 P6B 老问题"）、或 bug hunt 需要确认相关场景是否踩过坑时才调用 `workflow_memory.py query`；日常 case 任务不触发。
 
 ### 4. 输出默认值（禁止项；正面清单见 `Output Defaults`）
 
-- **`test_point` 默认只回填正文和 `已实现 case`**；默认只写 `case_name`，必要时才补短状态。Why: `test_point` 是测试意图描述，不是审计日志。加太多运行证据会让 test_point 膨胀难读，且审计证据在别处（gate pack / submission card）已有。
-- **禁止在 `test_point` 条目后追加审计式后半段块**，例如 `[新增 case]`、`[质量门禁结果]`、`[分层结论]`、`[编译/运行统计]`。Why: 同上——这些是交付摘要的职责，不是 test_point 的。混进来会让后续改 case 时难以判断 test_point 本身要表达什么。
-- **禁止默认输出 `exclude_check`**。Why: 这是早期模板遗留字段，当前 workflow 已不用；默认输出会让交付摘要携带无意义字段。
+- **`test_point` 默认只回填正文和 `已实现 case`**；默认只写 `case_name`，必要时才补短状态；**禁止追加 `[新增 case]`、`[质量门禁结果]`、`[分层结论]`、`[编译/运行统计]` 等审计式块**。Why: `test_point` 是测试意图描述，不是审计日志。加运行证据和分层块会让 test_point 膨胀难读，且审计证据在别处（gate pack / submission card / 最终交付摘要）已有。
+- **禁止默认输出 `exclude_check`**。Why: 默认输出会让交付摘要携带无意义字段。
 - **禁止默认输出全量 Gate A-H**；只有非 pass Gate 或用户明确要求时，才在最终交付摘要里输出 `[质量门禁结果]`。Why: 全 pass 时列八条"Gate X: pass"纯噪声；只在有问题时列出来反而让工程师一眼看到阻塞点。
 - **禁止为 `default` case 默认单独输出 `[分层结论]`**；只有 `manual` / `compile-only` / `blocked`，或用户明确要求时，才在最终交付摘要里输出 `decision_prelim` / `decision_final` / `reason_code`。Why: `default` 是"一切正常"的默认分层，需要解释的是**偏离 default 的情况**；给 default case 加分层块是反向信息量。
 
@@ -106,24 +111,107 @@ Agent 执行入口。从 `test_point/*.md` 分析，到 `ai_test_cases/*.c` 或 
      --file <test_point_file> \
      --check-register
    ```
+13. **memory append 自问**（仅 bug hunt / 新增测试点 / `fix-case` 发现工具坑 / 非预期运行结果等场景）：按 `Workflow Memory` 段的 3 门槛处理。其它任务类型跳过。
+
+## Workflow Memory
+
+`$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是本地经验白名单，**不是流水账**。目标：skill 越用越聪明，只沉淀**几乎确定有用且不会错**的经验。不替代本轮证据，不替代 SKILL.md 硬规则。详细 CLI 见 `references/workflow_state.md`。
+
+### 读端 + 写端：按任务类型分档
+
+| 任务类型 | 默认 query | 完成后自问 append |
+|---|---|---|
+| bug hunt（`target_module=<m>` + `new-case-only`，或 test_point 文件名含 `suspected_bug_corner_points`） | ✓ 按 `target_module` 关键词 | ✓ |
+| 新增测试点 `new-case-only`（有明确模块特征的 `test_point_file`） | ✓ 按 test_point 文件名模块部分 | ✓ |
+| `fix-case` 遇到非平凡失败 | ✓ 按 `case_name` / `cause` | ✓ |
+| 用户明确提到"以前的 XX 问题 / 复盘 / 历史问题" | 强制查 | 强制自问 |
+| 补已有 `### PnX` 小改 / `run-only` / `preflight-only` / `writeback-only` | ✗ | ✗ |
+| `triage-only` | triage skill 自决 | triage skill 自决 |
+
+查询按 topic 精确匹配，自动过滤 `status=obsolete`，即使总量到 100+ 条也只返回相关 10-20 条。
+
+### 写端：3 条强门槛（同时满足才 append）
+
+过 3 门槛，**任一不满足就不写**。宁缺毋滥。
+
+1. **可验证事实，不是猜测**（✗ "感觉 StoreQueue 有问题"）
+2. **下次相似任务会用得上**（✗ "今天补了 P13A" 这种流水账）
+3. **非平凡**——文档/源码 5 分钟能查到的**不记**（✗ "TEST_END 只能一个"）
+
+**补充**：每条带日期标签、一条一事、不确定就不写。
+
+```bash
+# append（三门槛全过才跑）
+python3 scripts/workflow_memory.py append --repo-root $HYPTEST_HOME --topic <kw> --note "<...>"
+
+# 标过时
+python3 scripts/workflow_memory.py append --repo-root $HYPTEST_HOME --topic <kw> --status obsolete --note "<...>"
+```
+
+**3 门槛全过** → append；**任一不过** → 摘要里写"无经验可沉淀"（不 append）。
+
+### 膨胀控制
+
+- 3 门槛把关（写端） + `status=obsolete` 过滤（读端） + 按需 audit 清过时的
+- 典型规模：一年 20-50 条、几十 KB、按 topic 检索不会线性变慢
+
+用户发 "audit workflow memory" / "清理过时 memory" 类 prompt 时的具体步骤见 `references/workflow_state.md` 的"按需 audit"段。
 
 ## Bug Hunt Evidence（仅 bug hunt 场景自动触发）
 
-典型触发词：`target_module=<module>` + `new-case-only`、`bug_hunt_focus`、"继续围绕 X 找 bug 点"、`test_point_file` 文件名含 `suspected_bug_corner_points`。普通"落 test_point 的 case"任务**不要**自动触发，以免增加无谓延迟。
+**本段是 Workflow 步骤 3 "选点"环节的 bug hunt 专用扩展**（用三类资料替代普通相似检索），**不替代** Workflow 其它步骤（唯一性 / profile 标记 / 写 case / 编译运行 / 回填 照常执行）。触发词：`target_module=<module>` + `new-case-only`、`bug_hunt_focus`、"继续围绕 X 找 bug 点"、`test_point_file` 文件名含 `suspected_bug_corner_points`。普通"落 test_point 的 case"任务**不触发**本段，以免增加无谓延迟。
 
-- **自动跑两个脚本**（顺序）：
-  ```bash
-  python3 scripts/query_rtl_bug_history.py --module <target_module> --limit 10 --markdown
-  python3 scripts/query_uncovered_bug_neighbors.py --module <target_module> --limit 20 --markdown
-  ```
-  `query_uncovered_bug_neighbors.py` 把 fix commit 的 `file:line` 与已有 `test_point/*.md` 里引用的 `<file>.scala:<line>` 做距离比对，输出"已修过但附近 test_point 没覆盖"的高价值点，**直接引导 agent 选新的怀疑点方向**，不用凭空挑。
-- **环境缺失兜底**：`HYPTEST_LINKNAN_HOME` 不可见或目标 submodule 不在 LinkNan/Nanhu 下时，跳过并在摘要里注明"未查 RTL 历史 bug（环境缺失）"。
-- **查询结果只是证据的一部分**：
-  - commit subject 启发式会漏掉没有 `fix/bug` 关键词的修复、未提交的真 bug、重构顺带修掉的 bug。
-  - 能用来做的：给 case 的"怀疑点"段提供 commit hash + file:line 作为可追溯证据；定位"真 bug 邻域"。
-  - 不能用来做的：替代 profile 判断、替代 `find_similar_cases` 检索、替代自己对 RTL 代码和 test_point 的阅读。
-- **怀疑点 evidence 分级**（test_point 回填里必须标）：`[evidence=commit]` > `[evidence=log-confirmed]` > `[evidence=suggestive]` > `[evidence=speculation]`。`evidence=commit` 时**必须**给 commit hash + file:line；commit 指向的路径要跟本 case 场景真的对齐，不要把"这个模块最近修过 bug"包装成"这个 case 就是在查那个 bug"。
-- **查询空结果 ≠ 没 bug**：继续按相似 case / profile / RTL 阅读等其它途径找可疑点，证据等级降到 `suggestive` 或 `speculation`。
+### 核心策略：源码阅读 + profile 边界 + test_point 已有覆盖
+
+bug hunt 主线是从 **RTL 源码 + profile 边界 + 已有 test_point** 找当前未被覆盖的可疑点。
+
+**开工前先校验 `target_module` 拼写**：
+
+```bash
+# 校验 target_module 在 Chisel 源码里真实存在（自动展开大驼峰：memblock → MemBlock）
+ls $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main 2>/dev/null \
+  | grep -iE "^<target_module>$|<target_module>\.scala$" \
+  || find $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main -type f -iname "*<target_module>*" | head -5
+```
+
+或用 `find -iname "*<module>*"`（大小写不敏感）验证。如果查不到任何匹配文件，**停下提醒用户**："`target_module=<值>` 在 RTL 源码里找不到对应文件，请确认拼写（`memblock` 而非 `mmemblock`）"。不能静默继续——静默继续会让 bug hunt 跑偏成"什么都找不到"误导用户"该模块没 bug"。
+
+### 源码可疑点识别（主要动作）
+
+按优先级读以下三类资料，每读一处提取可疑点候选：
+
+1. **`references/spec_profiles/<spec_profile>.md` §5 "Spike 不适合 gate 的场景"**
+   - profile 维护者已标出的**已知高风险领域**：TLB/cache/CBO/refill/replay/sbuffer/MSHR/reservation/PMA CSR 等
+   - target_module 属于哪些类别 → 优先在这些类别里找 corner
+
+2. **target_module 的 RTL 源码**（`$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`）
+   - 看 anti-pattern：
+     - `WireDefault(false.B)` 后条件分支不完整
+     - `Valid` 输出但无对应 `ready` 握手
+     - `Reg(Vec)` 资源共用但无显式 retire/dealloc
+     - 粘性 CSR（trigger/pmp/mstatus）未清
+     - 特权态切换时状态未重置
+
+3. **现有 `test_point/*.md` 覆盖情况**
+   - 用 `rg` 或 `find_similar_cases` 查 target_module 相关 test_point 已覆盖哪些场景
+   - 找"profile 关心但 test_point 未覆盖"的交集——这是确认的未覆盖区域
+
+写 test_point 的"怀疑点"段时，用自然语言描述从源码或 profile 得到的具体线索（`<file>.scala:<line>` + 一句话说明为什么可疑）。推测就是推测，不要包装成已验证的 bug。
+
+### 环境缺失兜底
+
+`HYPTEST_LINKNAN_HOME` 不可见或目标 submodule 不在 LinkNan/Nanhu 下时：
+
+- 跳过 RTL 源码阅读（无法访问）
+- 降级到 profile §5 + 现有 test_point + 相似 case 检索
+- 摘要里注明"未读 RTL 源码（环境缺失）"
+
+### 输出要求
+
+Bug hunt 场景最终交付摘要额外包含：
+
+- 选点所用的证据来源：profile §5 哪条 / 源码哪个 anti-pattern（`<file>.scala:<line>` + 一句话说明）/ 现有 test_point 的覆盖空隙
+- 诚实说明怀疑程度：推测就是推测，别包装成已验证 bug
 
 ## Output Defaults
 
@@ -135,7 +223,7 @@ Agent 执行入口。从 `test_point/*.md` 分析，到 `ai_test_cases/*.c` 或 
 - **test_point → case 映射表**：逐条列出 test_point 每个要求对应到 case 哪一行断言（详见 `references/writing_cases.md` §14.1）。
 - `compile-only` 时显式写 Gate D=`N/A` 与不运行原因。
 - 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须明确说明原因，不能把旧条目或旧 case 当成"新增结果"。
-- bug hunt 场景额外包含：`query_rtl_bug_history` + `query_uncovered_bug_neighbors` 调用证据（哪怕空结果）；怀疑点 `[evidence=...]` 分级。
+- **memory 动作**（仅在 Workflow 步骤 13 触发的任务类型输出）：列本轮 query 了哪些 topic（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 13 的任务不用列。
 
 ## What To Read
 

@@ -29,7 +29,6 @@ def infer_group(path: str) -> str:
         "find_similar_cases.py",
         "markdown_sections.py",
         "similar_case_cache.py",
-        "similar_case_core.py",
         "similar_case_ranker.py",
         "similar_case_render.py",
         "similar_case_terms.py",

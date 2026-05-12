@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | 1 | `new-case-memblock-cross16b-boundary` | 新增测试点 + 新 case（memblock 场景，store side effect 检查）|
 | 2 | `supplement-existing-p6b-assert` | 补已有 `### PnX` 条目（supplement 模式）|
-| 3 | `bug-hunt-storequeue-uncovered-neighbor` | bug hunt + 强制用 `query_rtl_bug_history` + `query_uncovered_bug_neighbors` + 怀疑点 evidence 分级 |
+| 3 | `bug-hunt-storequeue-uncovered-neighbor` | bug hunt + 源码阅读 + profile §5 + 现有 test_point 覆盖空隙 |
 
 每个 eval 含 12-16 条 expectations，可被 grader 机器验证（grep/ls/python 脚本）或人工判断（`human`）。
 

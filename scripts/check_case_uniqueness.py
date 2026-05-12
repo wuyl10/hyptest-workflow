@@ -176,6 +176,20 @@ def render_text(report: dict[str, Any]) -> str:
 def main() -> int:
     args = parse_args()
     report = build_report(args)
+
+    # Warn when cache miss: SKILL.md Non-Negotiables §3 要求 repo_evidence_index 预热后再跑；
+    # cache miss 时实际发生的是 load_or_build 做了全仓冷扫（或 fallback 到 rg），
+    # 违反了"走缓存索引快路径"的硬规则。打印 stderr 警告让调用者/agent 可见。
+    cache = report.get("cache") or {}
+    if not args.no_cache and not cache.get("hit"):
+        print(
+            "WARN check_case_uniqueness: cache miss — 建议先跑 "
+            "`python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --json > /dev/null` "
+            "预热，然后再跑本脚本；否则本轮属于全仓冷扫，NFS 上较慢且违反 "
+            "SKILL.md Non-Negotiables §3 '走缓存索引快路径' 的硬规则。",
+            file=sys.stderr,
+        )
+
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:

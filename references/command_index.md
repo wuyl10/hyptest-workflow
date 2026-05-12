@@ -8,7 +8,7 @@
 python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-file test_point/<file>.md ...
 ```
 
-如果当前进程已经能读到 `HYPTEST_HOME`，命令可以直接写 `$HYPTEST_HOME`；如果没有设置，就把 `$HYPTEST_HOME` 替换成实际仓库路径。对外 prompt 和共享配置统一写 `HYPTEST_HOME`，不再使用旧的仓库路径字段写法。
+如果当前进程已经能读到 `HYPTEST_HOME`，命令可以直接写 `$HYPTEST_HOME`；如果没有设置，就把 `$HYPTEST_HOME` 替换成实际仓库路径。对外 prompt 和共享配置统一写 `HYPTEST_HOME`。
 
 所有带 `--spec-profile <spec_profile>` 的命令都可以省略该参数；省略时使用 `references/spec_profiles/index.json` 中的 `default_profile`。需要复核实际解析结果时，先跑 `python3 scripts/resolve_spec_profile.py --spec-profile <spec_profile>`。
 
@@ -241,18 +241,6 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
 
   ```bash
   python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --address <pa> --decision-only
-  ```
-
-- `rtl-bug-history`: Auto-invoked by skill in bug hunt tasks; results are one evidence source (commit heuristic misses non-'fix' commits and unmerged bugs). Do not rely on alone.
-
-  ```bash
-  python3 scripts/query_rtl_bug_history.py --module <module> --limit 10 --markdown
-  ```
-
-- `uncovered-bug-neighbors`: Cross-reference RTL fix commits against test_point/*.md references; surface 'already fixed but no nearby test_point coverage' bug hunt candidates. Pairs with rtl-bug-history.
-
-  ```bash
-  python3 scripts/query_uncovered_bug_neighbors.py --module <module> --limit 20 --markdown
   ```
 
 - `reason-code`: 根据失败现象给出候选 reason_code。

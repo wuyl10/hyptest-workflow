@@ -213,16 +213,6 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
                 "desc": "Print only matching profile default_decision values.",
             },
             {
-                "name": "rtl-bug-history",
-                "cmd": "python3 scripts/query_rtl_bug_history.py --module <module> --limit 10 --markdown",
-                "desc": "Auto-invoked by skill in bug hunt tasks; results are one evidence source (commit heuristic misses non-'fix' commits and unmerged bugs). Do not rely on alone.",
-            },
-            {
-                "name": "uncovered-bug-neighbors",
-                "cmd": "python3 scripts/query_uncovered_bug_neighbors.py --module <module> --limit 20 --markdown",
-                "desc": "Cross-reference RTL fix commits against test_point/*.md references; surface 'already fixed but no nearby test_point coverage' bug hunt candidates. Pairs with rtl-bug-history.",
-            },
-            {
                 "name": "reason-code",
                 "cmd": "python3 scripts/suggest_reason_code.py --symptom '<failure symptom>'",
                 "desc": "Suggest candidate reason_code values from a failure symptom.",
