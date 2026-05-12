@@ -6,9 +6,20 @@
 - 本文里的路径和场景属于某个时间点的快照，可能已经被 RTL 重构、文件重命名或 bug 修过；不要把这里的路径当成通用规则。
 - 规格/profile 仍以 `references/spec_and_model_limits.md` 和 `references/spec_profiles/<spec_profile>.md` 为准。
 
-当写 `test_point` 的"怀疑点 / 对应场景"段需要一个可参考结构时，可以看下面的示例；引用路径前先确认当前 RTL 源码里该 `<file>.scala:<line>` 仍成立。
+## 扫 RTL 源码时常见的 anti-pattern
 
-## Store Misalign / Fake-Crosspage Template Reuse
+读 target_module 的 RTL 时，优先留意以下几类结构——命中其中一类通常就是值得写 test_point 的怀疑点候选：
+
+- `WireDefault(false.B)` 或其它默认值后，条件分支不完整（某些 case 未显式赋值）
+- `Valid` 输出但无对应 `ready` 握手；或 `ready/valid` 配对但 retire/cancel 路径不对称
+- `Reg(Vec)` 之类资源池被多路共用，但缺乏显式 retire/dealloc 或清零路径
+- 粘性 CSR（`trigger` / `pmp` / `mstatus` / `mcause` 等）在异常/特权态切换路径上未清
+- 特权态（U/HS/M/VS）切换或 trap entry 时，模块内部状态未统一重置
+- 跨页 / 跨 16B 等 split 路径有"快速完成"分支，但 fault / refault / replay 分支复用同一模板寄存器
+
+引用前先 `ls` / `grep` 确认该 `<file>.scala:<line>` 在当前 RTL 中仍然存在、语义未变；若已重构以当前源码为准。
+
+## 示例 1：Store Misalign / Fake-Crosspage Template Reuse
 
 怀疑点示例：
 
@@ -19,10 +30,3 @@
 
 - `sd(1B+7B)` repeated `SAF` -> repair -> upper-half aligned `sd(8B)` success x4 -> refault `SAF` -> repair -> retried `sd(1B+7B)` success -> immediate `sw(1B+3B)` success
 - 最终要求 `sw` trap-free，只覆盖 bytes7-10，不破坏其余 boundary image。
-
-使用提醒：
-
-- 只在任务明确需要从 RTL/源码定位可疑点时引用这类路径。
-- 不要把这里的具体路径当成所有 profile 的通用事实。
-- 若当前 profile 不是 LinkNan/NHV5.1AP，先确认源码路径和实现结构仍成立。
-- 引用前先 `ls`/`grep` 确认该 `<file>.scala:<line>` 在当前 RTL 中仍然存在、语义未变；若已重构以当前源码为准。

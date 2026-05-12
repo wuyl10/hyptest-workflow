@@ -3,12 +3,12 @@
   "positive_evals": [
     {
       "id": "new_case_only_file_scope",
-      "prompt": "使用 hyptest-workflow：repo_root=<repo_root>，test_point_file=test_point/memblock_suspected_bug_corner_points_10.md，platform=spike，spec_profile=<spec_profile>，task_mode=new-case-only，新增 1 个 case，并回填 test_point。",
+      "prompt": "使用 hyptest-workflow：repo_root=<repo_root>，test_point_file=test_point/suspected/memblock/memblock_suspected_bug_corner_points_10.md，platform=spike，spec_profile=<spec_profile>，task_mode=new-case-only，新增 1 个 case，并回填 test_point。",
       "expected_output": "应先区分 test_point 文件和 ### PnX 条目，新增新的 PnX 和 ai_* case，做相似 case 检索、编译、运行与轻量回填。"
     },
     {
       "id": "supplement_existing_point",
-      "prompt": "使用 hyptest-workflow：只补 test_point/foo.md 里的 ### P7D，已有条目下再补 1 个 case，不新增其它 PnX。",
+      "prompt": "使用 hyptest-workflow：只补 test_point/suspected/memblock/foo.md 里的 ### P7D，已有条目下再补 1 个 case，不新增其它 PnX。",
       "expected_output": "应进入补已有测试点模式，只围绕 P7D 做局部补 case 和回填，不把整个文件当成单个测试点。"
     },
     {
@@ -45,7 +45,7 @@
     },
     {
       "id": "negative_analysis_only_no_edits",
-      "prompt": "先帮我分析 test_point/foo.md 里 P3A 是否已有类似覆盖，暂时不要改代码。",
+      "prompt": "先帮我分析 test_point/suspected/memblock/foo.md 里 P3A 是否已有类似覆盖，暂时不要改代码。",
       "expected_output": "应只做覆盖/相似检索和结论说明，不修改 ai_test_cases、manual_test_cases、test_register.c 或 test_point。"
     },
     {

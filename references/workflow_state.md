@@ -75,6 +75,11 @@ python3 scripts/workflow_memory.py summarize \
 python3 scripts/workflow_paths.py --repo-root $HYPTEST_HOME
 ```
 
+## 膨胀控制
+
+- 3 门槛把关（写端） + `status=obsolete` 过滤（读端） + 按需 audit 清过时的
+- 典型规模：一年 20-50 条、几十 KB、按 topic 检索不会线性变慢
+
 ## 按需 audit（用户 prompt 触发）
 
 用户发 "audit workflow memory" / "清理一下过时的 memory" / "memory 体检" 这类 prompt 时，agent 按以下步骤做：

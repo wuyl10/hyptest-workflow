@@ -32,14 +32,14 @@ skill 被触发后会按 `SKILL.md` 自动执行完整流程（repo 级覆盖检
 根据给定测试场景编写用例：
 
 ```
-"帮我给 test_point/memblock_suspected_bug_corner_points_15.md 新增 1 个 case，
+"帮我给 test_point/suspected/memblock/memblock_suspected_bug_corner_points_15.md 新增 1 个 case，
 验证 same-page cross-16B sd 在 repair 后再一次 sw 的 boundary image 保持"
 ```
 
 根据给定测试点新增用例并反标：
 
 ```
-"给 test_point/memblock_suspected_bug_corner_points_15.md 新增 1 个 ### PnX 测试点，
+"给 test_point/suspected/memblock/memblock_suspected_bug_corner_points_15.md 新增 1 个 ### PnX 测试点，
 再写对应 ai_micro_* case 并反标到该条目的'已实现 case'段；
 聚焦 cbo.inval → prefetch_r → AMO 的 owner 串用"
 ```
@@ -48,13 +48,13 @@ skill 被触发后会按 `SKILL.md` 自动执行完整流程（repo 级覆盖检
 
 ```
 "围绕 memblock 找 1 个高价值 suspected bug 点并新增 case，
-test_point_file=test_point/memblock_suspected_bug_corner_points_15.md"
+test_point_file=test_point/suspected/memblock/memblock_suspected_bug_corner_points_15.md"
 ```
 
 补已有 `### PnX`：
 
 ```
-"给 test_point/<xxx>.md 的 ### P6B 补一个 case，聚焦 boundary preserved 方向"
+"给 test_point/suspected/<module>/<xxx>.md 的 ### P6B 补一个 case，聚焦 boundary preserved 方向"
 ```
 
 给已有 case 补断言：
@@ -78,7 +78,7 @@ test_point_file=test_point/memblock_suspected_bug_corner_points_15.md"
 开写前摸底：
 
 ```
-"看一下 test_point/<xxx>.md 当前还有没有新增空间，哪些方向值得优先补"
+"看一下 test_point/suspected/<module>/<xxx>.md 当前还有没有新增空间，哪些方向值得优先补"
 ```
 
 交 triage：
@@ -95,7 +95,7 @@ skill 能从 prompt 里自动推断大部分字段。下表按"什么时候写"�
 
 | 字段 | 什么时候写 | 取值 |
 | --- | --- | --- |
-| `test_point_file` | 新增/补点/回填任务 | 测试点容器文件；按 `$HYPTEST_HOME` 解析；例 `test_point/memblock_suspected_bug_corner_points_15.md` |
+| `test_point_file` | 新增/补点/回填任务 | 测试点容器文件；按 `$HYPTEST_HOME` 解析；例 `test_point/suspected/memblock/memblock_suspected_bug_corner_points_15.md` |
 | `target_module` | bug hunt 任务 | 模块名；**拼写必须对**（`memblock` 不是 `mmemblock`）否则 skill 按模块找源码 / 相似 test_point 都会跑偏 |
 | `target_test_point` | 补已有条目 | `"### P<id>. <title>"` |
 | `case_name` | `run-only` / `fix-case` / 补 assert | 目标 case 名 |

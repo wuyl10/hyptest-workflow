@@ -116,7 +116,7 @@ Agent 执行入口。触发后按以下优先级执行：
 
 ## Workflow Memory
 
-`$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是本地经验白名单，**不是流水账**。目标：skill 越用越聪明，只沉淀**几乎确定有用且不会错**的经验。不替代本轮证据，不替代 SKILL.md 硬规则。详细 CLI 见 `references/workflow_state.md`。
+`$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是本地经验白名单，**不是流水账**。目标：skill 越用越聪明，只沉淀**几乎确定有用且不会错**的经验。不替代本轮证据，不替代 SKILL.md 硬规则。
 
 ### 读端 + 写端：按任务类型分档
 
@@ -130,34 +130,17 @@ Agent 执行入口。触发后按以下优先级执行：
 | 补已有 `### PnX` 小改 / `run-only` / `preflight-only` / `writeback-only` | ✗ | ✗ |
 | `triage-only` | triage skill 自决 | triage skill 自决 |
 
-查询按 topic 精确匹配，自动过滤 `status=obsolete`，即使总量到 100+ 条也只返回相关 10-20 条。
+查询按 topic 精确匹配，自动过滤 `status=obsolete`，100+ 条也只返回相关 10-20 条。
 
-### 写端：3 条强门槛（同时满足才 append）
-
-过 3 门槛，**任一不满足就不写**。宁缺毋滥。
+### 写端 3 条强门槛（同时满足才 append；任一不过 → 摘要里写"无经验可沉淀"）
 
 1. **可验证事实，不是猜测**（✗ "感觉 StoreQueue 有问题"）
 2. **下次相似任务会用得上**（✗ "今天补了 P13A" 这种流水账）
 3. **非平凡**——文档/源码 5 分钟能查到的**不记**（✗ "TEST_END 只能一个"）
 
-**补充**：每条带日期标签、一条一事、不确定就不写。
+每条带日期标签、一条一事、不确定就不写。
 
-```bash
-# append（三门槛全过才跑）
-python3 scripts/workflow_memory.py append --repo-root $HYPTEST_HOME --topic <kw> --note "<...>"
-
-# 标过时
-python3 scripts/workflow_memory.py append --repo-root $HYPTEST_HOME --topic <kw> --status obsolete --note "<...>"
-```
-
-**3 门槛全过** → append；**任一不过** → 摘要里写"无经验可沉淀"（不 append）。
-
-### 膨胀控制
-
-- 3 门槛把关（写端） + `status=obsolete` 过滤（读端） + 按需 audit 清过时的
-- 典型规模：一年 20-50 条、几十 KB、按 topic 检索不会线性变慢
-
-用户发 "audit workflow memory" / "清理过时 memory" 类 prompt 时的具体步骤见 `references/workflow_state.md` 的"按需 audit"段。
+CLI 入口（`append` / `query` / `summarize` / 按需 audit）、膨胀控制、与 Claude auto memory 的分工都在 `references/workflow_state.md`。
 
 ## Bug Hunt Evidence（仅 bug hunt 场景自动触发）
 
@@ -167,46 +150,27 @@ python3 scripts/workflow_memory.py append --repo-root $HYPTEST_HOME --topic <kw>
 
 bug hunt 主线是从 **RTL 源码 + profile 边界 + 已有 test_point** 找当前未被覆盖的可疑点。
 
-**开工前先校验 `target_module` 拼写**：
+**开工前先校验 `target_module` 拼写**——在 RTL 源码里确认模块名真实存在（自动展开大驼峰，如 `memblock` → `MemBlock`）：
 
 ```bash
-# 校验 target_module 在 Chisel 源码里真实存在（自动展开大驼峰：memblock → MemBlock）
 ls $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main 2>/dev/null \
   | grep -iE "^<target_module>$|<target_module>\.scala$" \
   || find $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main -type f -iname "*<target_module>*" | head -5
 ```
 
-或用 `find -iname "*<module>*"`（大小写不敏感）验证。如果查不到任何匹配文件，**停下提醒用户**："`target_module=<值>` 在 RTL 源码里找不到对应文件，请确认拼写（`memblock` 而非 `mmemblock`）"。不能静默继续——静默继续会让 bug hunt 跑偏成"什么都找不到"误导用户"该模块没 bug"。
+查不到任何匹配文件时**停下提醒用户**确认拼写（`memblock` 而非 `mmemblock`），不能静默继续——静默继续会让 bug hunt 跑偏成"什么都找不到"误导用户"该模块没 bug"。
 
-### 源码可疑点识别（主要动作）
+### 三类资料按优先级读
 
-按优先级读以下三类资料，每读一处提取可疑点候选：
-
-1. **`references/spec_profiles/<spec_profile>.md` §5 "Spike 不适合 gate 的场景"**
-   - profile 维护者已标出的**已知高风险领域**：TLB/cache/CBO/refill/replay/sbuffer/MSHR/reservation/PMA CSR 等
-   - target_module 属于哪些类别 → 优先在这些类别里找 corner
-
-2. **target_module 的 RTL 源码**（`$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`）
-   - 看 anti-pattern：
-     - `WireDefault(false.B)` 后条件分支不完整
-     - `Valid` 输出但无对应 `ready` 握手
-     - `Reg(Vec)` 资源共用但无显式 retire/dealloc
-     - 粘性 CSR（trigger/pmp/mstatus）未清
-     - 特权态切换时状态未重置
-
-3. **现有 `test_point/**/*.md` 覆盖情况**
-   - 用 `rg` 或 `find_similar_cases` 查 target_module 相关 test_point 已覆盖哪些场景
-   - 找"profile 关心但 test_point 未覆盖"的交集——这是确认的未覆盖区域
+1. **`references/spec_profiles/<spec_profile>.md` §5 "Spike 不适合 gate 的场景"**——profile 维护者已标出的已知高风险领域（TLB/cache/CBO/refill/replay/sbuffer/MSHR/reservation/PMA CSR 等）。target_module 若落在其中，优先在这些类别里找 corner。
+2. **target_module 的 RTL 源码**（`$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`）——扫典型 anti-pattern。**anti-pattern 清单与代表性引用例**见 `references/rtl_bug_patterns.md`。
+3. **现有 `test_point/**/*.md` 覆盖情况**——用 `rg` 或 `find_similar_cases` 查已覆盖场景，找"profile 关心但 test_point 未覆盖"的交集。
 
 写 test_point 的"怀疑点"段时，用自然语言描述从源码或 profile 得到的具体线索（`<file>.scala:<line>` + 一句话说明为什么可疑）。推测就是推测，不要包装成已验证的 bug。
 
 ### 环境缺失兜底
 
-`HYPTEST_LINKNAN_HOME` 不可见或目标 submodule 不在 LinkNan/Nanhu 下时：
-
-- 跳过 RTL 源码阅读（无法访问）
-- 降级到 profile §5 + 现有 test_point + 相似 case 检索
-- 摘要里注明"未读 RTL 源码（环境缺失）"
+`HYPTEST_LINKNAN_HOME` 不可见或目标 submodule 不在 LinkNan/Nanhu 下时：跳过 RTL 源码阅读；降级到 profile §5 + 现有 test_point + 相似 case 检索；摘要里注明"未读 RTL 源码（环境缺失）"。
 
 ### 输出要求
 
