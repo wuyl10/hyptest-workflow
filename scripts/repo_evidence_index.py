@@ -13,6 +13,7 @@ from typing import Any
 
 from case_extractor import extract_cases
 from skill_config import resolve_path
+from workflow_paths import cache_file
 
 
 CACHE_VERSION = 1
@@ -30,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-cache", action="store_true", help="Rebuild without reading/writing the cache.")
     parser.add_argument(
         "--cache-dir",
-        help="Override cache directory. Default: <repo-root>/.hyptest_skill_cache",
+        help="Override cache directory. Default: <repo-root>/.hyptest_workflow_skill/cache",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     return parser.parse_args()
@@ -71,8 +72,9 @@ def source_fingerprint(repo_root: Path) -> dict[str, Any]:
 
 
 def cache_path(repo_root: Path, cache_dir_arg: str | None) -> Path:
-    root = resolve_path(cache_dir_arg) if cache_dir_arg else repo_root / ".hyptest_skill_cache"
-    return root / "repo_evidence_index.json"
+    if cache_dir_arg:
+        return resolve_path(cache_dir_arg) / "repo_evidence_index.json"
+    return cache_file(repo_root, "repo_evidence_index.json")
 
 
 def split_heading_sections(text: str) -> list[tuple[str, int, str]]:

@@ -265,6 +265,7 @@ def main() -> int:
     record("check_reason_codes", [sys.executable, "scripts/check_reason_codes.py"])
     record("eval_reason_code_suggestions", [sys.executable, "scripts/eval_reason_code_suggestions.py"])
     record("eval_check_case_lint", [sys.executable, "scripts/eval_check_case_lint.py"])
+    record("eval_check_case_uniqueness", [sys.executable, "scripts/eval_check_case_uniqueness.py"])
     record("eval_case_lint_baseline_diff", [sys.executable, "scripts/eval_case_lint_baseline_diff.py"])
     record("eval_workflow_task_prompts", [sys.executable, "scripts/eval_workflow_task_prompts.py"])
     record("eval_workflow_transcripts", [sys.executable, "scripts/eval_workflow_transcripts.py"])
@@ -282,6 +283,7 @@ def main() -> int:
     record("eval_hyptest_cli_contract", [sys.executable, "scripts/eval_hyptest_cli_contract.py"])
     record("eval_case_generation_contract", [sys.executable, "scripts/eval_case_generation_contract.py"])
     record("eval_workflow_smoke", [sys.executable, "scripts/eval_workflow_smoke.py"])
+    record("eval_workflow_paths_memory", [sys.executable, "scripts/eval_workflow_paths_memory.py"])
     record("eval_repo_evidence_index", [sys.executable, "scripts/eval_repo_evidence_index.py"])
     record("eval_case_pack_workflow", [sys.executable, "scripts/eval_case_pack_workflow.py"])
     record("eval_case_gate_pack", [sys.executable, "scripts/eval_case_gate_pack.py"])
@@ -295,6 +297,7 @@ def main() -> int:
     record("eval_case_workflow_ledger", [sys.executable, "scripts/eval_case_workflow_ledger.py"])
     record("eval_suggest_case_name", [sys.executable, "scripts/eval_suggest_case_name.py"])
     record("eval_case_timing_summary", [sys.executable, "scripts/eval_case_timing_summary.py"])
+    record("eval_workflow_timeline", [sys.executable, "scripts/eval_workflow_timeline.py"])
     record("doctor_skip_self", [sys.executable, "scripts/doctor.py", "--skip-self-check", "--strict"])
     record("list_skill_commands_markdown", [sys.executable, "scripts/list_skill_commands.py", "--markdown"])
     record("eval_listed_commands_help", [sys.executable, "scripts/eval_listed_commands_help.py"])
@@ -315,15 +318,6 @@ def main() -> int:
                 print("SKIP repo checks: --repo-root not provided")
             results.append({"name": "repo_checks", "ok": True, "skipped": True})
         else:
-            record(
-                "check_hyptest_repo_migration",
-                [
-                    sys.executable,
-                    "scripts/check_hyptest_repo_migration.py",
-                    "--repo-root",
-                    args.repo_root,
-                ],
-            )
             record(
                 "check_hyptest_cli_contract",
                 [

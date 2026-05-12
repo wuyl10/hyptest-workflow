@@ -30,7 +30,6 @@ STEP_CATEGORIES = {
     "check_resource_index": "skill_health",
     "check_hyptest_cli_contract": "repo_health",
     "check_get_result_log_contract": "repo_health",
-    "check_hyptest_repo_migration": "repo_health",
     "repo_snapshot": "repo_health",
     "check_env": "env_health",
     "check_case_lint": "case_health",
@@ -50,7 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--pre-submit",
         action="store_true",
-        help="Run the recommended repo pre-submit checks: repo migration, CLI contract, and lint baseline.",
+        help="Run the recommended repo pre-submit checks: CLI contract, log contract, snapshot, and lint baseline.",
     )
     parser.add_argument(
         "--strict",
@@ -62,11 +61,6 @@ def parse_args() -> argparse.Namespace:
         "--case-lint-baseline",
         action="store_true",
         help="Run check_case_lint.py with the bundled historical baseline and warnings-as-errors.",
-    )
-    parser.add_argument(
-        "--check-repo-migration",
-        action="store_true",
-        help="Also check hyptest repo for removed layout/platform/path logic.",
     )
     parser.add_argument("--skip-self-check", action="store_true", help="Skip self_check.py --quick.")
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
@@ -174,7 +168,7 @@ def main() -> int:
             )
         )
 
-    run_repo_contract = bool(args.repo_root and (args.check_repo_migration or args.pre_submit))
+    run_repo_contract = bool(args.repo_root and args.pre_submit)
     run_lint_baseline = bool(args.repo_root and (args.case_lint_baseline or args.pre_submit))
 
     if run_repo_contract:
@@ -195,17 +189,6 @@ def main() -> int:
                 [
                     sys.executable,
                     "scripts/check_get_result_log_contract.py",
-                    "--repo-root",
-                    str(Path(args.repo_root).expanduser()),
-                ],
-            )
-        )
-        steps.append(
-            run_step(
-                "check_hyptest_repo_migration",
-                [
-                    sys.executable,
-                    "scripts/check_hyptest_repo_migration.py",
                     "--repo-root",
                     str(Path(args.repo_root).expanduser()),
                 ],

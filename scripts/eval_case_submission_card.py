@@ -15,7 +15,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -97,7 +97,7 @@ def main() -> int:
                                     },
                                     "latest_logs": [
                                         {
-                                            "path": f"result_log/spike/{case_name}.log",
+                                            "path": f".tmp/result_log/spike/{case_name}.log",
                                             "summary": {
                                                 "has_pass": True,
                                                 "has_fail": False,

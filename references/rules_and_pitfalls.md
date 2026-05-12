@@ -1,6 +1,6 @@
 # HYPTEST 规则入口索引
 
-本文只作为兼容旧引用的索引，不再承载完整规则内容。人工写用例、判断 Spike 结果、处理 harness/API 问题时，请按下面入口读取。
+本文是规则入口索引。人工写用例、判断 Spike 结果、处理 harness/API 问题时，请按下面入口读取。
 
 ## 1. 规格与平台模型入口
 
@@ -46,11 +46,9 @@
 
 ## 4. 口径优先级
 
-冲突时按以下顺序裁决：
+仲裁顺序以 `SKILL.md` 的 `Source Priority` 为准，本文件不再维护副本以避免两处漂移。
 
-1. `test_point/Manual_Reference.md`
-2. `references/spec_and_model_limits.md`
-3. `references/spec_profiles/<spec_profile>.md`
-4. `references/quality_gate.md` + `references/tiering_decision.md` + `references/reason_code_catalog.md` + `references/submission_card.md`
-5. `references/writing_cases.md` + `references/framework_usage_pitfalls.md` + `references/build_run_debug.md`
-6. `test_point/CRITICAL_ISSUES_LOG.md`（历史问题库，主要用于线索，不直接覆盖当前门禁）
+补充说明（不在 SKILL.md 重复）：
+
+- Gate 在 spec_profile 之前，是为了让工作流优先走"跑一遍看结果"的闭环；Spike 跑通即按 default 落位。
+- 若后续 RTL 或其它平台（LinkNan / difftest）与 Spike 结果出现分歧，转 `hyptest-failure-triage` 反向定位，再回 profile 修分层。

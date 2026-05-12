@@ -23,6 +23,7 @@ from skill_config import (
     process_env_value,
     resolve_path,
 )
+from workflow_paths import cache_file
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -119,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--pack-cache-dir",
-        help="Override preflight pack cache directory. Default: <repo-root>/.hyptest_skill_cache/preflight_pack",
+        help="Override preflight pack cache directory. Default: <repo-root>/.hyptest_workflow_skill/cache/preflight_pack",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     parser.add_argument("--md-out", help="Write Markdown report to this path.")
@@ -410,7 +411,7 @@ def pack_cache_path(repo_root: Path, args: argparse.Namespace, fingerprint: dict
     cache_root = (
         Path(args.pack_cache_dir).expanduser().resolve()
         if args.pack_cache_dir
-        else repo_root / ".hyptest_skill_cache" / "preflight_pack"
+        else cache_file(repo_root, "preflight_pack")
     )
     digest = hashlib.sha256(
         json.dumps(fingerprint, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -675,8 +676,16 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend(["", "## Timing", ""])
     timing = report.get("timing", {})
     lines.append(f"- total_seconds: `{timing.get('total_seconds', '-')}`")
+    by_step = timing.get("by_step") or {}
+    if by_step:
+        lines.append("- by_step:")
+        for name, seconds in by_step.items():
+            lines.append(f"  - {name}: `{seconds}` seconds")
+    slowest = timing.get("slowest_steps", [])
+    if slowest:
+        lines.append("- slowest_steps:")
     for item in timing.get("slowest_steps", []):
-        lines.append(f"- {item['name']}: `{item['seconds']}` seconds")
+        lines.append(f"  - {item['name']}: `{item['seconds']}` seconds")
     cache = report.get("cache", {})
     if cache:
         lines.extend(["", "## Cache", ""])

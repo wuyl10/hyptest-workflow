@@ -86,7 +86,6 @@ def test_point_counts(root: Path) -> dict[str, object]:
 
 def generated_artifacts(root: Path) -> dict[str, object]:
     case_elf = root / "case_elf_asm"
-    legacy = root / ("individual" + "_tests")
     artifact_map = case_elf / "artifact_name_map.json"
     elf_count = len(list(case_elf.rglob("*.ELF"))) if case_elf.is_dir() else 0
     asm_count = len(list(case_elf.rglob("*.S"))) if case_elf.is_dir() else 0
@@ -95,12 +94,11 @@ def generated_artifacts(root: Path) -> dict[str, object]:
         "case_elf_asm_elf_count": elf_count,
         "case_elf_asm_asm_count": asm_count,
         "artifact_name_map_exists": artifact_map.is_file(),
-        "legacy_case_dir_exists": legacy.exists(),
     }
 
 
 def latest_result_logs(root: Path) -> list[str]:
-    base = root / "result_log"
+    base = root / ".tmp" / "result_log"
     if not base.is_dir():
         return []
     logs = sorted(base.rglob("*.log"), key=lambda path: path.stat().st_mtime, reverse=True)
@@ -167,8 +165,6 @@ def main() -> int:
             "case_elf_asm: "
             f"exists={gen['case_elf_asm_exists']} elf={gen['case_elf_asm_elf_count']} asm={gen['case_elf_asm_asm_count']}"
         )
-        if gen["legacy_case_dir_exists"]:
-            print("warning: legacy generated ELF/ASM path exists")
         if payload["latest_result_logs"]:
             print("latest logs:")
             for rel in payload["latest_result_logs"]:

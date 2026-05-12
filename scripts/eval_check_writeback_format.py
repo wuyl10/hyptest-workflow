@@ -49,7 +49,7 @@ def normalize_fixture_text(raw: str) -> str:
 
 
 def temp_parent() -> Path:
-    path = Path(__file__).resolve().parent.parent / ".hyptest_skill_tmp"
+    path = Path(__file__).resolve().parent.parent / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

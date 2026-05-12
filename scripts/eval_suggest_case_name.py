@@ -15,7 +15,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

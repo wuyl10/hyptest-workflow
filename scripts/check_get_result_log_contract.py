@@ -20,6 +20,7 @@ REQUIRED_SOURCE_TOKENS = [
     "missing_required",
     "found_forbidden",
     "untested_occurrences",
+    "status_counts",
 ]
 
 
@@ -56,6 +57,8 @@ def check_log(path: Path) -> list[str]:
     for token in ["pass", "fail", "timeout", "missing", "forbidden", "untested"]:
         if token not in lowered:
             issues.append(f"sample log missing summary token `{token}`")
+    if "status_counts:" not in lowered:
+        issues.append("sample log missing status_counts block")
     if not re.search(r"\b(PASSED|FAILED|timeout|missing_required|found_forbidden)\b", text):
         issues.append("sample log does not contain recognizable case result markers")
     return issues

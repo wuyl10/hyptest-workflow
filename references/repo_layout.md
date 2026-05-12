@@ -30,18 +30,31 @@ These directories are generated artifacts and should not drive source decisions:
 build/
 deploy/
 case_elf_asm/
-result_log/
-tmp/
-.hyptest_skill_cache/   skill-local helper cache; never use as source evidence
-.hyptest_skill_tmp/     skill-local eval/self-check temporary workspace
+.tmp/
+.hyptest_workflow_skill/
 ```
 
-`case_elf_asm/` is the only current per-case ELF/ASM export directory.
-Do not introduce the removed legacy name back into scripts or docs.
+`case_elf_asm/` stores per-case ELF/ASM exports.
 
-These helper directories are safe to delete at any time.
+`.hyptest_workflow_skill/` is the unified repo-local workflow state root:
 
-Use `python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME` to remove them.
+```text
+.hyptest_workflow_skill/cache/      rebuildable workflow indexes and preflight packs
+.hyptest_workflow_skill/reports/    saved preflight/gate/postcheck/submission/ledger reports
+.hyptest_workflow_skill/tmp/        temporary workflow helper files
+.hyptest_workflow_skill/memory/     append-only local lessons/failure records; review before deleting
+.tmp/hyptest_compile/                compile_elf.py register sources and compiler TMPDIR
+.tmp/result_log/                     get_result.py Spike/LinkNan run logs
+```
+
+Most helper state under `cache/`, `reports/`, and `tmp/` is safe to delete and
+rebuild. Treat `memory/` differently: it is local evidence for repeated failure
+patterns and fixes, so mark stale records `obsolete` instead of casually
+dropping them.
+
+Use `python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME` to remove
+workflow cache/report/tmp directories after confirming no useful logs need to
+be kept.
 
 ## Platform Names
 

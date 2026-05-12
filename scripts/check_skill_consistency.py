@@ -18,34 +18,31 @@ REQUIRED_GITIGNORE_PATTERNS = [
     "__pycache__/",
     "**/__pycache__/",
     "*.py[cod]",
-    ".hyptest_skill_cache/",
-    "**/.hyptest_skill_cache/",
-    ".hyptest_skill_tmp/",
-    "**/.hyptest_skill_tmp/",
+    ".hyptest_workflow_skill/",
+    "**/.hyptest_workflow_skill/",
 ]
 
-LEGACY_CASE_DIR = "individual" + "_tests"
-LEGACY_SPIKE_BIN_FIELD = "spike" + "_bin"
-LEGACY_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
-LEGACY_XIANGSHAN_PLAT = "--plat " + "xiangshan"
+NONCURRENT_CASE_DIR = "individual" + "_tests"
+NONCURRENT_SPIKE_BIN_FIELD = "spike" + "_bin"
+NONCURRENT_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
+NONCURRENT_XIANGSHAN_PLAT = "--plat " + "xiangshan"
 DEFAULT_PROFILE_LITERAL = "nhv5" + "_1_ap"
 PUBLIC_ENV_DOCS = [
     "README.md",
     "SKILL.md",
-    "references/prompt_recipes.md",
     "references/task_input_schema.md",
     "references/quick_execution.md",
     "references/repo_layout.md",
 ]
-REMOVED_PROMPT_ENV_TERMS = [
-    ("HYPTEST_REPO", "old repo environment variable"),
+CURRENT_PROMPT_ENV_FORBIDDEN_TERMS = [
+    ("HYPTEST_REPO", "repo environment variable"),
     ("HYPTEST_NANHU_HOME", "standalone Nanhu environment variable"),
     ("NANHU_HOME", "standalone Nanhu environment variable"),
-    ("ignored legacy", "legacy migration warning text"),
-    ("accepted for compatibility", "legacy prompt compatibility text"),
+    ("ignored legacy", "compatibility warning text"),
+    ("accepted for compatibility", "prompt compatibility text"),
 ]
 REMOVED_PROMPT_FIELD_PATTERNS = [
-    (re.compile(r"(?mi)^\s*(?:[-*]\s*)?repo_root\s*:"), "old prompt field `repo_root:`"),
+    (re.compile(r"(?mi)^\s*(?:[-*]\s*)?repo_root\s*:"), "prompt field `repo_root:`"),
     (re.compile(r"(?mi)^\s*(?:[-*]\s*)?SPIKE_BIN\s*:"), "bare prompt field `SPIKE_BIN:`"),
     (re.compile(r"(?mi)^\s*(?:[-*]\s*)?LINKNAN_HOME\s*:"), "bare prompt field `LINKNAN_HOME:`"),
     (re.compile(r"(?mi)^\s*(?:[-*]\s*)?DIFFTEST_REF_SO\s*:"), "bare prompt field `DIFFTEST_REF_SO:`"),
@@ -130,11 +127,10 @@ def main() -> int:
         issues.append("task input schema missing from README/SKILL entry points")
     if "<!-- BEGIN GENERATED COMMANDS -->" not in command_index_text:
         issues.append("command_index.md missing generated command block markers")
-    if LEGACY_CASE_DIR in "\n".join([skill_text, readme_text, repo_layout_text]):
-        issues.append(f"skill docs still mention removed legacy directory `{LEGACY_CASE_DIR}`")
+    if NONCURRENT_CASE_DIR in "\n".join([skill_text, readme_text, repo_layout_text]):
+        issues.append(f"skill docs still mention non-current artifact directory `{NONCURRENT_CASE_DIR}`")
     generic_docs = [
         "SKILL.md",
-        "README.md",
         "agents/openai.yaml",
         "references/spec_and_model_limits.md",
         "references/task_input_schema.md",
@@ -151,20 +147,19 @@ def main() -> int:
 
     for rel in PUBLIC_ENV_DOCS:
         text = read(root, rel)
-        for needle, label in REMOVED_PROMPT_ENV_TERMS:
+        for needle, label in CURRENT_PROMPT_ENV_FORBIDDEN_TERMS:
             if needle in text:
                 issues.append(f"public docs still mention {label}: `{needle}` in `{rel}`")
         for pattern, label in REMOVED_PROMPT_FIELD_PATTERNS:
             if pattern.search(text):
                 issues.append(f"public docs still contain {label} in `{rel}`")
 
-    prompt_recipes_text = read(root, "references/prompt_recipes.md")
-    profile_lines = re.findall(r"(?m)^\s*spec_profile:\s*(.+?)\s*$", prompt_recipes_text)
+    profile_lines = re.findall(r"(?m)^\s*spec_profile:\s*(.+?)\s*$", readme_text)
     concrete_default_lines = [line for line in profile_lines if line == DEFAULT_PROFILE_LITERAL]
     if len(concrete_default_lines) != 1:
         issues.append(
-            "prompt_recipes.md should keep exactly one concrete default profile example "
-            f"`spec_profile: {DEFAULT_PROFILE_LITERAL}`; reusable templates should use "
+            "README.md should keep exactly one concrete default profile example "
+            f"`spec_profile: {DEFAULT_PROFILE_LITERAL}`; other occurrences should use "
             "`spec_profile: <当前项目 spec_profile>`"
         )
 
@@ -173,10 +168,10 @@ def main() -> int:
             issues.append(f"repo_layout.md missing platform line `{platform}`")
 
     forbidden_patterns = [
-        (LEGACY_CASE_DIR, "removed legacy ELF/ASM directory"),
-        (LEGACY_SPIKE_BIN_FIELD, "old lowercase Spike binary field"),
-        (LEGACY_XIANGSHAN_PLATFORM, "old xiangshan platform value"),
-        (LEGACY_XIANGSHAN_PLAT, "old xiangshan plat value"),
+        (NONCURRENT_CASE_DIR, "non-current ELF/ASM artifact directory"),
+        (NONCURRENT_SPIKE_BIN_FIELD, "lowercase Spike binary field"),
+        (NONCURRENT_XIANGSHAN_PLATFORM, "xiangshan platform value"),
+        (NONCURRENT_XIANGSHAN_PLAT, "xiangshan plat value"),
     ]
     for needle, label in forbidden_patterns:
         haystack = "\n".join([skill_text, readme_text, repo_layout_text])

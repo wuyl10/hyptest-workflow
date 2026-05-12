@@ -44,7 +44,7 @@ def read_fixture(path: Path) -> List[Dict[str, object]]:
 
 
 def temp_parent() -> Path:
-    path = Path(__file__).resolve().parent.parent / ".hyptest_skill_tmp"
+    path = Path(__file__).resolve().parent.parent / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -24,16 +25,16 @@ TRIAGE_REQUIRED_TERMS = [
     "suspected RTL bug",
 ]
 
-LEGACY_CASE_DIR = "individual" + "_tests"
-LEGACY_SPIKE_BIN_FIELD = "spike" + "_bin"
-LEGACY_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
-LEGACY_XIANGSHAN_PLAT = "--plat " + "xiangshan"
+NONCURRENT_CASE_DIR = "individual" + "_tests"
+NONCURRENT_SPIKE_BIN_FIELD = "spike" + "_bin"
+NONCURRENT_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
+NONCURRENT_XIANGSHAN_PLAT = "--plat " + "xiangshan"
 
 FORBIDDEN_WORKFLOW_PATTERNS = [
-    (LEGACY_CASE_DIR, "removed legacy ELF/ASM directory"),
-    (LEGACY_SPIKE_BIN_FIELD, "old lowercase Spike binary field"),
-    (LEGACY_XIANGSHAN_PLATFORM, "old xiangshan platform value"),
-    (LEGACY_XIANGSHAN_PLAT, "old xiangshan plat value"),
+    (NONCURRENT_CASE_DIR, "non-current ELF/ASM artifact directory"),
+    (NONCURRENT_SPIKE_BIN_FIELD, "lowercase Spike binary field"),
+    (NONCURRENT_XIANGSHAN_PLATFORM, "xiangshan platform value"),
+    (NONCURRENT_XIANGSHAN_PLAT, "xiangshan plat value"),
 ]
 
 
@@ -122,8 +123,12 @@ def main() -> int:
         triage_layout = triage_repo_layout.read_text(encoding="utf-8", errors="ignore")
         if "case_elf_asm/" not in triage_layout:
             warnings.append("hyptest-failure-triage repo_layout.md should mention current case_elf_asm/")
-        if "legacy per-case ELF/ASM output" in triage_layout:
-            warnings.append("hyptest-failure-triage repo_layout.md still documents removed legacy ELF/ASM directory")
+        if ".tmp/hyptest_compile/" not in triage_layout:
+            issues.append("hyptest-failure-triage repo_layout.md missing current .tmp/hyptest_compile/")
+        if ".tmp/result_log/" not in triage_layout:
+            issues.append("hyptest-failure-triage repo_layout.md missing current .tmp/result_log/")
+        if re.search(r"(?m)^\s*result_log/\s*$", triage_layout):
+            issues.append("hyptest-failure-triage repo_layout.md still lists removed root result_log/")
 
     payload = {
         "ok": not issues,

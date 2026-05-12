@@ -2,6 +2,21 @@
 
 本文给维护 `hyptest-workflow` skill 时使用。它不是 agent 执行规则入口；执行规则仍从 `SKILL.md` 开始。
 
+## Table of Contents
+
+- [修改原则](#修改原则)
+- [新增或修改 Profile](#新增或修改-profile) — `new_spec_profile.py` + registry 登记
+- [新增脚本](#新增脚本) — script_manifest + resource_index 流程
+- [修改相似检索](#修改相似检索) — case_extractor / similar_case_* 模块
+- [修改 Reason Code](#修改-reason-code) — catalog 与 JSON 同步
+- [修改 Case Lint 或 Writeback Checker](#修改-case-lint-或-writeback-checker)
+- [修改 Preflight/Postcheck Pack](#修改-preflightpostcheck-pack) — 维护原则与边界
+- [Generated Cleanup](#generated-cleanup) — 清理 workflow 生成物
+- [Cross-Skill Consistency](#cross-skill-consistency) — workflow↔failure-triage 一致性
+- [推荐自检顺序](#推荐自检顺序) — `self_check --quick/--repo/--full` / `doctor`
+- [修改 README 命令块](#修改-readme-命令块) — `update_readme_commands`
+- [修改任务参数或失败日志规则](#修改任务参数或失败日志规则)
+
 ## 修改原则
 
 - 通用流程放 `SKILL.md` 或通用 `references/*.md`。
@@ -72,7 +87,7 @@ python3 scripts/self_check.py --quick --spec-profile <spec_profile>
 - `scripts/markdown_sections.py`：Markdown heading section split/filter/index 选择。
 - `scripts/similar_case_ranker.py`：相似度排序、多样性选择、retrieval assessment。
 - `scripts/similar_case_render.py`：snippet、match note、reading pack。
-- `scripts/similar_case_core.py`：兼容旧 import 的 re-export，不继续堆新逻辑。
+- `scripts/similar_case_core.py`：re-export 模块；新逻辑不要继续堆到这里。
 
 修改后至少跑：
 
@@ -182,14 +197,14 @@ python3 scripts/case_batch_gate_pack.py \
   --json
 
 python3 scripts/make_case_submission_card.py \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
-  --gate-json .hyptest_skill_reports/case_gate.json \
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
+  --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
   --emit-final-draft \
   --json
 
 python3 scripts/suggest_case_name.py \
   --repo-root $HYPTEST_HOME \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --prefix ai_micro \
   --json
 
@@ -203,14 +218,14 @@ python3 scripts/case_multi_platform_gate_pack.py \
   --json
 
 python3 scripts/case_timing_summary.py \
-  --reports '.hyptest_skill_reports/*.json' \
+  --reports '$HYPTEST_HOME/.hyptest_workflow_skill/reports/*.json' \
   --json
 
 python3 scripts/case_workflow_ledger.py \
   --case <case_name> \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
-  --gate-json .hyptest_skill_reports/case_gate.json \
-  --submission-json .hyptest_skill_reports/submission_card.json \
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
+  --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
+  --submission-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.json \
   --json
 ```
 
@@ -235,20 +250,9 @@ python3 scripts/case_workflow_ledger.py \
 - 三个 pack 脚本都应保留 `timing.total_seconds` 和 `timing.by_step`，便于长期观察耗时瓶颈。
 - 新增输出字段时，同步 README 命令清单、resource index 和公共指南中的提速章节。
 
-## Repo Migration Checks
-
-目录、平台名或生成物命名变更后，检查真实 hyptest 仓库是否还残留旧逻辑：
-
-```bash
-python3 scripts/check_hyptest_repo_migration.py --repo-root $HYPTEST_HOME
-python3 scripts/doctor.py --repo-root $HYPTEST_HOME --check-repo-migration --skip-self-check
-```
-
-这个检查只用于重构回归。正常规则入口仍是 `references/repo_layout.md`。
-
 ## Generated Cleanup
 
-skill eval 和自检产生的中间文件放在 skill root 下的 `.hyptest_skill_tmp/` / `.hyptest_skill_cache/`。
+skill eval、自检和真实 hyptest 仓库的新 workflow 生成物都默认放在对应根目录下的 `.hyptest_workflow_skill/`。
 
 验证结束后跑：
 
@@ -273,8 +277,10 @@ python3 scripts/eval_joint_handoff.py
 
 ```text
 references/triage_handoff_schema.md
-/nfs/home/wuyuanlong/.agents/skills/hyptest-failure-triage/SKILL.md
+<agents-skills-root>/hyptest-failure-triage/SKILL.md
 ```
+
+`<agents-skills-root>` 是 skill 安装根目录，具体路径因机器而异；不要在 skill 文档里写死个人 `/nfs/...` 绝对路径。
 
 ## 推荐自检顺序
 
@@ -302,7 +308,7 @@ python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain 
 
 ```bash
 python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile>
-python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md
+python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.md
 ```
 
 综合健康检查：
@@ -334,3 +340,26 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
 python3 scripts/classify_failure_log.py --log-file <log> --json
 python3 scripts/eval_failure_log_workflow.py
 ```
+
+## 修改触发条件或核心规则时跑 skill-creator Evals
+
+`evals/evals.json` 是 skill 整体的端到端 prompt eval 集（和 `scripts/eval_*.py` 测脚本不同）。以下情况应该跑一次 benchmark：
+
+- 改动 `SKILL.md` 的 `description`（触发边界）
+- 改动 Non-Negotiables 的硬规则（尤其是 Workflow 步骤增删）
+- 新增或移除 `scripts/` 下被 Workflow 默认调用的脚本
+- 准备把 skill 发给其他团队/用户
+
+操作（skill-creator 手册 §"Running and evaluating test cases"）：
+
+1. 对每个 eval spawn 两个 subagent（with-skill / without-skill）
+2. 输出保存到 `../hyptest-workflow-workspace/iteration-N/eval-<id>/{with_skill,without_skill}/outputs/`
+3. 跑 grader → `grading.json`（每条 expectation 评 passed/evidence）
+4. `aggregate_benchmark` 聚合成 `benchmark.json`
+5. `eval-viewer/generate_review.py` 打开对比
+
+更新 `evals/evals.json` 时需要保持：
+
+- `id` 唯一递增
+- expectations 里的宏名（`CAUSE_*` / `TEST_*` / `TEST_REGISTER`）、路径（`test_point/*`、`ai_test_cases/*.c`、`references/spec_profiles/*`）和 skill 当前实际一致
+- 引用的 spec_profile 应和 `references/spec_profiles/index.json` 的 `default_profile` 一致

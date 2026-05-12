@@ -39,6 +39,8 @@ SECTION_IMPLEMENTED = "已实现 case："
 SECTION_REUSE = "复用依据"
 SECTION_ORDER = "顺序一致性："
 SECTION_ASSERT = "断言一致性："
+SECTION_KEY_VAR = "关键变量一致性："
+SECTION_COVERAGE = "覆盖粒度一致性："
 
 DISALLOWED_MARKERS = [
     "workflow 回填",
@@ -297,6 +299,18 @@ def validate_entry(
             issues.append(f"{title}: 出现 `复用依据` 时缺少 `{SECTION_ORDER}`")
         if find_section_index(block[reuse_index:], SECTION_ASSERT) is None:
             issues.append(f"{title}: 出现 `复用依据` 时缺少 `{SECTION_ASSERT}`")
+        if find_section_index(block[reuse_index:], SECTION_KEY_VAR) is None:
+            warnings.append({
+                "entry": title,
+                "message": f"{title}: 出现 `复用依据` 时缺少 `{SECTION_KEY_VAR}`（建议补足四行：顺序/断言/关键变量/覆盖粒度一致性）",
+                "warning_code": "reuse_missing_key_var",
+            })
+        if find_section_index(block[reuse_index:], SECTION_COVERAGE) is None:
+            warnings.append({
+                "entry": title,
+                "message": f"{title}: 出现 `复用依据` 时缺少 `{SECTION_COVERAGE}`（建议补足四行：顺序/断言/关键变量/覆盖粒度一致性）",
+                "warning_code": "reuse_missing_coverage",
+            })
 
     if PROFILE_NONGATE_RE.search(block_text):
         implemented_lines = (

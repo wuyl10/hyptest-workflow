@@ -1,9 +1,5 @@
 __pycache__/
 **/__pycache__/
 *.py[cod]
-.hyptest_skill_cache/
-**/.hyptest_skill_cache/
-.hyptest_skill_tmp/
-**/.hyptest_skill_tmp/
-.hyptest_skill_reports/
-**/.hyptest_skill_reports/
+.hyptest_workflow_skill/
+**/.hyptest_workflow_skill/

@@ -11,12 +11,12 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_ROOT = SCRIPT_DIR.parent
-LEGACY_CASE_DIR = "individual" + "_tests"
-LEGACY_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
+NONCURRENT_CASE_DIR = "individual" + "_tests"
+NONCURRENT_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -42,8 +42,12 @@ def main() -> int:
         good = tmp / "good"
         write(
             good / "compile_elf.py",
-            'OUTPUT_DIR = Path("case_elf_asm")\n'
+            'REPO_ROOT = Path(__file__).resolve().parent\n'
+            'OUTPUT_DIR = REPO_ROOT / "case_elf_asm"\n'
+            'DEFAULT_TMP_ROOT = REPO_ROOT / ".tmp" / "hyptest_compile"\n'
+            'TEST_REGISTER_RE = r"\\s*(?://.*)?$"\n'
             'parser.add_argument("--plat")\n'
+            'parser.add_argument("--cross-compile")\n'
             'VALID_PLATS = ["spike", "nemu", "linknan"]\n'
             'ARTIFACT_MAP_FILE = "artifact_name_map.json"\n',
         )
@@ -52,6 +56,8 @@ def main() -> int:
             'PLATFORMS = ("spike", "linknan")\n'
             'parser.add_argument(\n        "--platform"\n)\n'
             'DEFAULT_ELF_DIRS = {"spike": REPO_ROOT / "case_elf_asm" / "spike"}\n'
+            'DEFAULT_LOG_DIRS = {"spike": REPO_ROOT / ".tmp" / "result_log" / "spike"}\n'
+            'TEST_REGISTER_RE = r"\\s*(?://.*)?$"\n'
             'ARTIFACT_MAP_FILE = "artifact_name_map.json"\n'
             'cmd = "${SPIKE_BIN:?set SPIKE_BIN to the spike executable}"\n'
             'cmd += "${LINKNAN_HOME:?set LINKNAN_HOME to the LinkNan repository root}"\n'
@@ -65,21 +71,21 @@ def main() -> int:
         bad = tmp / "bad"
         write(
             bad / "compile_elf.py",
-            f'OUTPUT_DIR = Path("{LEGACY_CASE_DIR}")\n'
+            f'OUTPUT_DIR = Path("{NONCURRENT_CASE_DIR}")\n'
             'parser.add_argument("--plat")\n',
         )
         write(
             bad / "get_result.py",
             'PLATFORMS = ("spike", "xiangshan")\n'
-            f"# {LEGACY_XIANGSHAN_PLATFORM}\n"
+            f"# {NONCURRENT_XIANGSHAN_PLATFORM}\n"
             'SPIKE_BIN = "/nfs/home/user/spike"\n',
         )
         write(bad / "test_register.c", "TEST_REGISTER(ai_bad);\n")
         bad_result = run(bad)
         if bad_result.returncode == 0:
             failures.append("bad fixture should fail")
-        if LEGACY_CASE_DIR not in bad_result.stdout or "xiangshan" not in bad_result.stdout:
-            failures.append("bad fixture should report legacy directory and platform")
+        if NONCURRENT_CASE_DIR not in bad_result.stdout or "xiangshan" not in bad_result.stdout:
+            failures.append("bad fixture should report non-current directory and platform")
 
     if failures:
         print("FAIL hyptest CLI contract eval")

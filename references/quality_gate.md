@@ -72,7 +72,7 @@
 
 证据：
 
-- 非 `compile-only`：`get_result.py --case <case>` 输出 + 对应 `result_log/spike/*.log`
+- 非 `compile-only`：`get_result.py --case <case>` 输出 + 对应 `.tmp/result_log/spike/*.log`
 - `compile-only`：Gate D=`N/A` 说明（含不运行原因）+ 分层依据/原因码
 
 失败处理：
@@ -116,7 +116,7 @@
 - 若改写/新增了测试点正文，已按“标题 + 双模板”组织：
   - 默认模板：`测试点 / 构建场景 / 已实现 case`
   - RTL/源码排查模板：`测试点 / 怀疑点 / 对应场景 / 已实现 case`
-- 若本轮未新增 case 而复用了已有 case，已按固定两行字段提供“复用依据”：`顺序一致性`、`断言一致性`
+- 若本轮未新增 case 而复用了已有 case，已按固定四行字段提供"复用依据"：`顺序一致性`、`断言一致性`、`关键变量一致性`、`覆盖粒度一致性`。任一行差异非"无"视为未覆盖。
 - 特殊约束（PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界）已标注
 - `已实现 case` 默认只写 `case_name`；仅在必要时追加短状态说明，如 `（default，已启用）`、`（已注释，manual）`、`（compile-only，未跑Spike）`
 - 没有在 `test_point` 里追加 `## ...workflow 回填`、`[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等审计式后半段块

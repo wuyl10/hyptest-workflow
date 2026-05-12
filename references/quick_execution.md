@@ -2,6 +2,20 @@
 
 本文是加速执行入口，不是规则简化版。所有质量判定仍以 `references/spec_and_model_limits.md`、当前 `references/spec_profiles/<spec_profile>.md`、`references/writing_cases.md`、`references/framework_usage_pitfalls.md`、`references/build_run_debug.md` 为准。
 
+## Table of Contents
+
+- [0. 使用原则](#0-使用原则) — Gate-0..7 对照、提速边界
+- [1. 输入锁定（Gate-0）](#1-输入锁定gate-0) — 输入清单、preflight pack 聚合入口
+- [2. 用例落地（Gate-1）](#2-用例落地gate-1) — 相似检索、skeleton、命名建议、uniqueness
+- [3. 单点编译（Gate-2）](#3-单点编译gate-2)
+- [4. 单点运行（Gate-3）](#4-单点运行gate-3) — `compile-only` 特例
+- [5. 语义裁决（Gate-4）](#5-语义裁决gate-4) — profile + `spike_gate_applicable`
+- [6. 分层落位（Gate-5）](#6-分层落位gate-5) — default/manual/compile-only 判定
+- [7. 回填闭环（Gate-6）](#7-回填闭环gate-6) — 映射回填 + `check_writeback_format`
+- [8. 证据交付（Gate-7）](#8-证据交付gate-7) — submission card、multi-platform gate、timing、ledger
+- [快速执行不降质的三条红线](#快速执行不降质的三条红线)
+- [一条命令的最短闭环](#一条命令的最短闭环仅在已满足-gate-01-时) — `compile_elf && get_result`
+
 ## 0. 使用原则
 
 - 目标：减少路径切换成本，不减少质量检查项。
@@ -25,8 +39,8 @@ Gate 对照（便于与 `references/quality_gate.md` 对齐）：
 
 必须先明确：
 
-- 仓库来源（https://github.com/wuyl10/riscv-hyp-tests-nhv5.git）
-- 当前分支（`nhv5.1`）
+- 仓库来源（`$HYPTEST_HOME` 指向的 `riscv-hyp-tests` fork）
+- 当前分支（以团队约定为准，常见 `nhv5.1`）
 - 测试点文件与条目
 - case 名
 - 平台（通常 `spike`）
@@ -52,7 +66,7 @@ git branch --show-current
 更快的聚合入口：
 
 ```bash
-cd /nfs/home/wuyuanlong/.agents/skills/hyptest-workflow
+cd $HYPTEST_SKILL_HOME
 python3 scripts/case_preflight_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
@@ -61,8 +75,8 @@ python3 scripts/case_preflight_pack.py \
   --task-mode new-case-only \
   --new-case-count 1 \
   --query '<scenario terms>' \
-  --md-out .hyptest_skill_reports/case_preflight.md \
-  --json-out .hyptest_skill_reports/case_preflight.json
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.md \
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json
 ```
 
 说明：
@@ -82,9 +96,10 @@ python3 scripts/case_preflight_pack.py \
 1. 先按 `references/spec_and_model_limits.md` 选择规格/平台口径（`spec_profile`，未指定时默认 profile registry 的 `default_profile`），并按 `references/spec_profiles/<spec_profile>.md` 确认规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
 2. 再检索 2~5 个相似存量 case，优先复用已有写法中的结构、断言和环境构造。
    如果测试点描述较长、分支较多，优先让脚本先生成 reading pack，再由模型抽象哪些结构值得学、哪些不能照搬。
-3. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
-4. 在合适的 case 目录写或改 case：AI/批量生成 case 默认放 `ai_test_cases/`，人工维护 case 放 `manual_test_cases/<module>/`。
-5. 按 `references/framework_usage_pitfalls.md` 复核 `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册和工具使用风险。
+3. 命名确定后，先做精确唯一性检查；新增 case 用 `--expect absent`，不要等写完后才第一次发现撞名。
+4. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
+5. 在合适的 case 目录写或改 case：AI/批量生成 case 默认放 `ai_test_cases/`，人工维护 case 放 `manual_test_cases/<module>/`。
+6. 按 `references/framework_usage_pitfalls.md` 复核 `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册和工具使用风险。
 
 建议命令：
 
@@ -123,7 +138,7 @@ python3 scripts/repo_evidence_index.py \
 ```bash
 python3 scripts/make_case_skeleton.py \
   --case <case_name> \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --test-point-id <PnX>
 ```
 
@@ -134,12 +149,24 @@ python3 scripts/make_case_skeleton.py \
 ```bash
 python3 scripts/suggest_case_name.py \
   --repo-root $HYPTEST_HOME \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --prefix ai_micro \
   --json
 ```
 
 该脚本只建议 case 名，并检查全仓精确同名和相似名称；最终命名仍需结合测试点语义和相似 case 检索结果确认。
+
+命名确定后做快速唯一性检查：
+
+```bash
+python3 scripts/check_case_uniqueness.py \
+  --repo-root $HYPTEST_HOME \
+  --case <case_name> \
+  --expect absent \
+  --json
+```
+
+该检查复用 `repo_evidence_index.py` 缓存，适合放在写 case 之前；写完后 `case_postcheck_pack.py` 仍会复核 `definition_unique=true`。
 
 通过标准：
 
@@ -172,17 +199,17 @@ python3 compile_elf.py --plat spike --name <case_name>
 如果希望把 Gate-2、Gate-3 和证据收口压成一个命令，可在写完 case、注册和回填后执行：
 
 ```bash
-cd /nfs/home/wuyuanlong/.agents/skills/hyptest-workflow
+cd $HYPTEST_SKILL_HOME
 python3 scripts/case_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
   --spec-profile <spec_profile> \
-  --md-out .hyptest_skill_reports/case_gate.md \
-  --json-out .hyptest_skill_reports/case_gate.json \
-  --postcheck-md-out .hyptest_skill_reports/case_postcheck.md \
-  --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.md \
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
+  --postcheck-md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.md \
+  --postcheck-json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.json
 ```
 
 该命令只聚合执行和证据，不替代 profile/tiering 规则裁决。它的 PASS 还要求 postcheck 能看到目标 ELF；非 `--compile-only` / 非 `--skip-run` 时，还要求能看到目标 case 的最新运行日志。
@@ -305,27 +332,27 @@ python3 scripts/check_writeback_format.py \
 提交前动作：
 
 ```bash
-cd /nfs/home/wuyuanlong/.agents/skills/hyptest-workflow
+cd $HYPTEST_SKILL_HOME
 python3 scripts/case_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
   --platform spike \
   --spec-profile <spec_profile> \
-  --md-out .hyptest_skill_reports/case_gate.md \
-  --json-out .hyptest_skill_reports/case_gate.json \
-  --postcheck-md-out .hyptest_skill_reports/case_postcheck.md \
-  --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.md \
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
+  --postcheck-md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.md \
+  --postcheck-json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.json
 ```
 
 - 可继续生成证据卡片，减少最终摘要整理时间：
 
 ```bash
 python3 scripts/make_case_submission_card.py \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
-  --gate-json .hyptest_skill_reports/case_gate.json \
-  --json-out .hyptest_skill_reports/submission_card.json \
-  --md-out .hyptest_skill_reports/submission_card.md
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
+  --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.json \
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.md
 ```
 
 证据卡片只汇总 preflight/gate/postcheck 证据，不做分层裁决。
@@ -340,8 +367,8 @@ python3 scripts/case_batch_gate_pack.py \
   --case <case2> \
   --platform spike \
   --spec-profile <spec_profile> \
-  --json-out .hyptest_skill_reports/case_batch_gate.json \
-  --md-out .hyptest_skill_reports/case_batch_gate.md
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_batch_gate.json \
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_batch_gate.md
 ```
 
 批量 gate 默认串行执行，避免共享 build/result 目录互相踩踏；只有确认目标仓库产物隔离时才显式加 `--parallel`。批量报告不把多个 case 合并为一个分层结论。
@@ -350,11 +377,11 @@ python3 scripts/case_batch_gate_pack.py \
 
 ```bash
 python3 scripts/make_case_submission_card.py \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
-  --gate-json .hyptest_skill_reports/case_gate.json \
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
+  --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
   --emit-final-draft \
-  --json-out .hyptest_skill_reports/submission_card.json \
-  --md-out .hyptest_skill_reports/submission_card.md
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.json \
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.md
 ```
 
 交付草稿只整理“新增 case、唯一性证据、编译/运行、日志和回填”字段，`decision_final` 仍必须由 workflow 根据 profile、Spike gate 和日志证据填写。
@@ -369,8 +396,8 @@ python3 scripts/case_multi_platform_gate_pack.py \
   --platform spike \
   --platform linknan \
   --spec-profile <spec_profile> \
-  --json-out .hyptest_skill_reports/case_multi_platform_gate.json \
-  --md-out .hyptest_skill_reports/case_multi_platform_gate.md
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_multi_platform_gate.json \
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_multi_platform_gate.md
 ```
 
 多平台 gate 只是并行收集每个平台的证据，不把平台结果合并成最终分层。
@@ -379,9 +406,9 @@ python3 scripts/case_multi_platform_gate_pack.py \
 
 ```bash
 python3 scripts/case_timing_summary.py \
-  --reports '.hyptest_skill_reports/*.json' \
-  --json-out .hyptest_skill_reports/timing_summary.json \
-  --md-out .hyptest_skill_reports/timing_summary.md
+  --reports '$HYPTEST_HOME/.hyptest_workflow_skill/reports/*.json' \
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/timing_summary.json \
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/timing_summary.md
 ```
 
 timing summary 只用于观察 compile/run/postcheck/cache hit 等耗时，不是质量门禁。
@@ -391,11 +418,11 @@ timing summary 只用于观察 compile/run/postcheck/cache hit 等耗时，不�
 ```bash
 python3 scripts/case_workflow_ledger.py \
   --case <case_name> \
-  --preflight-json .hyptest_skill_reports/case_preflight.json \
-  --gate-json .hyptest_skill_reports/case_gate.json \
-  --submission-json .hyptest_skill_reports/submission_card.json \
-  --json-out .hyptest_skill_reports/workflow_ledger.json \
-  --md-out .hyptest_skill_reports/workflow_ledger.md
+  --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
+  --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
+  --submission-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.json \
+  --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/workflow_ledger.json \
+  --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/workflow_ledger.md
 ```
 
 ledger 只用于观察 preflight、编辑、compile、run、postcheck、提交整理中的耗时和返工信号，不参与分层裁决。

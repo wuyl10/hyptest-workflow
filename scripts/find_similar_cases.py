@@ -134,7 +134,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--cache-dir",
-        help="Override the case extraction cache directory. Default: <repo-root>/.hyptest_skill_cache",
+        help="Override the case extraction cache directory. Default: <repo-root>/.hyptest_workflow_skill/cache",
     )
     parser.add_argument(
         "--show-snippet",

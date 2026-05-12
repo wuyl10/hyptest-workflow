@@ -19,7 +19,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -326,7 +326,7 @@ def main() -> int:
                 failures.append("process HYPTEST_HOME should map to normalized repo_root")
             if normalized.get("repo_root_source") != "HYPTEST_HOME":
                 failures.append("repo_root_source should record process HYPTEST_HOME fallback")
-        legacy_env_md = run(
+        bare_spike_env_md = run(
             "--request-md",
             str(env_fallback_request_md),
             "--json",
@@ -335,16 +335,13 @@ def main() -> int:
                 "SPIKE_BIN": str(spike),
             },
         )
-        if legacy_env_md.returncode == 0:
+        if bare_spike_env_md.returncode == 0:
             failures.append("request-md should not accept bare SPIKE_BIN as HYPTEST_SPIKE_BIN")
         else:
-            legacy_payload = json.loads(legacy_env_md.stdout)
-            issues = "\n".join(legacy_payload.get("issues", []))
-            warnings = "\n".join(legacy_payload.get("warnings", []))
+            bare_spike_payload = json.loads(bare_spike_env_md.stdout)
+            issues = "\n".join(bare_spike_payload.get("issues", []))
             if "requires HYPTEST_SPIKE_BIN" not in issues:
                 failures.append("bare SPIKE_BIN should fail with a missing HYPTEST_SPIKE_BIN issue")
-            if "ignored legacy" in warnings:
-                failures.append("bare SPIKE_BIN should not produce legacy migration warnings")
         alias_md = run("--request-md", str(alias_request_md), "--json")
         if alias_md.returncode != 0:
             failures.append("request-md fixture with HYPTEST_HOME and HYPTEST_* fields should pass")
@@ -390,11 +387,8 @@ def main() -> int:
         else:
             old_repo_payload = json.loads(old_repo_env.stdout)
             issues = "\n".join(old_repo_payload.get("issues", []))
-            warnings = "\n".join(old_repo_payload.get("warnings", []))
             if "HYPTEST_HOME is required" not in issues:
                 failures.append("process HYPTEST_REPO should fail with a missing HYPTEST_HOME issue")
-            if "ignored legacy" in warnings:
-                failures.append("process HYPTEST_REPO should not produce legacy warnings")
         preflight_only = run("--request-md", str(preflight_only_md), "--json")
         if preflight_only.returncode != 0:
             failures.append("preflight-only fixture should pass without case_name or HYPTEST_SPIKE_BIN")

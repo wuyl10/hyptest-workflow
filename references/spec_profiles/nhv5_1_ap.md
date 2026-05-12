@@ -279,7 +279,7 @@ MMIO responder matrix：
 - CBO 的内部 line 状态、cache side effect、refill image、以及无 A/D 权限时的实现分类差异，不作为 official Spike default gate。
 - replay queue、sbuffer、uncache buffer、MSHR、ROB head、response-context binding。
 - PMA/PBMT/MMIO/cacheability routing 和平台 responder 行为。
-- LR/SC reservation timeout 或实现特定 reservation 策略。
+- LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
 - project/custom CSR、custom instruction、NMI/double trap 等非本轮 NHV5.1AP 验证范围或 official Spike 不支持的路径。
 
 Spike 结果使用口径：
@@ -287,6 +287,15 @@ Spike 结果使用口径：
 - 普通 cacheable DRAM、ISA 可见、无平台私有依赖的 case，可以用 Spike 做 default gate。
 - Spike fail 但场景属于上述模型边界时，先标 `manual` / `compile-only` / `blocked`；涉及 TLB/cache 一致性或访问 PMA CSR 的 case 直接按 RTL-only/LinkNan 仿真路径处理，不要直接改弱断言。
 - Spike pass 也不证明 PMA/PBMT/MMIO/cache/TLB 微架构路径正确；这类仍需要 LinkNan/RTL/波形证据。
+
+### 5.1 LR/SC 同 PA 不同 VA 口径
+
+同 PA 不同 VA 的 LR/SC case 需要显式写清 VA alias、PA、访问宽度、地址偏移、reservation 时间窗口和 DCache 命中状态。NHV5.1AP 当前口径如下：
+
+- 若 LR 和 SC 映射到同一 PA，访问宽度一致，访问的字节范围/地址一致，地址自然对齐，reservation 未超时，且 SC 路径不是 DCache miss，则 SC 可以成功。
+- 若同 PA 不同 VA 但 VA 的 set index 不同，或者前面没有预热对应 alias 导致 SC 访问成为 DCache miss，即使宽度一致、PA/地址一致、reservation 未超时，SC 也按失败处理。
+- 因此同 PA 不同 VA 的 LR/SC 成功断言必须同时保证 cache residency / set index / 预热条件；若 case 故意构造不同 set index、未预热 alias、miss/refill/replay、TLB/cache stale 等场景，不应断言 SC 必然成功。
+- 这类规则依赖 LinkNan DCache/TLB/reservation 实现状态，不适合作为 official Spike default gate；默认走 RTL-only/LinkNan difftest 或 manual 分层。
 
 ## 6. 非对齐与异常优先级
 
@@ -316,7 +325,7 @@ Spike 结果使用口径：
 - PMA/PBMT/MMIO/cacheability。
 - TLB/cache 一致性、访问 PMA CSR、CBO/refill/replay/sbuffer/MSHR。
 - PMP sub-4KB 精度假设。
-- LR/SC reservation timeout。
+- LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件。
 - custom CSR/instruction、NMI/double trap 等 official Spike 或本轮项目范围不支持的路径。
 
 ## 8. Spike 不一致时的 NHV5.1AP 处理流程
@@ -338,6 +347,6 @@ Spike 结果使用口径：
 - TLB/cache 一致性、stale translation、cache residency、dirty line preservation、refill image：优先 `D-MANUAL-NONGATE`，走 RTL-only/LinkNan 证据，不走 official Spike gate。
 - 访问 `PMAADDR*` / `PMACFG*` 等 PMA CSR：优先 `D-MANUAL-NONGATE` 或 `compile-only`，因为本版本 official Spike 没有 PMA CSR 模型。
 - PMA/PBMT/MMIO/cacheability routing、Device responder 行为：优先 `D-MANUAL-NONGATE`；若当前 testbench 没有 responder 或访问会无返回，则 `blocked`。
-- LR/SC reservation timeout 或实现特定 reservation 策略：优先 `D-MANUAL-NONGATE`。
+- LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件、或其它实现特定 reservation 策略：优先 `D-MANUAL-NONGATE`。
 - NMI / double trap：本轮 NHV5.1AP 常规验证范围外，默认不进入常规 default gate。
 - project/custom CSR 或 custom instruction 且 official Spike 不支持：先按 official Spike model gap 归因；是否保留为 manual/compile-only 取决于测试点/项目需求。

@@ -19,7 +19,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -105,7 +105,7 @@ def main() -> int:
             "from pathlib import Path\n"
             "assert os.environ.get('SPIKE_BIN'), 'SPIKE_BIN runtime mapping missing'\n"
             "p=argparse.ArgumentParser(); p.add_argument('--platform', default='spike'); p.add_argument('--case', required=True); a=p.parse_args()\n"
-            "out=Path('result_log')/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
+            "out=Path('.tmp')/'result_log'/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
             "(out/(a.case+'_smoke.log')).write_text('PASSED\\nHIT GOOD TRAP\\n')\n"
             "print('PASSED', a.case)\n",
         )
@@ -382,7 +382,7 @@ def main() -> int:
             "from pathlib import Path\n"
             "assert os.environ.get('SPIKE_BIN'), 'SPIKE_BIN runtime mapping missing'\n"
             "p=argparse.ArgumentParser(); p.add_argument('--platform', default='spike'); p.add_argument('--case', required=True); a=p.parse_args()\n"
-            "out=Path('result_log')/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
+            "out=Path('.tmp')/'result_log'/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
             "(out/(a.case+'_failed.log')).write_text('FAILED\\nassert_site=smoke assert_expr=0\\n')\n"
             "print('FAILED', a.case)\n"
             "sys.exit(1)\n",

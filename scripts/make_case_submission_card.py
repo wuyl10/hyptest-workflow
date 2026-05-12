@@ -238,6 +238,14 @@ def render_markdown(card: dict[str, Any]) -> str:
     cache = preflight.get("cache") or {}
     if cache:
         lines.append(f"- cache_hit: `{cache.get('hit')}`")
+    timing = preflight.get("timing") or {}
+    if timing:
+        lines.append(f"- timing.total_seconds: `{timing.get('total_seconds')}`")
+        by_step = timing.get("by_step") or {}
+        if by_step:
+            lines.append("- timing.by_step:")
+            for name, seconds in by_step.items():
+                lines.append(f"  - {name}: `{seconds}` seconds")
     lines.append(f"- retrieval_status: `{preflight.get('retrieval_status')}`")
     similar = preflight.get("similar_cases") or []
     if similar:
@@ -268,6 +276,11 @@ def render_markdown(card: dict[str, Any]) -> str:
     timing = gate.get("timing") or {}
     if timing:
         lines.append(f"- timing.total_seconds: `{timing.get('total_seconds')}`")
+        by_step = timing.get("by_step") or {}
+        if by_step:
+            lines.append("- timing.by_step:")
+            for name, seconds in by_step.items():
+                lines.append(f"  - {name}: `{seconds}` seconds")
 
     lines.extend(["", "## Postcheck", ""])
     postcheck = card.get("postcheck", {})

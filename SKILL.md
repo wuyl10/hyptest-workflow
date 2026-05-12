@@ -1,106 +1,15 @@
 ---
 name: hyptest-workflow
-description: 用于 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库（nhv5.1 分支目录）的 hyptest 测试点到用例落地工作流。凡是涉及新增/修改 ai_test_cases 或 manual_test_cases 用例、更新 test_register.c、根据 test_point 回填映射、执行 compile_elf.py 和 get_result.py 编译批跑、分析 Spike/LinkNan 日志并做 default/manual/compile-only 分层决策时，都应触发此技能；当用户要求检查“类似测试点是否已经覆盖”“其它文件里有没有重复 case”“跨 test_point 文件排重/扩点”时也必须使用本技能；涉及规格/平台模型边界时通过规格/平台口径 spec_profile=<name> 选择 references/spec_profiles/<name>.md。
+description: hyptest 测试点到用例落地 skill。**必须触发**：新增/改 ai_test_cases 或 manual_test_cases、新增/回填 test_point/*.md `### PnX`、更新 test_register.c、跨 test_point 排重或 case 去重、按模块找 suspected bug 并写新测试点、default/manual/compile-only/blocked 初判分层、test_point↔断言映射核对、涉及 hyptest harness (TEST_START/TEST_END/TEST_ASSERT/TEST_SETUP_EXCEPT/TEST_REGISTER) 的 case 编写。spec_profile 路由到 references/spec_profiles/<name>.md。**不触发**：只看 Spike/LinkNan 失败日志不落新 case、FSDB/stuck/50000 cycles/difftest mismatch/suspected RTL bug 深挖 → hyptest-failure-triage；波形协议分析 → waveform-debug；纯 RISC-V 知识问答/Spike 工具链参数/解析 ELF/通用代码 review。
 ---
 
 # HYPTEST Workflow
 
-该 skill 用于 `riscv-hyp-tests-nhv5` 的 hyptest 闭环工作：从 `test_point` 分析，到 `ai_test_cases/*.c` 或 `manual_test_cases/**/*.c` 落地、`test_register.c` 注册、单 case 编译/运行、日志归因、分层决策和轻量回填。
-
-## Use This Skill When
-
-- 根据 `test_point/*` 新增或修改 `ai_test_cases/*.c` / `manual_test_cases/**/*.c`
-- 更新 `test_register.c`
-- 跑 `compile_elf.py` / `get_result.py` 做单 case 或小批量验证
-- 判断 case 应进入 `default` / `manual` / `compile-only`
-- 回填 `test_point` 映射与短状态说明
-- 检查跨 `test_point/*.md` 的类似测试点是否已覆盖
-- 检查跨 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c` 的相似 case / 重复 case 风险
-
-## Repo Anchors
-
-See `references/repo_layout.md` for the current full layout, generated
-directories, platform names, and environment variables. The fast anchors are:
-
-- 框架宏与异常结构：`inc/rvh_test.h`
-- 框架实现：`src/`
-- 全局汇编入口：`asm/`
-- 注册表：`test_register.c`
-- AI 用例目录：`ai_test_cases/`
-- 人工维护用例目录：`manual_test_cases/`
-- 编译脚本：`compile_elf.py`
-- 批跑脚本：`get_result.py`
-- 项目规则：`test_point/Manual_Reference.md`
-- 历史线索：`test_point/CRITICAL_ISSUES_LOG.md`
-
-## Spec Profile / 规格平台口径
-
-- `spec_profile=<name>` 是当前项目的规格/平台口径名称，用来判断 Spike gate、PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界和 default/manual/compile-only/blocked 分层。
-- 示例：`spec_profile=<name>` 对应 `references/spec_profiles/<name>.md`。
-- 若用户给的是 profile 文件路径，按该文件路径读取；若只给名称，按 `references/spec_profiles/<name>.md` 解析。
-- 显式 `spec_profile` 优先；未指定时读取 `references/spec_profiles/index.json` 的 `default_profile`。
-- 最终交付摘要中应记录实际使用的规格/平台口径（`spec_profile`）。
-- 需要确认 profile 路径时，使用 `python3 scripts/resolve_spec_profile.py --spec-profile <name>`。
-- 可选 profile 与默认 profile 记录在 `references/spec_profiles/index.json`。
-- `SKILL.md` 不承载 profile 专属规则；no-H、PMP 粒度、PMA/PBMT/MMIO、Spike gate 等具体规格只写在对应 profile 中。
-
-## Test Point Scope
-
-- `test_point_file` 是测试点容器文件，不是单个测试点；文件中的每个 `### PnX` 才是独立测试点条目。去重、扩写、复用、完成判定都按条目级进行，不按整个文件级进行。
-- 若用户明确指定已有 `### PnX`，或明确表达“补已有测试点的用例 / 继续补 P6B / 给这个条目再补 case”，默认进入“补已有测试点模式”：围绕该条目做局部排重、局部补 case、局部回填，不为整个文件重新扫描新条目。
-- 若用户只给 `test_point_file`，要求“补充测试点 / 去模块里继续找 bug 点 / new-case-only”且未指定已有条目，默认进入“新增测试点模式”：先扫描文件已有 `###` 条目与 `已实现 case`，再继续新增新的 `PnX` 条目与对应 case。
-- 新条目编号默认沿当前文件前缀继续递增，例如 `*_points_7.md` 默认继续补 `P7D/P7E/...`；只有用户明确指定已有条目时，才回到旧条目做增补。
-
-## Coverage Scope
-
-- 普通任务中不要要求用户手动填写 `coverage_scope`；先根据用户目的自动推导覆盖范围。
-- 若用户要求新增测试点、继续找 suspected bug point、跨文件排重或 `task_mode=new-case-only`，默认按 `coverage_scope=repo` 做全仓 `test_point/*.md` 覆盖检查。
-- 若用户明确要求补已有 `### PnX` 或 `task_mode=supplement-existing-point`，默认按 `coverage_scope=file` 围绕当前条目/文件做局部测试点检查。
-- `coverage_scope=file`：仅围绕当前 `test_point_file` 或指定 `### PnX` 做局部测试点排重；适合“补已有测试点模式”。
-- `coverage_scope=repo`：扫描全仓 `test_point/*.md` 做类似测试点覆盖检查；适合“新增测试点模式”和用户明确要求跨文件排重的任务。
-- `case` 去重始终是 repo 级；`find_similar_cases.py` 始终搜索全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。
-- 详细口径、比较准则和命令模板见 `references/coverage_and_dedupe.md`。
-
-## Quick Decision Table
-
-| 场景 | 先查什么 | 初始处理 |
-| --- | --- | --- |
-| 新增普通架构 case | `references/spec_profiles/<spec_profile>.md` + 相似 case | 先争取 `default`，再编译/运行闭环 |
-| PMA/PBMT/MMIO/cache/TLB/CBO 等 profile-sensitive case | `scripts/query_spec_profile.py` + profile 的 Spike gate | 若 `spike_gate_applicable=false`，不要用 official Spike 结果当 default gate |
-| 访问 MMIO/Device 区间 | profile 的 MMIO responder 表 | 未确认 responder 会返回时，优先 `manual` / `compile-only` / `blocked` |
-| 只改回填或注册状态 | `test_register.c` + `scripts/check_writeback_format.py --check-register` | 保证 `已实现 case` 状态与注册一致 |
-| Spike/LinkNan 运行失败 | `references/build_run_debug.md` + `references/tiering_decision.md` | 先定位用例/assert/环境/model gap，再给 `reason_code` |
-| 不确定 `reason_code` | `scripts/suggest_reason_code.py --symptom "<现象>"` | 把建议当候选，最终仍以日志和 profile 证据为准 |
-
-## Non-Negotiables
-
-- 路径字段统一按“环境可见则可省略，否则 prompt 必须写”处理；prompt 写成 `$VAR` 但当前进程无法展开时，视为缺失。需要读写 hyptest 仓库但既没有 prompt `HYPTEST_HOME` 也没有环境 `HYPTEST_HOME` 时，先提醒补齐仓库路径。脚本 CLI 内部的 `--repo-root` 与 prompt 里的 `HYPTEST_HOME` 是同一含义。
-- 每次任务只补当前进程看不到的必需路径，详细字段见 `references/task_input_schema.md`：Spike gate 需要 `HYPTEST_HOME` + `HYPTEST_SPIKE_BIN`；Spike + LinkNan/Nanhu 源码证据还需要 `HYPTEST_LINKNAN_HOME`；LinkNan gate 需要 `HYPTEST_HOME` + `HYPTEST_LINKNAN_HOME` + `HYPTEST_DIFFTEST_REF_SO`。与本轮平台无关的组件直接省略；Nanhu 源码固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导。
-- 任何会调用 `get_result.py` 的 `spike` 运行前，必须确认 `HYPTEST_SPIKE_BIN` 在当前进程可见，且指向社区版/上游 riscv-isa-sim Spike 可执行文件；不得用 `which spike` 或 PATH 中的其它 `spike` 替代。若缺失，先提醒并停止运行 gate。
-- 任何会调用 `get_result.py` 的 `linknan` 运行前，必须确认 `HYPTEST_LINKNAN_HOME`、`HYPTEST_DIFFTEST_REF_SO` 以及 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 可用。`HYPTEST_SPIKE_BIN` 只用于 official/community Spike gate；LinkNan/difftest 证据走 `HYPTEST_DIFFTEST_REF_SO`，不要把定制 difftest Spike 当作 default gate 的 `HYPTEST_SPIKE_BIN`。
-- prompt 显式给出的运行环境字段（`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` / `HYPTEST_CROSS_COMPILE` / `HYPTEST_TMPDIR`）必须作为本轮覆盖传给支持 `--env` 的脚本，例如 `--env HYPTEST_SPIKE_BIN=<path>`。脚本调用 hyptest 仓库命令时会把这些字段映射为仓库原本识别的 `SPIKE_BIN` / `LINKNAN_HOME` / `DIFFTEST_REF_SO` 等运行时变量。
-- 写新 case 或判断 Spike 结果前，必须先确定规格/平台口径（`spec_profile`；未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，明确规格来源、平台模型边界、`spike_gate_applicable` 和初始分层候选。
-- 若用户说环境变量写在 `~/.bashrc` 但脚本读不到，优先检查这些 export 是否位于 `case $-` / `return` 这类非交互 shell 提前返回保护之后。
-- 一个 case 函数只能有一个 `TEST_END(...)`。
-- 只要本步骤要断言 `excpt.triggered/cause/tval`，都先调用 `TEST_SETUP_EXCEPT()`。
-- 注册统一放在 `test_register.c`，不在 case 源文件末尾注册。
-- 写新 case 前，先检索 2~5 个相似存量 case；模板只作骨架提醒，不替代存量 case 学习。
-- `test_point` 默认只回填正文和 `已实现 case`；默认只写 `case_name`，必要时才补短状态。
-- 禁止在 `test_point` 条目后追加审计式后半段块，例如 `[新增 case]`、`[质量门禁结果]`、`[分层结论]`、`[编译/运行统计]`。
-- 新增 AI/批量生成 case 默认放 `ai_test_cases/*.c`；人工维护 case 按模块放 `manual_test_cases/<module>/`。
-- 遇到历史大文件或用户明确不想继续堆叠时，必须新建主题明确的 case 文件承载新 case。
-- 禁止默认输出 `exclude_check`。
-- 禁止默认输出全量 Gate A-H；只有非 pass Gate 或用户明确要求时，才在最终交付摘要里输出 `[质量门禁结果]`。
-- 禁止为 `default` case 默认单独输出 `[分层结论]`；只有 `manual` / `compile-only` / `blocked`，或用户明确要求时，才在最终交付摘要里输出 `decision_prelim` / `decision_final` / `reason_code`。
-- 严禁文件级误判：不能把整个 `test_point_file` 当成单个测试点，也不能因为文件之前改过，就停止继续处理新条目或误把旧条目当新增结果。
-- `new-case-only` 且未指定已有条目时，默认必须新增新的 `### PnX` 条目和新的 `ai_*` case；若属于补已有测试点模式，则默认优先在指定旧条目下补 case，不强行新增新条目。
-- 若扫描后未发现新的高价值测试点，必须明确说明“未发现新的测试点 / 未新增 case”，不能把旧条目或旧 case 再次作为新增结果交付。
-- 新增测试点前，必须先做测试点覆盖检查；默认按全仓 `test_point/*.md` 扫描，不能只看当前文件就声称“全仓未覆盖”。
-- 写新 case 前，必须同时做 repo 级 case 相似检索和精确唯一性检索；“相似检索未命中”和“函数名唯一”不是同一件事，两者都要留证据。
+Agent 执行入口。从 `test_point/*.md` 分析，到 `ai_test_cases/*.c` 或 `manual_test_cases/**/*.c` 落地、`test_register.c` 注册、单 case 编译/运行、日志归因、分层决策和轻量回填。用户面向的用法、环境变量、字段速查、触发范例在 `README.md`；本文件只管 agent 被触发后要遵守的规则和执行步骤。
 
 ## Source Priority
 
-冲突时按以下顺序执行：
+冲突时按以下顺序裁决：
 
 1. `test_point/Manual_Reference.md`
 2. `references/quality_gate.md` + `references/tiering_decision.md` + `references/reason_code_catalog.md` + `references/submission_card.md`
@@ -113,7 +22,124 @@ directories, platform names, and environment variables. The fast anchors are:
 - 顺序问题一律以日志和最小复现实验为准，不以视觉顺序经验做硬判断。
 - 存量 case 是学习样本，不高于项目规则。
 
+## Non-Negotiables
+
+4 组硬规则，按优先级：代码硬约束（违反 = case 无效）> 环境路径 / runner（缺失 = gate 不可信）> 工作流边界（防误判漏去重）> 输出默认值（交付摘要形状）。
+
+### 1. 代码硬约束（违反 = case 无效）
+
+- **单个 case 函数只保留一个 `TEST_END(...)`**。Why: `TEST_END` 走固定收尾路径（回 M 态 + reset + 记录结果），多次触发会撞 linker 重复标签或多次收尾导致状态错乱。提前退出用 `return false;`，不要写第二个 `TEST_END`。
+- **断言 `excpt.triggered/cause/tval` 前必须调用 `TEST_SETUP_EXCEPT()`**。Why: `excpt.*` 是全局状态，上个 case 或上段代码的异常会污染本次判定。`TEST_SETUP_EXCEPT()` 显式初始化异常状态，确保读到的是本步骤的结果。`reset_state()` 只重置 CSR，不等价于异常初始化。
+- **注册统一放 `test_register.c`，不在 case 源文件末尾注册**。Why: `.test_table` 由链接器收集 + `get_result.py` 扫 `test_register.c` 决定跑哪些 case。散落注册让"这个 case 为什么没跑"极难定位；单真值来源才能保证回归一致。
+- **AI/批量生成 case 放 `ai_test_cases/*.c`；人工维护 case 按模块放 `manual_test_cases/<module>/`**。Why: 两类 case 的质量口径、回归策略、review 方式不同。Makefile 按目录收集，混放会让 commit 审查 / ownership 追踪失效。
+- **遇到历史大文件或用户明确不想继续堆叠时，必须新建主题明确的 case 文件**。Why: 单文件过大会让 merge conflict 变多、相似检索召回粒度变粗、PR review 成本飙升。新文件名应点出子主题（例如 `*_memblock_followup_cases.c`）。
+
+### 2. 环境路径 / runner 要求（缺失 = gate 不可信，先停 gate）
+
+- **本轮需要的 `HYPTEST_*` 变量缺失时停 gate，不 fallback 到个人路径或 PATH**。Why: 用 PATH 里的 `spike` 可能跑到 LinkNan 定制 difftest Spike 而不是社区版，得到"看起来过了其实不是 architecture gate"的假 default；fallback 到别人绝对路径也会让 CI 和本地行为分叉。必要组合：Spike gate = `HYPTEST_HOME` + `HYPTEST_SPIKE_BIN`；LinkNan gate = `HYPTEST_HOME` + `HYPTEST_LINKNAN_HOME` + `HYPTEST_DIFFTEST_REF_SO`；Nanhu 源码从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导；详细字段见 `references/task_input_schema.md`。
+- **runner 角色不可混用**：`HYPTEST_SPIKE_BIN` 只用于社区版/上游 Spike 的 default gate；LinkNan/difftest 走 `HYPTEST_DIFFTEST_REF_SO`，不要把定制 difftest Spike 当作 `HYPTEST_SPIKE_BIN`。Why: 定制 difftest Spike 为了和 RTL 对齐会刻意复制 RTL quirk，用它当 gate 等于"把 RTL bug 当成规范"——失去架构 gate 意义。两种 runner 职责严格分开才能形成有效交叉验证。
+- **prompt 显式给的运行环境字段**（`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` / `HYPTEST_CROSS_COMPILE` / `HYPTEST_TMPDIR`）**必须映射成 `--env KEY=VALUE`** 传给支持 `--env` 的脚本；`$HYPTEST_SKILL_HOME` 由调用者 export，skill 文档不写死个人绝对路径。Why: 脚本子进程不继承 shell 别名和 prompt 字段，不显式传会拿到 OS 默认或旧值；skill 里写死绝对路径会让其他人 clone 后直接报错。
+- 环境 troubleshooting（`~/.bashrc` 非交互 shell 提前 return、`$VAR` 展开失败、submodule 未初始化、`case $-` 保护位置等）见 `references/build_run_debug.md` §7.2，不在 Non-Negotiables 展开。
+
+### 3. 工作流边界（防误判、漏去重、错误扩点）
+
+- **`test_point_file` 是容器，`### PnX` 才是独立测试点**。去重、扩写、复用、完成判定都按条目级进行；不能把整个文件当单个测试点，也不能因为文件之前改过就停止处理新条目或误把旧条目当新增结果。Why: `test_point_file` 里可能有十几个 `### PnX`，"文件改过"≠"每个条目都处理过"；把旧条目包装成新增是**虚假交付**。
+- **两种任务模式**：
+  - **新增测试点模式**（`task_mode=new-case-only` 或未指定条目）：默认 `coverage_scope=repo` 做全仓 `test_point/*.md` 覆盖检查，必须新增新的 `### PnX` 条目和新的 `ai_*` case。新条目编号沿当前文件前缀继续递增（如 `*_points_7.md` 继续补 `P7D/P7E`）。
+  - **补已有测试点模式**（`task_mode=supplement-existing-point` 或用户明确指定 `### PnX`）：默认 `coverage_scope=file` 围绕该条目/文件做局部测试点检查，优先在旧条目下补 case，不强行新增新条目。
+- **写新 case 或判断 Spike 结果前必须先确定规格/平台口径 `spec_profile`**（未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，**标记**规格来源、平台模型边界、`spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位，见 `Source Priority`）。Why: 同一个断言在不同 profile 下的结论可能相反（例如 PMA=IO 非对齐在某些 profile 下走 AF，通用 RISC-V 走 AM）。不定口径就判 Spike 结果会把"profile 限制"误认为"RTL bug"。
+- **写新 case 前先检索 2~5 个相似存量 case**；模板只作骨架提醒，不替代存量 case 学习。Why: 模板只给形状，存量 case 含本 repo 的**特权态切换顺序、页表/PMP 处理习惯、断言文案风格**。跳过学习容易写出和仓库风格脱节的 case，review 阶段被打回。
+- **写新 case 前必须同时做 repo 级 case 相似检索 + 精确唯一性检索**；"相似检索未命中"和"函数名唯一"不是同一件事，两者都要留证据。命名确定后优先用 `scripts/check_case_uniqueness.py --expect absent` 走缓存索引快路径；缓存由 `scripts/repo_evidence_index.py` 预热（见 Workflow 步骤 1），**没预热时脚本会 fallback 到全仓 rg，等于违反此条**。写完后的 postcheck 只作复核，不能替代写前唯一性拦截。`case` 去重始终是 repo 级；`find_similar_cases.py` 始终搜索全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。详见 `references/coverage_and_dedupe.md`。
+- **新增测试点前必须先做测试点覆盖检查**；默认按全仓 `test_point/*.md` 扫描，不能只看当前文件就声称"全仓未覆盖"。Why: test_point 按模块分文件但**同一怀疑点可能散落在多个文件**。只看当前文件就声称"新点"会造成跨文件重复。
+- **若扫描后未发现新的高价值测试点，必须明确说明"未发现新的测试点 / 未新增 case"**，不能把旧条目或旧 case 再次作为新增结果交付。Why: LLM 为了"完成任务"有凑数倾向。硬规则强制承认"这次没找到"，避免把旧成果包装成本轮新增污染历史。
+- **case 独立性**：新 case 必须能单跑通过（不依赖前面 case 的 CSR/TLB/cache/reservation 残留）。prepare 段应显式清理本 case 会用到的状态（相关 CSR 位、`sfence_vma`、`TEST_SETUP_EXCEPT()` 等）。Why: 批跑顺序会变（新增/移除 case 影响 `test_register.c` 注册位置；全局 `.data`/`.bss` 段 layout 也会变）。默认只要求单跑通过 + prepare 段显式清理状态即可落 `default`；怀疑有顺序依赖时可手工跑一次窄范围 `get_result.py --platform <plat> --range <本 case 前后几条>` 补对比证据，但不作为硬门禁。
+- **workflow memory 不默认查询**。`$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是本地经验记录，不替代本轮证据。只在用户明确要求复盘历史、任务明确涉及已知历史问题（如"还是那个 P6B 老问题"）、或 bug hunt 需要确认相关场景是否踩过坑时才调用 `workflow_memory.py query`；日常 case 任务不触发。
+
+### 4. 输出默认值（禁止项；正面清单见 `Output Defaults`）
+
+- **`test_point` 默认只回填正文和 `已实现 case`**；默认只写 `case_name`，必要时才补短状态。Why: `test_point` 是测试意图描述，不是审计日志。加太多运行证据会让 test_point 膨胀难读，且审计证据在别处（gate pack / submission card）已有。
+- **禁止在 `test_point` 条目后追加审计式后半段块**，例如 `[新增 case]`、`[质量门禁结果]`、`[分层结论]`、`[编译/运行统计]`。Why: 同上——这些是交付摘要的职责，不是 test_point 的。混进来会让后续改 case 时难以判断 test_point 本身要表达什么。
+- **禁止默认输出 `exclude_check`**。Why: 这是早期模板遗留字段，当前 workflow 已不用；默认输出会让交付摘要携带无意义字段。
+- **禁止默认输出全量 Gate A-H**；只有非 pass Gate 或用户明确要求时，才在最终交付摘要里输出 `[质量门禁结果]`。Why: 全 pass 时列八条"Gate X: pass"纯噪声；只在有问题时列出来反而让工程师一眼看到阻塞点。
+- **禁止为 `default` case 默认单独输出 `[分层结论]`**；只有 `manual` / `compile-only` / `blocked`，或用户明确要求时，才在最终交付摘要里输出 `decision_prelim` / `decision_final` / `reason_code`。Why: `default` 是"一切正常"的默认分层，需要解释的是**偏离 default 的情况**；给 default case 加分层块是反向信息量。
+
+## Workflow
+
+默认走"**预热 + 轻量直通**"：`repo_evidence_index` 预热 → `find_similar_cases` → `check_case_uniqueness` → 写 case → `compile_elf` → `get_result` → `check_case_lint` →（失败时）`classify_failure_log` → 回填 → `check_writeback_format --check-register`。**不默认跑 pack 聚合工具**（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `make_case_submission_card` / `case_workflow_ledger`）；只有用户明确要求"跑完整 pack"、"输出 submission card"、"复盘耗时"时才走完整 pipeline。质量工具（lint / 失败分类 / 注册一致性）在轻量路径仍必须保留。
+
+1. **锁定输入 + 预热缓存**：确认 `HYPTEST_HOME`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）；本轮需要运行平台时先用 `scripts/check_env.py` 检查环境。输入字段多或存在旧平台名/不确定模式时用 `scripts/validate_task_request.py` 做 preflight。要做 repo 级检索/唯一性时先预热：
+   ```bash
+   python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --json > /dev/null
+   ```
+2. **识别任务模式**：新增测试点模式 vs 补已有测试点模式（见 Non-Negotiables §3 第 1-2 条）。
+3. **覆盖检查 + 相似 + 唯一性**：按 `references/coverage_and_dedupe.md` 做测试点覆盖检查、repo 级 case 相似检索、精确唯一性检索（`check_case_uniqueness.py --expect absent`）。相似检索 `--limit` 按任务分档：
+   - 补已有 `### PnX` 且只加 assert / 小改：`--limit 2-3`
+   - 补已有 `### PnX` 新增 case：`--limit 3-4`
+   - 新增 `### PnX` 或跨模块：`--limit 5`
+   - bug hunt / 跨模块扩点：`--limit 5-8`
+4. **profile 标记**：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`，标记 `spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位）。
+5. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
+6. **调整 `test_register.c`** 注册状态，使其与目标分层一致。
+7. **单 case 编译**：
+   ```bash
+   python3 compile_elf.py --plat spike --name <case_name>
+   ```
+8. **单 case 运行**（非 `compile-only`）：
+   ```bash
+   python3 get_result.py --platform spike --case <case_name>
+   ```
+   运行前确认平台环境变量在当前进程可见。`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
+9. **lint + 失败分类**：
+   ```bash
+   python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
+   ```
+   运行失败或 `untested exception` 时补一次失败分类（`FAILED` 不是分层结论）：
+   ```bash
+   python3 scripts/classify_failure_log.py --log-file <log> --json
+   ```
+10. **test_point → case 映射表自查**：运行通过后，对照 `test_point` 正文逐条列出每个要求落在 case 哪一行断言。发现漏项立即补；发现偏移立即改。详见 `references/writing_cases.md` §14.1。
+11. **回填 `test_point`**：默认轻量回填（只写 `case_name` + 必要短状态；不追加审计块）。详细模板和复用口径见 `references/writing_cases.md`。
+12. **回填核对**：
+   ```bash
+   python3 scripts/check_writeback_format.py \
+     --repo-root $HYPTEST_HOME \
+     --file <test_point_file> \
+     --check-register
+   ```
+
+## Bug Hunt Evidence（仅 bug hunt 场景自动触发）
+
+典型触发词：`target_module=<module>` + `new-case-only`、`bug_hunt_focus`、"继续围绕 X 找 bug 点"、`test_point_file` 文件名含 `suspected_bug_corner_points`。普通"落 test_point 的 case"任务**不要**自动触发，以免增加无谓延迟。
+
+- **自动跑两个脚本**（顺序）：
+  ```bash
+  python3 scripts/query_rtl_bug_history.py --module <target_module> --limit 10 --markdown
+  python3 scripts/query_uncovered_bug_neighbors.py --module <target_module> --limit 20 --markdown
+  ```
+  `query_uncovered_bug_neighbors.py` 把 fix commit 的 `file:line` 与已有 `test_point/*.md` 里引用的 `<file>.scala:<line>` 做距离比对，输出"已修过但附近 test_point 没覆盖"的高价值点，**直接引导 agent 选新的怀疑点方向**，不用凭空挑。
+- **环境缺失兜底**：`HYPTEST_LINKNAN_HOME` 不可见或目标 submodule 不在 LinkNan/Nanhu 下时，跳过并在摘要里注明"未查 RTL 历史 bug（环境缺失）"。
+- **查询结果只是证据的一部分**：
+  - commit subject 启发式会漏掉没有 `fix/bug` 关键词的修复、未提交的真 bug、重构顺带修掉的 bug。
+  - 能用来做的：给 case 的"怀疑点"段提供 commit hash + file:line 作为可追溯证据；定位"真 bug 邻域"。
+  - 不能用来做的：替代 profile 判断、替代 `find_similar_cases` 检索、替代自己对 RTL 代码和 test_point 的阅读。
+- **怀疑点 evidence 分级**（test_point 回填里必须标）：`[evidence=commit]` > `[evidence=log-confirmed]` > `[evidence=suggestive]` > `[evidence=speculation]`。`evidence=commit` 时**必须**给 commit hash + file:line；commit 指向的路径要跟本 case 场景真的对齐，不要把"这个模块最近修过 bug"包装成"这个 case 就是在查那个 bug"。
+- **查询空结果 ≠ 没 bug**：继续按相似 case / profile / RTL 阅读等其它途径找可疑点，证据等级降到 `suggestive` 或 `speculation`。
+
+## Output Defaults
+
+正面清单：最终交付摘要**必须**包含哪些字段。禁止项见 Non-Negotiables §4。
+
+- 改动文件、case 名、编译结果、运行结果、关键日志路径。
+- 实际使用的规格/平台口径（`spec_profile`）。
+- **唯一性证据**：测试点覆盖检查结论（范围 + 是否发现相近旧点）、repo 级相似 case 检索 top 结果、函数名精确唯一性结论。
+- **test_point → case 映射表**：逐条列出 test_point 每个要求对应到 case 哪一行断言（详见 `references/writing_cases.md` §14.1）。
+- `compile-only` 时显式写 Gate D=`N/A` 与不运行原因。
+- 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须明确说明原因，不能把旧条目或旧 case 当成"新增结果"。
+- bug hunt 场景额外包含：`query_rtl_bug_history` + `query_uncovered_bug_neighbors` 调用证据（哪怕空结果）；怀疑点 `[evidence=...]` 分级。
+
 ## What To Read
+
+按场景查 reference：
 
 - 规格/profile 路由：`references/spec_and_model_limits.md`
 - 当前规格/平台模型边界/Spike gate：`references/spec_profiles/<spec_profile>.md`
@@ -125,72 +151,9 @@ directories, platform names, and environment variables. The fast anchors are:
 - 失败交接给 triage：`references/triage_handoff_schema.md`
 - 非 default 分层：`references/tiering_decision.md` + `references/reason_code_catalog.md`
 - 交付前复核：`references/submission_card.md`
-- 涉及跨文件测试点覆盖检查或 case 去重：`references/coverage_and_dedupe.md`
-- 需要 RTL 怀疑点示例：`references/rtl_bug_patterns.md`
-
-## Workflow
-
-1. 锁定输入：确认 `HYPTEST_HOME` / `--repo-root`、`test_point_file`、平台、case 名、目标分层和规格/平台口径（`spec_profile`；未指定则用 profile registry 中的 `default_profile`）；只要本轮需要运行平台，就先用 `scripts/check_env.py` 检查平台环境。
-   - 若输入字段较多或存在旧平台名/不确定模式，先用 `scripts/validate_task_request.py` 做 preflight。
-2. 区分补已有测试点模式和新增测试点模式；`test_point_file` 是容器文件，每个 `### PnX` 才是独立测试点条目。
-3. 按 `references/coverage_and_dedupe.md` 做测试点覆盖检查、repo 级 case 相似检索和精确唯一性检索。
-4. 按 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md` 判断规格来源、平台模型边界、`spike_gate_applicable` 和 default/manual/compile-only/blocked 候选，不要先写完再临时补判定。
-5. 写或改 case：AI/批量生成 case 默认放在 `ai_test_cases/*.c`；人工维护 case 放在 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
-6. 调整 `test_register.c` 注册状态，使其与目标分层一致。
-7. 先做单 case 编译：
-   ```bash
-   python3 compile_elf.py --plat spike --name <case_name>
-   ```
-8. 非 `compile-only` 必须做单 case 运行；运行前先确认平台环境变量在当前进程可见。`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
-9. 更新 `test_point`，默认只做轻量回填；详细模板和复用口径见 `references/writing_cases.md`。
-10. 回填后建议执行：
-   ```bash
-   python3 scripts/check_writeback_format.py \
-     --repo-root $HYPTEST_HOME \
-     --file <test_point_file> \
-     --check-register
-   ```
-
-## Output Defaults
-
-- 默认最终摘要至少包含：改动文件、case 名、编译结果、运行结果、关键日志路径。
-- 默认最终摘要记录实际使用的规格/平台口径（`spec_profile`）。
-- 只有存在非 pass Gate 或用户明确要求时，才在最终摘要里输出 `[质量门禁结果]`。
-- 只有最终不是 `default`，或用户明确要求时，才在最终摘要里输出 `decision_prelim` / `decision_final` / `reason_code`。
-- `compile-only` 必须显式写 Gate D=`N/A` 与不运行原因。
-- 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须在最终摘要里明确说明原因，不能把旧条目或旧 case 当成“新增结果”。
-
-## Bundled Resources
-
-完整资源清单见 `references/resource_index.md`。常用入口如下：
-
-- `references/resource_index.md`
-  - 文档、脚本、eval fixture 的完整索引；维护资源清单时只改这里。
-- `references/maintainer_guide.md`
-  - 修改 skill、profile、脚本、reason_code、eval 时的自检流程。
-- `scripts/find_similar_cases.py`
-  - 相似 case 检索；写新 case 前使用。
-- `scripts/check_case_lint.py`
-  - case 源文件结构检查；新增/改动文件可用 `--changed-only --strict-case-end`。
-- `scripts/validate_task_request.py`
-  - 校验任务输入参数、profile、平台名、路径和 task_mode 组合。
-- `scripts/check_writeback_format.py`
-  - `test_point` 轻量回填格式检查；可加 `--spec-profile` 做 profile-aware 警告。
-- `scripts/query_spec_profile.py`
-  - 查询 profile 里的 PMA/PBMT/MMIO 机器可读表，辅助判断 Spike gate 和初始分层。
-- `scripts/suggest_reason_code.py`
-  - 根据失败现象给 `reason_code` 候选；最终结论仍以日志、profile 和分层规则为准。
-- `scripts/classify_failure_log.py`
-  - 从失败日志抽取场景、错误点、候选 `reason_code` 和下一步动作。
-- `scripts/make_triage_handoff.py`
-  - 按 `references/triage_handoff_schema.md` 生成 workflow-to-triage 交接卡片。
-- `scripts/check_hyptest_repo_migration.py`
-  - 检查 hyptest 仓库是否仍残留旧目录、旧平台名或旧字段逻辑。
-- `scripts/doctor.py`
-  - 一条命令汇总 profile、文档链接、reason_code、环境和 quick self-check。
-- `scripts/list_skill_commands.py`
-  - 打印常用 skill 维护/使用命令。
-- `scripts/skill_summary.py`
-  - 汇总 skill profile、reference、script、eval asset 和推荐自检命令。
-- `scripts/self_check.py`
-  - skill 自检总入口；支持 `--quick` / `--repo` / `--platform-check` / `--full`。
+- 跨文件测试点覆盖检查或 case 去重：`references/coverage_and_dedupe.md`
+- workflow 状态 / cache / memory CLI：`references/workflow_state.md`
+- `excpt.cause` 常量怎么选：`references/cause_code_catalog.md`
+- RTL 怀疑点示例：`references/rtl_bug_patterns.md`
+- 用户侧用法、触发范例、字段速查、反例：`README.md`
+- 完整资源索引：`references/resource_index.md`

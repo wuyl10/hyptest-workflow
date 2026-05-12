@@ -1,0 +1,74 @@
+{
+  "skill_name": "hyptest-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "name": "new-case-memblock-cross16b-boundary",
+      "prompt": "使用 hyptest-workflow skill。test_point_file=test_point/memblock_suspected_bug_corner_points_14.md, platform=spike, spec_profile=nhv5_1_ap, task_mode=new-case-only, new_case_count=1, target_policy=default-first, target_module=memblock。要求：新增 1 个 ### PnX 测试点，检查 same-page cross-16B `sd(1B+7B)` 在 repeated SAF → repair → upper-half aligned `sd(8B)` success → refault SAF → repair → retried `sd(1B+7B)` success 序列下，boundary image（guard_before/boundary/guard_after）是否保持。新增 1 个 ai_micro_* case，走预热+轻量直通路径；Spike 跑通按 default 落位。",
+      "expected_output": "新 ### PnX 条目 + 新 ai_micro_* case + Spike 编译/运行通过 + test_register.c 启用 + test_point 轻量回填 + test_point → case 映射表 + 最终决策写在摘要",
+      "files": [],
+      "expectations": [
+        "The output adds a new `### P` entry under test_point/memblock_suspected_bug_corner_points_14.md that did not exist before",
+        "The new test point is NOT a copy of an existing one in the same file",
+        "A new ai_micro_* case function is added to ai_test_cases/*.c",
+        "The new case function contains exactly one TEST_END(...)",
+        "TEST_SETUP_EXCEPT() is called before any excpt.* assertion in the new case",
+        "test_register.c contains a TEST_REGISTER line for the new case (enabled, not commented)",
+        "compile_elf.py was invoked with --plat spike --name <new_case_name>",
+        "get_result.py was invoked with --platform spike --case <new_case_name>",
+        "Spike run log contains PASSED (from .tmp/result_log/spike/*.log)",
+        "The test_point entry body mentions boundary/guard/adjacent preservation",
+        "Repo-level similar-case search was performed before writing (via find_similar_cases.py or repo_evidence_index.py)",
+        "check_case_uniqueness.py --expect absent was run on the new case name before writing",
+        "The final delivery summary contains a test_point → case mapping table (each test_point requirement mapped to a specific TEST_ASSERT line)",
+        "The spec_profile used (nhv5_1_ap) is recorded in the final summary",
+        "check_writeback_format.py --check-register was run after writeback",
+        "If the final decision is not default, a reason_code from references/reason_code_catalog.md is given; if default, no decision_prelim/decision_final block is emitted"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "supplement-existing-p6b-assert",
+      "prompt": "使用 hyptest-workflow skill。test_point_file=test_point/memblock_suspected_bug_corner_points_14.md, platform=spike, spec_profile=nhv5_1_ap, task_mode=supplement-existing-point, target_test_point=\"### P6B\" (or whichever existing ### PnX entry is in that file — pick the first one that lacks a boundary assertion)。要求：在指定旧条目下，给已有的 ai_micro_* case 补充 1 条面向邻接地址 preserve 的断言（用 adjacent / guard / boundary 作为断言文案关键词），不新增测试点，不改变 case 函数名。写完后单 case 编译 + 运行。",
+      "expected_output": "修改已有 ai_micro_* case 添加邻接断言 + 未新增 ### PnX 条目 + 未改 test_register.c（case 名不变）+ Spike 跑通 + test_point → case 映射表更新体现新断言",
+      "files": [],
+      "expectations": [
+        "No new `### P` entry is added to the test_point file (supplement mode, not new-case)",
+        "An existing ai_micro_* case function is modified, not renamed or duplicated",
+        "The modification adds at least one TEST_ASSERT containing adjacent / guard / boundary / neighbor / preserve keyword",
+        "The modified case still has exactly one TEST_END",
+        "TEST_SETUP_EXCEPT() placement (if the case reads excpt.*) is preserved or correctly added",
+        "test_register.c is NOT modified (case name did not change, registration status did not change)",
+        "compile_elf.py --plat spike --name <case_name> was invoked on the modified case",
+        "get_result.py --platform spike --case <case_name> was invoked",
+        "Spike run log contains PASSED",
+        "The final summary notes this was a supplement-existing-point task (not a new test point)",
+        "The test_point → case mapping table in the final summary shows the new assertion line mapped to a boundary/preservation requirement",
+        "coverage_scope is file (not repo) — supplement mode default"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "bug-hunt-storequeue-uncovered-neighbor",
+      "prompt": "使用 hyptest-workflow skill。target_module=StoreQueue, platform=spike, spec_profile=nhv5_1_ap, task_mode=new-case-only, new_case_count=1, target_policy=default-first, test_point_file=test_point/StoreQueue_suspected_bug_corner_points_1.md（若不存在则创建）。要求：围绕 StoreQueue 模块找 1 个高价值 suspected bug 点，**必须用 query_rtl_bug_history.py 和 query_uncovered_bug_neighbors.py 做证据交叉**，选一个在已修 fix commit 邻域但当前 test_point 未覆盖的怀疑点。新增 1 个 ### PnX 条目和 1 个 ai_micro_* case，怀疑点段必须带 [evidence=commit|log-confirmed|suggestive|speculation] 四级分级标签并引用具体 commit hash + file:line。",
+      "expected_output": "query_rtl_bug_history + query_uncovered_bug_neighbors 的调用证据 + 新 ### PnX（带怀疑点 evidence 标签 + commit hash + file:line）+ 新 ai_micro_* case + 编译运行 + 映射表",
+      "files": [],
+      "expectations": [
+        "query_rtl_bug_history.py was invoked with --module StoreQueue",
+        "query_uncovered_bug_neighbors.py was invoked with --module StoreQueue",
+        "The new test_point entry body contains a '怀疑点' (or 'suspected point' / 'RTL path') section",
+        "The 怀疑点 section uses at least one of these evidence tags: [evidence=commit], [evidence=log-confirmed], [evidence=suggestive], [evidence=speculation]",
+        "If evidence=commit is claimed, a git commit short-sha AND a file:line reference are both present",
+        "The file:line reference resolves to a .scala file under LinkNan/Nanhu source tree",
+        "A new ### P entry is added to the test_point file (new-case-only)",
+        "The new test_point entry is NOT a duplicate of an existing one (checked via repo-level test_point coverage)",
+        "A new ai_micro_* case function is added to ai_test_cases/*.c with exactly one TEST_END",
+        "TEST_SETUP_EXCEPT() is present before excpt.* assertions",
+        "test_register.c is updated with the new case",
+        "compile_elf.py and get_result.py were both invoked on the new case",
+        "Final summary records: used spec_profile, uniqueness evidence (test_point coverage + case similarity top results + function-name uniqueness), test_point → case assertion mapping table, compile/run result, final decision",
+        "If no high-value bug point was found, the summary explicitly says '未发现新的测试点 / 未新增 case' rather than fabricating a new entry"
+      ]
+    }
+  ]
+}

@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 
+from workflow_paths import cache_file
+
 
 CACHE_VERSION = 1
 
@@ -50,7 +52,7 @@ def source_fingerprint(repo_root: Path) -> Dict[str, object]:
 def cache_path(repo_root: Path, cache_dir_arg: str | None) -> Path:
     if cache_dir_arg:
         return Path(cache_dir_arg).expanduser().resolve() / "find_similar_cases_index.json"
-    return repo_root / ".hyptest_skill_cache" / "find_similar_cases_index.json"
+    return cache_file(repo_root, "find_similar_cases_index.json")
 
 
 def load_with_cache(

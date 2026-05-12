@@ -201,6 +201,14 @@ def render_markdown(ledger: dict[str, Any]) -> str:
     for name, item in (ledger.get("cache") or {}).items():
         lines.append(f"- {name}: seen=`{item.get('seen')}` hit=`{item.get('hit')}`")
     lines.extend(["", "## Slowest Steps", ""])
+    steps = ledger.get("timing", {}).get("steps", [])
+    if steps:
+        lines.append("### All Steps")
+        for step in steps:
+            lines.append(
+                f"- `{step.get('name')}` {step.get('seconds')}s ok=`{step.get('ok')}` source=`{step.get('source')}`"
+            )
+        lines.append("")
     for step in ledger.get("timing", {}).get("slowest_steps", []):
         lines.append(f"- `{step.get('name')}` {step.get('seconds')}s ok=`{step.get('ok')}`")
     lines.extend(["", "## Rework Signals", ""])

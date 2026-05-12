@@ -12,9 +12,9 @@ from pathlib import Path
 from skill_config import resolve_path
 
 
-LEGACY_CASE_DIR = "individual" + "_tests"
-LEGACY_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
-LEGACY_XIANGSHAN_PLAT = "--plat " + "xiangshan"
+NONCURRENT_CASE_DIR = "individual" + "_tests"
+NONCURRENT_XIANGSHAN_PLATFORM = "--platform " + "xiangshan"
+NONCURRENT_XIANGSHAN_PLAT = "--plat " + "xiangshan"
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,17 +57,20 @@ def main() -> int:
     if compile_path:
         text = read(compile_path)
         checks = [
-            ("OUTPUT_DIR must use case_elf_asm", 'OUTPUT_DIR = Path("case_elf_asm")'),
+            ("OUTPUT_DIR must use case_elf_asm", 'OUTPUT_DIR = REPO_ROOT / "case_elf_asm"'),
             ("compile_elf.py should expose --plat", 'parser.add_argument("--plat"'),
             ("compile_elf.py should support linknan platform", '"linknan"'),
             ("compile_elf.py should support spike platform", '"spike"'),
             ("compile_elf.py should persist artifact_name_map.json", "ARTIFACT_MAP_FILE"),
+            ("compile_elf.py should default compile temp files under .tmp/hyptest_compile", 'REPO_ROOT / ".tmp" / "hyptest_compile"'),
+            ("compile_elf.py should allow overriding CROSS_COMPILE", "--cross-compile"),
+            ("compile_elf.py should parse TEST_REGISTER lines with trailing comments", r"\s*(?://.*)?$"),
         ]
         for label, needle in checks:
             if needle not in text:
                 issues.append(f"compile_elf.py: {label}")
-        if LEGACY_CASE_DIR in text:
-            issues.append(f"compile_elf.py: forbidden legacy directory `{LEGACY_CASE_DIR}`")
+        if NONCURRENT_CASE_DIR in text:
+            issues.append(f"compile_elf.py: forbidden artifact directory `{NONCURRENT_CASE_DIR}`")
 
     if result_path:
         text = read(result_path)
@@ -79,14 +82,16 @@ def main() -> int:
             ("get_result.py should require LINKNAN_HOME", "LINKNAN_HOME"),
             ("get_result.py should require DIFFTEST_REF_SO", "DIFFTEST_REF_SO"),
             ("get_result.py should use artifact_name_map.json", "ARTIFACT_MAP_FILE"),
+            ("get_result.py should default result logs under .tmp/result_log", 'REPO_ROOT / ".tmp" / "result_log"'),
+            ("get_result.py should parse TEST_REGISTER lines with trailing comments", r"\s*(?://.*)?$"),
         ]
         for label, needle in checks:
             if needle not in text:
                 issues.append(f"get_result.py: {label}")
-        if LEGACY_CASE_DIR in text:
-            issues.append(f"get_result.py: forbidden legacy directory `{LEGACY_CASE_DIR}`")
-        if LEGACY_XIANGSHAN_PLATFORM in text or LEGACY_XIANGSHAN_PLAT in text:
-            issues.append("get_result.py: forbidden old xiangshan platform CLI")
+        if NONCURRENT_CASE_DIR in text:
+            issues.append(f"get_result.py: forbidden artifact directory `{NONCURRENT_CASE_DIR}`")
+        if NONCURRENT_XIANGSHAN_PLATFORM in text or NONCURRENT_XIANGSHAN_PLAT in text:
+            issues.append("get_result.py: forbidden xiangshan platform CLI")
         if "/nfs/home/" in text:
             issues.append("get_result.py: reusable runner should not contain personal /nfs/home paths")
         if not has_regex(text, r'\$\{\{?SPIKE_BIN:\?set SPIKE_BIN'):

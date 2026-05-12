@@ -14,7 +14,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -44,12 +44,15 @@ def main() -> int:
         write(
             good / "get_result.py",
             "# 总 log 和终端结尾会统计 pass/fail/timeout/missing 以及 forbidden/untested marker 数\n"
-            "missing_required found_forbidden untested_occurrences timeout pass fail missing forbidden untested\n",
+            "missing_required found_forbidden untested_occurrences timeout pass fail missing forbidden untested status_counts\n",
         )
         log = tmp / "result.log"
         write(
             log,
             "summary: pass=1 fail=2 timeout=3 missing=4 forbidden=5 untested=6\n"
+            "status_counts:\n"
+            "  MARKER_MISMATCH: 2\n"
+            "  PASS: 1\n"
             "case_a: missing_required=['PASSED'], found_forbidden=['FAILED']\n",
         )
         good_result = run(good, log)

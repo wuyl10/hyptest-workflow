@@ -8,11 +8,11 @@
     "expected_ok": true
   },
   {
-    "id": "ok-legacy-manual-comment",
-    "description": "legacy manual short status should remain accepted",
+    "id": "ok-manual-short-comment",
+    "description": "manual short status should remain accepted",
     "check_register": true,
-    "register_text": "// TEST_REGISTER(ai_legacy_manual_case)\n",
-    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_legacy_manual_case` 已注释（manual）\\n",
+    "register_text": "// TEST_REGISTER(ai_manual_short_case)\n",
+    "markdown_text": "### P1. sample\\n\\n测试点：\\n- desc\\n\\n构建场景：\\n- desc\\n\\n已实现 case：\\n- `ai_manual_short_case` 已注释（manual）\\n",
     "expected_ok": true
   },
   {

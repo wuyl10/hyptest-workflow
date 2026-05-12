@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from skill_config import default_spec_profile, resolve_path
+from workflow_paths import workflow_report_dir
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -53,8 +54,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--report-dir",
-        default=".hyptest_skill_reports",
-        help="Directory for per-case gate/postcheck reports.",
+        help="Directory for per-case gate/postcheck reports. Default: <repo-root>/.hyptest_workflow_skill/reports",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     parser.add_argument("--md-out", help="Write Markdown report to this path.")
@@ -74,7 +74,8 @@ def summarize_text(text: str, limit: int = 1600) -> str:
 
 
 def run_case(args: argparse.Namespace, case_name: str) -> dict[str, Any]:
-    report_dir = Path(args.report_dir).expanduser()
+    repo_root = resolve_path(args.repo_root)
+    report_dir = workflow_report_dir(repo_root, args.report_dir)
     stem = safe_name(case_name)
     command = [
         sys.executable,
@@ -204,8 +205,16 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend(["", "## Timing", ""])
     timing = report.get("timing", {})
     lines.append(f"- total_seconds: `{timing.get('total_seconds')}`")
+    by_step = timing.get("by_step") or {}
+    if by_step:
+        lines.append("- by_step:")
+        for name, seconds in by_step.items():
+            lines.append(f"  - {name}: `{seconds}` seconds")
+    slowest = timing.get("slowest_steps", [])
+    if slowest:
+        lines.append("- slowest_steps:")
     for item in timing.get("slowest_steps", []):
-        lines.append(f"- {item['name']}: `{item['seconds']}` seconds")
+        lines.append(f"  - {item['name']}: `{item['seconds']}` seconds")
     lines.extend(["", "## Decision Boundary", "", report.get("decision_note", ""), ""])
     return "\n".join(lines)
 

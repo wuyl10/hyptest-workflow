@@ -1,6 +1,8 @@
 # HYPTEST 一页提交核对卡
 
-用途：把快速执行流程和质量门禁合并为一张可勾选清单，用于提交前最后确认。
+用途：把快速执行流程和质量门禁合并为一张可勾选清单，用于**提交前内部核对**。
+
+本卡片是内部核对工具，不作为交付内容输出；最终交付摘要按 `SKILL.md` 的 `Output Defaults` 组织。
 
 若本次修改的是 skill 自身，先运行：
 
@@ -30,7 +32,7 @@ python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME
 - [ ] 非 compile-only：单 case 运行完成
 - [ ] 非 compile-only：结果可归因（pass/fail/untested）
 - [ ] compile-only：已注明 Gate D=N/A 与不运行原因
-- [ ] 非 compile-only：日志路径可回溯（通常为 `result_log/spike/*.log` 或 `result_log/linknan/*.log`）
+- [ ] 非 compile-only：日志路径可回溯（通常为 `.tmp/result_log/spike/*.log` 或 `.tmp/result_log/linknan/*.log`）
 - [ ] compile-only：Gate D=N/A 证据可回溯（不运行原因 + 分层依据/原因码）
 
 ## D. 语义与分层

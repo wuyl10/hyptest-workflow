@@ -1,6 +1,25 @@
 # HYPTEST 用例编写指南
 
-本文面向 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 仓库的 `nhv5.1` 分支目录，用于规范 AI/人工协同写 case 的方式。
+本文面向 `riscv-hyp-tests` 仓库（`$HYPTEST_HOME` 指向的工作目录），用于规范 AI/人工协同写 case 的方式。skill 不绑死某个 fork 或分支；具体 URL/分支以 `$HYPTEST_HOME` 实际指向为准。
+
+## Table of Contents
+
+- [1. 放置位置与命名](#1-放置位置与命名) — 目录规则、命名前缀、大文件拆分、写前学存量 case
+- [2. 基础函数结构](#2-基础函数结构) — case 骨架模板
+- [3. 断言与可观测性](#3-断言与可观测性) — 面向 `excpt.*` / 数据 / 边界
+- [4. 异常路径写法](#4-异常路径写法) — `TEST_SETUP_EXCEPT` 使用口径、异常后清理
+- [5. 特权态和环境切换建议](#5-特权态和环境切换建议)
+- [6. 注册与回归准入](#6-注册与回归准入) — test_register.c、三层准入策略
+- [7. 测试点回填](#7-测试点回填) — 默认/扩展模板、复用依据四行、一一映射
+- [8. 高质量 case 的最小标准](#8-高质量-case-的最小标准)
+- [9. 常见反模式](#9-常见反模式)
+- [10. 推荐起步流程](#10-推荐起步流程)
+- [11. 建议的四段式 case 结构](#11-建议的四段式-case-结构) — prepare/action/observe/validate
+- [12. side effect 检查建议](#12-side-effect-检查建议) — store/amo 目标 + 邻接
+- [13. 异常路径的状态隔离建议](#13-异常路径的状态隔离建议)
+- [13.1 Case 独立性](#131-case-独立性) — prepare 段清理清单
+- [14. 提交前硬检查](#14-提交前硬检查可复制到-pr-描述) — PR 前勾选清单
+- [14.1 test_point → case 映射表自查](#141-test_point--case-映射表自查写完运行通过后必做) — 覆盖完整性核对
 
 ## 1. 放置位置与命名
 
@@ -50,10 +69,10 @@
 - 优先参考这些存量 case：
   - 已在 `test_register.c` 中启用的 default case
   - 与当前测试点关键维度最接近的 case
-  - 最近仍在被复用、不是纯历史遗留的大文件尾部 case
+  - 近期风格一致、断言完整、仍被频繁复用的 case
 - 谨慎参考这些存量 case：
   - `manual` / `compile-only` / 已注释 case
-  - 历史大文件中风格明显陈旧、断言偏弱、只做近似覆盖的 case
+  - 大文件中风格明显陈旧、断言偏弱、只做近似覆盖的 case
   - 规则口径已经发生变化的旧 case（例如 misalign、PMA/PBMT、Spike 偏差相关）
 - 需要骨架时，再把 `assets/templates/new_case_template.c` 当作“空白骨架”；模板不替代对存量 case 的检索。
 
@@ -187,7 +206,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 依赖 PMA/PBMT 且未走 Spike gate：`case_name（依赖PMA CSR/TLB一致性/cache一致性，未跑Spike）`
 
 不要在 `test_point` 正文后追加 workflow 回填块或审计式证据块。
-兼容历史短状态写法 `case_name 已注释（manual）`，但新写法优先使用 `case_name（已注释，manual）`。
+新回填优先使用 `case_name（已注释，manual）`；`check_writeback_format.py` 也接受短状态写法 `case_name 已注释（manual）`。
 若任务要求输出 `Gate A-H`、`decision_prelim` / `decision_final`、`reason_code`，默认放到最终交付摘要，不写进 `test_point`。
 
 ### 7.1 测试点正文模板（默认简版 + RTL扩展）
@@ -225,8 +244,8 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 怀疑点：
 
-- `<RTL/path/File.scala:line>` 描述可疑状态/队列/模板/权限/响应绑定点。
-- `<RTL/path/Other.scala:line>` 描述与本测试点相关的第二个可疑交互点。
+- [evidence=commit] `<RTL/path/File.scala:line>`（commit `<hash>`，`git log` 查到的已修复 bug，当前场景在其邻域但未直接覆盖）
+- [evidence=speculation] `<RTL/path/Other.scala:line>` 描述与本测试点相关的可疑交互点（仅源码阅读推测，无已知 commit / 无复现日志）
 
 对应场景：
 
@@ -238,7 +257,16 @@ TEST_ASSERT("normal load should keep triggered=false",
 - `ai_micro_xxx_width_switch_case`（default，已启用）
 ```
 
-- 复用已有 case 时，才追加固定两行 `复用依据`：
+怀疑点证据分级（在 `[evidence=<level>]` 方括号标签中写明）：
+
+- `commit`：有 git log 的 RTL fix commit 明确指向该路径（最强证据，优先追问；可用 `scripts/query_rtl_bug_history.py` 交叉验证）。
+- `log-confirmed`：有当前项目可复现的失败日志指向该路径。
+- `suggestive`：RTL 代码中该段逻辑有已知 anti-pattern（例如 always-true 默认值、不对称的 ready/valid、resource 被共用但无退场信号）。
+- `speculation`：单纯源码阅读推测，没有 commit/日志/已知 pattern 支撑。
+
+同一测试点可以列多个怀疑点，按 `commit > log-confirmed > suggestive > speculation` 排序，让审阅者一眼看出最硬的证据。`speculation` 级可以保留但不应作为"这条 case 一定能抓 bug"的理由。
+
+- 复用已有 case 时，才追加固定四行 `复用依据`：
 
 ```text
 已实现 case：
@@ -249,6 +277,8 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 顺序一致性：一致；测试点顺序=fault -> repair -> success；复用 case 顺序=fault -> repair -> success；差异=无
 断言一致性：一致；测试点断言=检查 `excpt.triggered/cause/tval` 与 boundary image；复用 case 断言=检查 `excpt.triggered/cause/tval` 与 boundary image；差异=无
+关键变量一致性：一致；测试点关键项=`sd(1B+7B)`+repeated SAF+upper-half aligned；复用 case 关键项=`sd(1B+7B)`+repeated SAF+upper-half aligned；差异=无
+覆盖粒度一致性：一致；测试点粒度=byte boundary + cross-16B；复用 case 粒度=byte boundary + cross-16B；差异=无
 ```
 
 建议：
@@ -257,9 +287,9 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 默认优先简版模板；满足以下任一条件时启用扩展模板：新增/修改了源码怀疑点、需要引用 RTL/源码位置解释判定、分层结论依赖模块实现细节。
 - 简版模板中的 `构建场景` 与扩展模板中的 `对应场景` 都应可直接指导 case 构造，避免只写抽象结论。
 - 需要项目内具体 RTL 怀疑点示例时，看 `references/rtl_bug_patterns.md`；不要把那里的项目路径写成通用规则。
-- `new-case-only` 场景通常只写到 `已实现 case` 即可；只有复用已有 case 时才出现 `复用依据` 两行。
+- `new-case-only` 场景通常只写到 `已实现 case` 即可；只有复用已有 case 时才出现 `复用依据` 四行。
 - `已实现 case` 段只放与该测试点一一对应的 case；默认只写 `case_name`，只有确有必要时才附短状态说明；不要在这里写文件名、函数签名、日志、Gate 结果或分层块。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
-- 若复用已有 case，必须补“复用依据”，且固定为两行字段：`顺序一致性`（关键顺序一致性对比）与 `断言一致性`（关键断言覆盖一致性对比）。
+- 若复用已有 case，必须补"复用依据"，且固定为四行字段：`顺序一致性`、`断言一致性`、`关键变量一致性`、`覆盖粒度一致性`。任一行差异非"无"，就不能把旧 case 当作复用，应新增 case 或标 `blocked`。
 - `test_point` 回填到 `已实现 case` / `复用依据` 即结束；除非用户明确要求，不再追加 `[新增 case]`、`[唯一性检索证据]`、`[质量门禁结果]`、`[分层结论]` 等块。
 
 ### 7.2 测试点与 case 必须一一映射
@@ -267,7 +297,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 新增 case 或复用已有 case 都必须严格符合测试点要求并逐项映射到对应 bug 场景。
 - 不允许用“很像但不完全相同”的路径替代测试点要求的路径。
 - 若测试点要求包含特定模板、producer 切换、fault 次序、地址布局、guard 检查或期望 `tval/cause`，case 必须逐项落到断言里。
-- 若复用已有 case，必须在回填里给出固定两行“复用依据”（`顺序一致性` + `断言一致性`），否则视为未覆盖。
+- 若复用已有 case，必须在回填里给出固定四行"复用依据"（`顺序一致性` + `断言一致性` + `关键变量一致性` + `覆盖粒度一致性`），否则视为未覆盖。
 - 若最终发现无法构造出测试点要求的场景，应在结论里明确 `blocked`，而不是拿邻近 case 顶替。
 
 ## 8. 高质量 case 的最小标准
@@ -307,22 +337,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 
 建议每段之间保留最小必要注释，不要把多种语义混在一段中。
 
-## 12. 断言覆盖矩阵（建议至少覆盖两类）
-
-最小覆盖建议：
-
-- 异常类：`excpt.triggered` + `excpt.cause`
-- 地址类：`excpt.tval`（必要时含 second-half 地址）
-- 数据类：load 返回值或 store 后目标内存
-- 边界类：邻接地址未污染（adjacent preserved）
-
-常见组合：
-
-- fault 类 case：异常类 + 地址类 + 边界类
-- recover 类 case：异常类（前半）+ 数据类（后半）+ 边界类
-- mixed priority 类 case：异常类（优先级）+ 地址类（tval）+ 数据类（副作用）
-
-## 13. side effect 检查建议
+## 12. side effect 检查建议
 
 对 store/amo/vector store 场景，建议同时检查：
 
@@ -337,7 +352,7 @@ TEST_ASSERT("target word updated as expected", target_val == expected_target);
 TEST_ASSERT("adjacent word remains unchanged", adjacent_val == expected_adjacent);
 ```
 
-## 14. 异常路径的状态隔离建议
+## 13. 异常路径的状态隔离建议
 
 多段 fault/recovery case 中，建议每一段都做到：
 
@@ -347,7 +362,29 @@ TEST_ASSERT("adjacent word remains unchanged", adjacent_val == expected_adjacent
 
 不要把“上一段的异常残留”当作下一段的判定依据。
 
-## 15. 提交前硬检查（可复制到 PR 描述）
+## 13.1 Case 独立性
+
+新 case 的一个隐性质量指标：**能不能独立跑通，不依赖前面 case 的副作用**。这关系到未来 `test_register.c` 注册顺序调整或某个前置 case 被移除后，当前 case 是否仍然表达原测试意图。
+
+prepare 段应显式清理本 case 用到的状态，常见需要清理/初始化的项目：
+
+- CSR 残留：`mstatus.SUM/MXR`、`satp`、`menvcfg`、`senvcfg` 等本 case 会读/依赖的位
+- 翻译状态：相关页表项 + `sfence_vma(...)`；跨 ASID 时显式指定
+- Reservation：LR/SC 场景前做一次 dummy 操作清掉 reservation；或明确本 case 不依赖前 case reservation 状态
+- 异常状态：检查 `excpt.*` 前 `TEST_SETUP_EXCEPT()`
+- TLB/cache 预热假设：如果 case 真的**需要** warm cache / 预热 alias，prepare 段要显式构造；不要假设前面 case 刚好留了需要的状态
+
+**写完单跑通过**即可落 `default`。`compile-only` 不跑运行时本条不适用。
+
+怀疑有顺序依赖或 case 涉及跨 case 可见的全局状态（改过 `test_register.c` 的分组、共用 static 变量、触发 trigger/PMP 等粘性 CSR）时，可以手工跑一次窄范围的批跑做对比：
+
+```bash
+python3 get_result.py --platform spike --range <本 case 前后几条行号>
+```
+
+单跑 PASS 但窄范围批跑 FAIL，说明本 case 对前置 case 的副作用有依赖，应该标 `manual` + `reason_code="顺序敏感"`，并回头补 prepare 段的状态清理。这不是硬门禁（会给每次新增 case 多花 30-90s），按需使用。
+
+## 14. 提交前硬检查（可复制到 PR 描述）
 
 - case 源文件中函数命名与文件命名语义一致
 - 单函数仅 1 个 `TEST_END(...)`
@@ -356,3 +393,32 @@ TEST_ASSERT("adjacent word remains unchanged", adjacent_val == expected_adjacent
 - compile-only：已注明 Gate D=N/A、不运行原因与分层依据
 - 已完成 `test_point` 轻量回填（case 名 + 必要短状态；非 default 结论可在交付摘要中说明）
 - `test_register.c` 注册状态与分层策略一致
+- **已做 test_point → case 映射表自查**：逐条列出 test_point 每个要求对应到 case 哪一行断言；漏项已补、偏移已改
+
+### 14.1 test_point → case 映射表自查（写完运行通过后必做）
+
+对照 test_point 正文（尤其"构建场景"或扩展模板的"对应场景"），逐条列出**哪一条要求落在 case 的哪一行**：
+
+```text
+test_point 要求 → case 断言位置
+- "repeated SAF"           → L28 TEST_ASSERT("first SAF", excpt.cause==CAUSE_SAF)
+                              L42 TEST_ASSERT("second SAF", excpt.cause==CAUSE_SAF)
+- "repair 后再 retry 成功"  → L58 TEST_ASSERT("retried trap-free", excpt.triggered==false)
+- "boundary image 保持"     → L71 TEST_ASSERT("guard_before unchanged", guard_before==0xCC)
+                              L72 TEST_ASSERT("guard_after unchanged", guard_after==0xCC)
+- "最终 sw trap-free"       → L85 TEST_ASSERT("final sw no trap", excpt.triggered==false)
+```
+
+这一步的目的：
+
+- **抓漏项**：test_point 要求了但断言里没写的，立即补（例如要求查 boundary 但只断言了 target）
+- **抓偏移**：断言方向跟 test_point 不一致的，立即改（例如 test_point 说 `CAUSE_SAF` 但写成了 `CAUSE_LAF`，参考 `references/cause_code_catalog.md`）
+- **抓场景不匹配**：test_point 要 cross-16B 但 case 写成 cross-page，改回来
+
+工作方式：
+
+- 运行通过后、回填 test_point 前，在最终交付摘要里**显式输出一次这张表**（不写到 test_point 正文，只放摘要）
+- 如果 test_point 某条要求无法在 case 里构造（平台/环境/模型限制），在表里写明 `blocked` 原因，不要偷换成邻近场景
+- 补已有 `### PnX` 只加 assert 时，映射表也要做，只是只列本次改动的那几条
+
+映射表的时间开销 < 1 分钟，但能抓到 20-30% 的"写完才发现漏"类错误。

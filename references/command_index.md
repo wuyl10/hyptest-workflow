@@ -2,7 +2,7 @@
 
 本文是 `hyptest-workflow` 的常用命令索引。README 只保留最高频入口；完整命令由 `scripts/list_skill_commands.py --markdown` 生成到这里。
 
-命令中的 `$HYPTEST_HOME` 表示 `riscv-hyp-tests-nhv5.1` 仓库根目录，`<test_point_file>` 表示测试点文件路径。脚本 CLI 参数仍叫 `--repo-root`，但它和 prompt 里的 `HYPTEST_HOME` 是同一含义：
+命令中的 `$HYPTEST_HOME` 表示 `riscv-hyp-tests` 仓库根目录（具体 fork/分支以团队约定为准），`<test_point_file>` 表示测试点文件路径。脚本 CLI 参数仍叫 `--repo-root`，但它和 prompt 里的 `HYPTEST_HOME` 是同一含义：
 
 ```bash
 python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-file test_point/<file>.md ...
@@ -30,7 +30,7 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
 - `full`: 完整检查，包含真实仓库相似 case eval，并保存报告。
 
   ```bash
-  python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out .hyptest_skill_reports/self_check_full.json --md-out .hyptest_skill_reports/self_check_full.md
+  python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.md
   ```
 
 ### doctor
@@ -73,22 +73,34 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
   python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --query '<scenario terms>' --json
   ```
 
+- `workflow-paths`: 显示统一的 .hyptest_workflow_skill cache/report/memory/tmp 路径。
+
+  ```bash
+  python3 scripts/workflow_paths.py --repo-root $HYPTEST_HOME
+  ```
+
 - `case-preflight-pack`: 写 case 前聚合任务、规格/平台口径、环境、repo 快照和相似 case reading pack；覆盖范围可按 task_mode 自动推导。
 
   ```bash
-  python3 scripts/case_preflight_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out .hyptest_skill_reports/case_preflight.md --json-out .hyptest_skill_reports/case_preflight.json
+  python3 scripts/case_preflight_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1 --query '<scenario terms>' --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.md --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json
   ```
 
 - `case-skeleton`: 从 preflight 证据生成保守 C 骨架，不裁决 case 语义。
 
   ```bash
-  python3 scripts/make_case_skeleton.py --case <case_name> --preflight-json .hyptest_skill_reports/case_preflight.json --test-point-id <PnX>
+  python3 scripts/make_case_skeleton.py --case <case_name> --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json --test-point-id <PnX>
   ```
 
 - `case-name-suggest`: 根据 preflight/test_point 术语建议 case 名，并做全仓精确/相似命名冲突检查。
 
   ```bash
-  python3 scripts/suggest_case_name.py --repo-root $HYPTEST_HOME --preflight-json .hyptest_skill_reports/case_preflight.json --prefix ai_micro --json
+  python3 scripts/suggest_case_name.py --repo-root $HYPTEST_HOME --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json --prefix ai_micro --json
+  ```
+
+- `case-uniqueness`: 写新 case 前检查精确函数名唯一性，默认复用 repo evidence cache，避免每次 rg 冷扫。
+
+  ```bash
+  python3 scripts/check_case_uniqueness.py --repo-root $HYPTEST_HOME --case <case_name> --expect absent --json
   ```
 
 - `case-lint`: 检查已改 case 源文件的测试框架结构问题。
@@ -130,43 +142,79 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
 - `case-postcheck-pack`: 写 case 后聚合 lint、回填、注册、产物和最新日志证据。
 
   ```bash
-  python3 scripts/case_postcheck_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_postcheck.md --json-out .hyptest_skill_reports/case_postcheck.json
+  python3 scripts/case_postcheck_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.md --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.json
   ```
 
 - `case-gate-pack`: 单 case 编译、运行并聚合 postcheck 证据；编译失败会跳过运行，本轮运行日志会直接捕获，失败日志会自动分类，同时记录每步耗时。
 
   ```bash
-  python3 scripts/case_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out .hyptest_skill_reports/case_gate.md --json-out .hyptest_skill_reports/case_gate.json --postcheck-md-out .hyptest_skill_reports/case_postcheck.md --postcheck-json-out .hyptest_skill_reports/case_postcheck.json
+  python3 scripts/case_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --spec-profile <spec_profile> --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.md --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json --postcheck-md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.md --postcheck-json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_postcheck.json
   ```
 
 - `batch-gate-pack`: 对多个 case 分别跑 gate pack，保留每个 case 独立证据和独立分层边界。
 
   ```bash
-  python3 scripts/case_batch_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case1> --case <case2> --platform spike --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_batch_gate.json --md-out .hyptest_skill_reports/case_batch_gate.md
+  python3 scripts/case_batch_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case1> --case <case2> --platform spike --spec-profile <spec_profile> --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_batch_gate.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_batch_gate.md
   ```
 
 - `multi-platform-gate-pack`: 对同一个 case 并行跑多个平台的 gate pack，但不合并成最终分层裁决。
 
   ```bash
-  python3 scripts/case_multi_platform_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --platform linknan --spec-profile <spec_profile> --json-out .hyptest_skill_reports/case_multi_platform_gate.json --md-out .hyptest_skill_reports/case_multi_platform_gate.md
+  python3 scripts/case_multi_platform_gate_pack.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --case <case_name> --platform spike --platform linknan --spec-profile <spec_profile> --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_multi_platform_gate.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_multi_platform_gate.md
   ```
 
 - `submission-card`: 把 preflight/gate/postcheck 证据整理成最终交付卡片和可选交付草稿，但不自动裁决分层。
 
   ```bash
-  python3 scripts/make_case_submission_card.py --preflight-json .hyptest_skill_reports/case_preflight.json --gate-json .hyptest_skill_reports/case_gate.json --emit-final-draft --json-out .hyptest_skill_reports/submission_card.json --md-out .hyptest_skill_reports/submission_card.md
+  python3 scripts/make_case_submission_card.py --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json --emit-final-draft --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.md
   ```
 
 - `timing-summary`: 汇总 workflow pack 报告中的耗时和缓存命中率，用于观察瓶颈。
 
   ```bash
-  python3 scripts/case_timing_summary.py --reports '.hyptest_skill_reports/*.json' --json-out .hyptest_skill_reports/timing_summary.json --md-out .hyptest_skill_reports/timing_summary.md
+  python3 scripts/case_timing_summary.py --reports '$HYPTEST_HOME/.hyptest_workflow_skill/reports/*.json' --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/timing_summary.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/timing_summary.md
   ```
 
 - `workflow-ledger`: 汇总单个 case 的端到端耗时、缓存命中和返工信号，不裁决分层。
 
   ```bash
-  python3 scripts/case_workflow_ledger.py --case <case_name> --preflight-json .hyptest_skill_reports/case_preflight.json --gate-json .hyptest_skill_reports/case_gate.json --submission-json .hyptest_skill_reports/submission_card.json --json-out .hyptest_skill_reports/workflow_ledger.json --md-out .hyptest_skill_reports/workflow_ledger.md
+  python3 scripts/case_workflow_ledger.py --case <case_name> --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json --submission-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.json --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/workflow_ledger.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/workflow_ledger.md
+  ```
+
+- `workflow-timeline-start`: 在 repo 分析或编辑前启动 prompt-to-final 阶段耗时记录；可选 prompt 边界用于记录第一次工具调用前模型时间。
+
+  ```bash
+  python3 scripts/workflow_timeline.py start --repo-root $HYPTEST_HOME --timeline-id <case_or_task>_<timestamp> --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode <task_mode> --target-module <module> --phase prompt_intake [--prompt-received-at <iso_time>]
+  ```
+
+- `workflow-timeline-enter`: 记录 prompt-to-final workflow 的主要阶段切换。
+
+  ```bash
+  python3 scripts/workflow_timeline.py enter --repo-root $HYPTEST_HOME --timeline <timeline_id> --phase <phase_name>
+  ```
+
+- `workflow-timeline-finish`: 最终答复前结束 prompt-to-final 计时并写出 JSON/Markdown 报告。
+
+  ```bash
+  python3 scripts/workflow_timeline.py finish --repo-root $HYPTEST_HOME --timeline <timeline_id> --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/<timeline_id>_workflow_timeline.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/<timeline_id>_workflow_timeline.md
+  ```
+
+- `workflow-timed-cmd`: 运行具体命令并把命令 wall time 记录到 timeline，区分真实命令耗时、命令前/后空档和阶段未归属时间。
+
+  ```bash
+  python3 scripts/workflow_timed_cmd.py --repo-root $HYPTEST_HOME --timeline <timeline_id> --name <span_name> --phase <phase_name> -- <command> <args>
+  ```
+
+- `workflow-memory-append`: 追加一条本地 workflow memory，用于记录失败、修复或流程教训。
+
+  ```bash
+  python3 scripts/workflow_memory.py --repo-root $HYPTEST_HOME append --phase compile --status fixed --case <case_name> --module <module> --platform spike --symptom '<short symptom>' --fix '<short fix>'
+  ```
+
+- `workflow-memory-query`: 检索本地 workflow memory，作为避免重复踩坑的证据线索。
+
+  ```bash
+  python3 scripts/workflow_memory.py --repo-root $HYPTEST_HOME query --term '<keyword>' --limit 10
   ```
 
 ### profile-and-tiering
@@ -193,6 +241,18 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
 
   ```bash
   python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --address <pa> --decision-only
+  ```
+
+- `rtl-bug-history`: Auto-invoked by skill in bug hunt tasks; results are one evidence source (commit heuristic misses non-'fix' commits and unmerged bugs). Do not rely on alone.
+
+  ```bash
+  python3 scripts/query_rtl_bug_history.py --module <module> --limit 10 --markdown
+  ```
+
+- `uncovered-bug-neighbors`: Cross-reference RTL fix commits against test_point/*.md references; surface 'already fixed but no nearby test_point coverage' bug hunt candidates. Pairs with rtl-bug-history.
+
+  ```bash
+  python3 scripts/query_uncovered_bug_neighbors.py --module <module> --limit 20 --markdown
   ```
 
 - `reason-code`: 根据失败现象给出候选 reason_code。
@@ -271,7 +331,7 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
 
 ### cleanup
 
-- `clean-generated`: 删除 skill 本地临时文件和缓存文件。
+- `clean-generated`: 删除 workflow cache/report/tmp；默认保留 memory。
 
   ```bash
   python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME

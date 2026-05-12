@@ -31,19 +31,23 @@
 - `references/framework_usage_pitfalls.md`
   - `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册、编译脚本、运行脚本等 harness/工具坑点。
 - `references/rules_and_pitfalls.md`
-  - 兼容旧引用的规则入口索引；不是人工规格入口。
+  - 规则入口索引；不是人工规格入口。
 - `references/coverage_and_dedupe.md`
   - 测试点覆盖检查、repo/file 级排重口径、case 相似检索和唯一性检索模板。
 - `references/rtl_bug_patterns.md`
-  - 当前项目中可参考的 RTL 怀疑点示例；不是规格真值。
+  - 当前项目中可参考的 RTL 怀疑点示例；不是规格真值。bug hunt 时优先用 `scripts/query_rtl_bug_history.py`。
+- `references/workflow_state.md`
+  - `.hyptest_workflow_skill/` 的目录布局、清理策略、memory append/query/summarize CLI；SKILL.md 只保留精要提醒，细节放这里。
+- `references/cause_code_catalog.md`
+  - `excpt.cause` 断言用的 `CAUSE_*` 常量速查表：场景 → 常量映射 + 常见混淆对比 + 优先级冲突口径。写 case 前速查，避免写错 `LAF` vs `LPF` 等。
+- `evals/evals.json` + `evals/README.md`
+  - 真实任务 prompt eval 集，按 skill-creator 的 evals.json schema 维护。3 个 eval 覆盖新增 case / 补已有条目 / bug hunt 三种典型工作流。用于 skill-creator benchmark 循环；和 `scripts/eval_*.py` 不同——后者测脚本，此测 skill 整体。
 - `references/triage_handoff_schema.md`
   - workflow 交给 `hyptest-failure-triage` 的结构化字段约定。
 - `references/submission_card.md`
   - 提交前复核卡片。
 - `references/maintainer_guide.md`
   - skill 维护、新增 profile、脚本/eval 变更的检查清单。
-- `references/prompt_recipes.md`
-  - 可复制 prompt 模板；README 只保留快速入口，长 prompt 放这里维护。
 - `references/command_index.md`
   - 完整命令索引；生成命令块由 `scripts/update_readme_commands.py` 刷新。
 
@@ -63,6 +67,10 @@
   - 将 preflight/gate/postcheck JSON 汇总成最终交付证据卡；只整理证据，不自动裁决分层。
 - `scripts/case_timing_summary.py`
   - 汇总 workflow pack JSON 的 `timing` 和 cache hit/miss，辅助定位耗时瓶颈。
+- `scripts/workflow_timeline.py`
+  - 记录从 prompt intake 到最终答复前的 agent 可见阶段耗时；通过 `start/enter/finish` 写出 timeline JSON/Markdown report，也支持 `cmd-start/cmd-end` 记录命令级 span，并输出 `Optimization Hints` 区分 phase 边界滞后、无命令阶段和真实慢命令。若外部提供 `--prompt-received-at`，会额外报告第一次工具调用前的模型时间；否则该段显示为不可观测。
+- `scripts/workflow_timed_cmd.py`
+  - 包装一个具体命令并自动记录 timeline command span，用于区分命令真实耗时、命令前/后空档和 phase 内未归属时间。
 - `scripts/case_extractor.py`
   - `find_similar_cases.py` 的 case 提取、注册状态读取和缓存 builder。
 - `scripts/similar_case_ranker.py`
@@ -76,13 +84,17 @@
 - `scripts/markdown_sections.py`
   - Markdown heading section split/filter/index 选择辅助模块；从相似检索 term 逻辑中拆出。
 - `scripts/similar_case_core.py`
-  - 兼容旧 import 的 re-export 模块；新逻辑不要继续堆到这里。
+  - re-export 模块；新逻辑不要继续堆到这里。
 - `scripts/similar_case_cache.py`
   - `find_similar_cases.py` 的缓存/fingerprint 辅助模块。
 - `scripts/profile_utils.py`
   - 读取 profile fenced JSON block、解析地址窗口和共享 profile 查询逻辑。
 - `scripts/query_spec_profile.py`
   - 按 `spec_profile` 查询 PMA/PBMT/MMIO 机器可读表，可用 PA 地址或 window 过滤；支持 `--summary` 和 `--decision-only`。
+- `scripts/query_rtl_bug_history.py`
+  - 跨 LinkNan + Nanhu git log 查 RTL bug-fix commit；由 skill 在 bug hunt 场景（`target_module=<module>` + `new-case-only`、`bug_hunt_focus`、"找 suspected bug" 等）自动调用，不作为日常手工入口。结果只作为证据的一部分：commit 启发式会漏掉没有 `fix` 关键词的修复、未提交 bug、重构顺带修掉的 bug；调用规则和边界见 `SKILL.md` 的 `Bug Hunt Evidence` 段。
+- `scripts/query_uncovered_bug_neighbors.py`
+  - 交叉 `query_rtl_bug_history.py` 的 fix commit 与 `test_point/*.md` 中已引用的 `<file>.scala:<line>`，找"已修过但附近 test_point 没覆盖"的高价值 bug hunt 方向。bug hunt 场景 skill 在跑 `query_rtl_bug_history` 之后可顺手跑一次；`--proximity` 调节"附近"的行数距离（默认 50）。只是证据的一部分，不替代 RTL 阅读和 profile 判断。
 - `scripts/suggest_reason_code.py`
   - 根据失败现象文本给 `reason_code` 候选，便于分层时快速找到 catalog 条目。
 - `scripts/classify_failure_log.py`
@@ -93,6 +105,8 @@
   - 校验 prompt 中的 `HYPTEST_HOME`（脚本 CLI 参数为 `--repo-root`）、`test_point_file`、`platform`、`spec_profile`、`task_mode` 等任务输入；支持 CLI、`--request-json`、`--request-md`。
 - `scripts/check_case_lint.py`
   - 检查 case 源文件结构问题；支持 `--changed-only`、`--strict-case-end`、`--warnings-as-errors`、`--baseline`、`--write-baseline`，并提示弱断言文案/缺少断言。
+- `scripts/check_case_uniqueness.py`
+  - 写新 case 前检查精确函数名唯一性；默认复用 repo evidence cache，比每次 `rg` 冷扫更适合 NFS 仓库。
 - `scripts/case_lint_baseline_diff.py`
   - 比较两个 case lint baseline，列出新增/移除 issue。
 - `scripts/check_writeback_format.py`
@@ -106,7 +120,7 @@
 - `scripts/check_skill_consistency.py`
   - 检查 `SKILL.md`、README、resource index、`.gitignore`、self-check 脚本之间的维护一致性。
 - `scripts/check_cross_skill_consistency.py`
-  - 检查 `hyptest-workflow` 与 `hyptest-failure-triage` 的关键触发词和旧路径回归风险。
+  - 检查 `hyptest-workflow` 与 `hyptest-failure-triage` 的关键触发词和交接字段一致性。
 - `scripts/check_reason_codes.py`
   - 检查文档引用的 reason_code 是否同时存在于 Markdown catalog 和机器可读 JSON。
 - `scripts/check_resource_index.py`
@@ -119,8 +133,6 @@
   - 检查 repo anchors、工具链、`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` 等平台环境变量，以及 LinkNan submodule 中的 Nanhu source；支持 `--platform all` 和 `--explain`。
 - `scripts/new_spec_profile.py`
   - 从 profile template 创建新 profile skeleton，可同步更新 profile registry。
-- `scripts/check_hyptest_repo_migration.py`
-  - 检查真实 hyptest 仓库是否仍残留旧目录、旧字段或旧平台名逻辑；用于目录重构后回归。
 - `scripts/check_hyptest_cli_contract.py`
   - 检查真实 hyptest 仓库的 `compile_elf.py` / `get_result.py` CLI、平台名、`case_elf_asm`、环境变量和个人路径约束。
 - `scripts/repo_snapshot.py`
@@ -132,7 +144,7 @@
 - `scripts/eval_profile_portability.py`
   - 回归检查通用 README/SKILL/命令输出不泄漏具体默认 profile，只有显式解析时才展开 registry default。
 - `scripts/clean_generated.py`
-  - 清理 `.hyptest_skill_tmp/`、`.hyptest_skill_cache/`、`__pycache__/` 等生成物。
+  - 清理 `.hyptest_workflow_skill/cache/`、`.hyptest_workflow_skill/reports/`、`.hyptest_workflow_skill/tmp/`、`__pycache__/` 等 workflow 生成物；默认保留 memory。`compile_elf.py` 的编译临时文件默认在仓库 `.tmp/hyptest_compile/`。
 - `scripts/doctor.py`
   - 一条命令汇总 profile、文档链接、reason_code、repo 迁移、环境和 quick self-check 的健康检查。
 - `scripts/list_skill_commands.py`
@@ -164,6 +176,8 @@
   - 回归检查 hyptest CLI contract checker 的正反 fixtures。
 - `scripts/eval_check_case_lint.py`
   - 回归检查 case lint 的正反例和 `--changed-only`。
+- `scripts/eval_check_case_uniqueness.py`
+  - 回归检查写前 absent、写后 unique、注释注册 warning 和 cache hit 行为。
 - `scripts/eval_case_lint_baseline_diff.py`
   - 回归检查 case lint baseline diff 的新增 issue 检测。
 - `scripts/eval_check_writeback_format.py`
@@ -206,6 +220,8 @@
   - 回归检查 `make_case_submission_card.py` 的 evidence-only 输出 contract。
 - `scripts/eval_case_timing_summary.py`
   - 回归检查 `case_timing_summary.py` 的 timing/cache 汇总 contract。
+- `scripts/eval_workflow_timeline.py`
+  - 回归检查 `workflow_timeline.py` 的 start/enter/finish 阶段耗时、prompt 边界、command span、重叠命令合并和 unattributed time contract。
 
 ## Assets
 
@@ -248,7 +264,6 @@
 - `assets/script_manifest.json`
 - `assets/triage_handoff_schema.json`
 - `references/command_index.md`
-- `references/prompt_recipes.md`
 - `scripts/case_batch_gate_pack.py`
 - `scripts/case_extractor.py`
 - `scripts/case_gate_pack.py`
@@ -259,12 +274,12 @@
 - `scripts/case_timing_summary.py`
 - `scripts/case_workflow_ledger.py`
 - `scripts/check_case_lint.py`
+- `scripts/check_case_uniqueness.py`
 - `scripts/check_cross_skill_consistency.py`
 - `scripts/check_docs_links.py`
 - `scripts/check_env.py`
 - `scripts/check_get_result_log_contract.py`
 - `scripts/check_hyptest_cli_contract.py`
-- `scripts/check_hyptest_repo_migration.py`
 - `scripts/check_readme_commands.py`
 - `scripts/check_reason_codes.py`
 - `scripts/check_resource_index.py`
@@ -286,6 +301,7 @@
 - `scripts/eval_case_timing_summary.py`
 - `scripts/eval_case_workflow_ledger.py`
 - `scripts/eval_check_case_lint.py`
+- `scripts/eval_check_case_uniqueness.py`
 - `scripts/eval_check_env.py`
 - `scripts/eval_check_writeback_format.py`
 - `scripts/eval_failure_log_workflow.py`
@@ -304,8 +320,10 @@
 - `scripts/eval_suggest_case_name.py`
 - `scripts/eval_triage_handoff.py`
 - `scripts/eval_validate_task_request.py`
+- `scripts/eval_workflow_paths_memory.py`
 - `scripts/eval_workflow_smoke.py`
 - `scripts/eval_workflow_task_prompts.py`
+- `scripts/eval_workflow_timeline.py`
 - `scripts/eval_workflow_transcripts.py`
 - `scripts/find_similar_cases.py`
 - `scripts/list_skill_commands.py`
@@ -315,7 +333,9 @@
 - `scripts/markdown_sections.py`
 - `scripts/new_spec_profile.py`
 - `scripts/profile_utils.py`
+- `scripts/query_rtl_bug_history.py`
 - `scripts/query_spec_profile.py`
+- `scripts/query_uncovered_bug_neighbors.py`
 - `scripts/repo_evidence_index.py`
 - `scripts/repo_snapshot.py`
 - `scripts/resolve_spec_profile.py`
@@ -335,5 +355,9 @@
 - `scripts/update_script_manifest.py`
 - `scripts/validate_task_request.py`
 - `scripts/validate_triage_handoff.py`
+- `scripts/workflow_memory.py`
+- `scripts/workflow_paths.py`
+- `scripts/workflow_timed_cmd.py`
+- `scripts/workflow_timeline.py`
 - `scripts/writeback_register.py`
 <!-- END GENERATED RESOURCE COVERAGE -->

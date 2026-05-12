@@ -19,7 +19,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -90,7 +90,7 @@ def main() -> int:
         )
         write(repo / f"case_elf_asm/spike/{case_name}.ELF", "elf\n")
         write(repo / f"case_elf_asm/spike/{case_name}.asm", "asm\n")
-        write(repo / f"result_log/spike/{case_name}_smoke.log", "PASS\nHIT GOOD TRAP\n")
+        write(repo / f".tmp/result_log/spike/{case_name}_smoke.log", "PASS\nHIT GOOD TRAP\n")
 
         env = os.environ.copy()
         for name in (

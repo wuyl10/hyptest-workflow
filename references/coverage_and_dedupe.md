@@ -110,16 +110,34 @@ python3 scripts/find_similar_cases.py \
 
 相似检索不能替代唯一性检索。
 
-推荐命令：
+推荐快路径：
+
+```bash
+python3 scripts/check_case_uniqueness.py \
+  --repo-root $HYPTEST_HOME \
+  --case <case_name> \
+  --expect absent \
+  --json
+```
+
+说明：
+
+- `--expect absent` 用于写新 case 前，要求 `ai_test_cases/*.c` 和 `manual_test_cases/**/*.c` 中没有同名 `bool <case_name>(...)` 定义。
+- 该脚本默认复用 `repo_evidence_index.py` 的缓存；如果 preflight pack 已经构建过索引，后续唯一性检查应是 cache hit，避免每次在 NFS 上冷扫源码。
+- 写完 case 后仍由 `case_postcheck_pack.py` / `case_gate_pack.py` 复核 `definition_unique=true`，这是后置确认，不替代写前拦截。
+
+仅在脚本不可用或需要人工二次核实时使用 `rg` 备用命令：
 
 ```bash
 rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases manual_test_cases test_register.c
 ```
 
+不要把备用命令写成 repo root 全量扫描；精确唯一性只需要覆盖 case 源目录和注册表。
+
 结论规则：
 
-- `rg` 无命中：可以作为“函数名未被占用”的证据
-- `rg` 有命中：
+- `check_case_uniqueness.py --expect absent` 通过，或备用 `rg` 无命中：可以作为“函数名未被占用”的证据
+- 检查有命中：
   - 若是已有定义，禁止重复造同名 case
   - 若只在注释注册中命中，也要继续核对定义是否已存在
 
@@ -141,7 +159,7 @@ rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases manual_test_case
 1. 锁定目标 `### PnX`
 2. 默认按局部范围检查当前条目/文件内是否已覆盖
 3. 用全仓 `find_similar_cases.py` 检查相似 case
-4. 用 `rg` 检查函数名唯一性
+4. 用 `check_case_uniqueness.py --expect absent` 检查函数名唯一性
 5. 再决定补 case、复用 case 或不新增
 
 ### 新增测试点
@@ -149,5 +167,5 @@ rg -n "^\s*(?:static\s+)?bool\s+<case_name>\s*\(" ai_test_cases manual_test_case
 1. 默认按全仓范围扫描 `test_point/*.md`
 2. 判断是否已有近似测试点
 3. 再做全仓 case 相似检索
-4. 再做函数名唯一性检索
+4. 再做函数名唯一性检索；命名确定后先用 `check_case_uniqueness.py --expect absent`
 5. 只有在“测试点未覆盖 + case 未重复”时才新增

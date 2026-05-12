@@ -10,7 +10,6 @@ from pathlib import Path
 
 GENERIC_DOCS = [
     "SKILL.md",
-    "README.md",
     "agents/openai.yaml",
     "references/spec_and_model_limits.md",
     "references/writing_cases.md",

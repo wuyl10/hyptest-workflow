@@ -148,9 +148,9 @@ def find_case_definitions(repo_root: Path, case_name: str) -> list[dict[str, Any
 
 
 def latest_logs(repo_root: Path, platform: str, case_name: str, limit: int = 5) -> list[dict[str, Any]]:
-    base = repo_root / "result_log" / platform
+    base = repo_root / ".tmp" / "result_log" / platform
     if not base.is_dir():
-        base = repo_root / "result_log"
+        base = repo_root / ".tmp" / "result_log"
     if not base.is_dir():
         return []
     fast_candidates: list[Path] = []
@@ -351,8 +351,16 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend(["", "## Timing", ""])
     timing = report.get("timing", {})
     lines.append(f"- total_seconds: `{timing.get('total_seconds', '-')}`")
+    by_step = timing.get("by_step") or {}
+    if by_step:
+        lines.append("- by_step:")
+        for name, seconds in by_step.items():
+            lines.append(f"  - {name}: `{seconds}` seconds")
+    slowest = timing.get("slowest_steps", [])
+    if slowest:
+        lines.append("- slowest_steps:")
     for item in timing.get("slowest_steps", []):
-        lines.append(f"- {item['name']}: `{item['seconds']}` seconds")
+        lines.append(f"  - {item['name']}: `{item['seconds']}` seconds")
     lines.extend(["", "## Cases", ""])
     for case in report["cases"]:
         lines.append(f"### `{case['case']}`")

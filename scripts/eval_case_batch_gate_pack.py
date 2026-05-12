@@ -18,7 +18,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -56,7 +56,7 @@ def main() -> int:
             "import argparse\n"
             "from pathlib import Path\n"
             "p=argparse.ArgumentParser(); p.add_argument('--platform', default='spike'); p.add_argument('--case', required=True); a=p.parse_args()\n"
-            "out=Path('result_log')/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
+            "out=Path('.tmp')/'result_log'/a.platform; out.mkdir(parents=True, exist_ok=True)\n"
             "(out/(a.case+'_batch.log')).write_text('PASS\\nHIT GOOD TRAP\\n')\n"
             "print('PASS', a.case)\n",
         )

@@ -12,10 +12,10 @@
     "forbidden_terms": ["apply_patch", "新增 case"]
   },
   {
-    "id": "legacy_platform_alias_redirect",
+    "id": "xiangshan_platform_redirect",
     "prompt": "platform=xiangshan，帮我跑 ai_case。",
     "expected_terms": ["platform=linknan", "LINKNAN_HOME", "DIFFTEST_REF_SO"],
-    "forbidden_terms": ["legacy hyptest platform flag"]
+    "forbidden_terms": ["deprecated hyptest platform flag"]
   },
   {
     "id": "rtl_only_cache_tlb_policy",

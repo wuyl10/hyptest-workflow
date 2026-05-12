@@ -166,9 +166,9 @@ def run_env_check(args: argparse.Namespace, repo_root: Path, *, run_required: bo
 
 
 def collect_log_snapshot(repo_root: Path, platform: str, case_name: str) -> dict[str, float]:
-    base = repo_root / "result_log" / platform
+    base = repo_root / ".tmp" / "result_log" / platform
     if not base.is_dir():
-        base = repo_root / "result_log"
+        base = repo_root / ".tmp" / "result_log"
     if not base.is_dir():
         return {}
     snapshot: dict[str, float] = {}
@@ -188,9 +188,9 @@ def discover_run_logs(
     *,
     limit: int = 5,
 ) -> list[dict[str, Any]]:
-    base = repo_root / "result_log" / platform
+    base = repo_root / ".tmp" / "result_log" / platform
     if not base.is_dir():
-        base = repo_root / "result_log"
+        base = repo_root / ".tmp" / "result_log"
     if not base.is_dir():
         return []
     candidates: list[Path] = []
@@ -606,8 +606,16 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend(["", "## Timing", ""])
     timing = report.get("timing", {})
     lines.append(f"- total_seconds: `{timing.get('total_seconds', '-')}`")
+    by_step = timing.get("by_step") or {}
+    if by_step:
+        lines.append("- by_step:")
+        for name, seconds in by_step.items():
+            lines.append(f"  - {name}: `{seconds}` seconds")
+    slowest = timing.get("slowest_steps", [])
+    if slowest:
+        lines.append("- slowest_steps:")
     for item in timing.get("slowest_steps", []):
-        lines.append(f"- {item['name']}: `{item['seconds']}` seconds")
+        lines.append(f"  - {item['name']}: `{item['seconds']}` seconds")
     lines.extend(["", "## Evidence Requirements", ""])
     evidence = report.get("evidence_requirements", {})
     lines.append(f"- overall: `{'PASS' if evidence.get('ok') else 'FAIL'}`")

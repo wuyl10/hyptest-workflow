@@ -63,6 +63,12 @@
       "self_check": false
     },
     {
+      "path": "scripts/check_case_uniqueness.py",
+      "group": "check",
+      "public": true,
+      "self_check": false
+    },
+    {
       "path": "scripts/check_cross_skill_consistency.py",
       "group": "check",
       "public": true,
@@ -88,12 +94,6 @@
     },
     {
       "path": "scripts/check_hyptest_cli_contract.py",
-      "group": "check",
-      "public": true,
-      "self_check": true
-    },
-    {
-      "path": "scripts/check_hyptest_repo_migration.py",
       "group": "check",
       "public": true,
       "self_check": true
@@ -225,6 +225,12 @@
       "self_check": true
     },
     {
+      "path": "scripts/eval_check_case_uniqueness.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
       "path": "scripts/eval_check_env.py",
       "group": "eval",
       "public": true,
@@ -333,6 +339,12 @@
       "self_check": true
     },
     {
+      "path": "scripts/eval_workflow_paths_memory.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
       "path": "scripts/eval_workflow_smoke.py",
       "group": "eval",
       "public": true,
@@ -340,6 +352,12 @@
     },
     {
       "path": "scripts/eval_workflow_task_prompts.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_workflow_timeline.py",
       "group": "eval",
       "public": true,
       "self_check": true
@@ -399,8 +417,20 @@
       "self_check": false
     },
     {
+      "path": "scripts/query_rtl_bug_history.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
       "path": "scripts/query_spec_profile.py",
       "group": "profile",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/query_uncovered_bug_neighbors.py",
+      "group": "workflow",
       "public": true,
       "self_check": false
     },
@@ -514,6 +544,30 @@
     },
     {
       "path": "scripts/validate_triage_handoff.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/workflow_memory.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/workflow_paths.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/workflow_timed_cmd.py",
+      "group": "workflow",
+      "public": true,
+      "self_check": false
+    },
+    {
+      "path": "scripts/workflow_timeline.py",
       "group": "workflow",
       "public": true,
       "self_check": false

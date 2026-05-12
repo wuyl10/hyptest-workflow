@@ -15,7 +15,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -104,7 +104,7 @@ def main() -> int:
                     "definitions": [{"path": "ai_test_cases/skeleton.c", "line": 1}],
                     "register_status": "enabled",
                     "artifacts": {"elf": f"case_elf_asm/spike/{case}.ELF", "asm": f"case_elf_asm/spike/{case}.asm"},
-                    "latest_logs": [{"path": f"result_log/spike/{case}.log", "summary": {"has_pass": True}}],
+                    "latest_logs": [{"path": f".tmp/result_log/spike/{case}.log", "summary": {"has_pass": True}}],
                     "test_point_mentions": [{"line": 10, "text": f"- `{case}`（default，已启用）"}],
                 }
             ],

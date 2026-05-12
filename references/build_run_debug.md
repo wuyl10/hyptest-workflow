@@ -1,6 +1,6 @@
 # HYPTEST 编译、运行与调试指南
 
-本文给出在 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git 的 `nhv5.1` 分支目录中最实用、可直接执行的命令序列。
+本文给出在 `riscv-hyp-tests` 仓库（`$HYPTEST_HOME` 指向的工作目录）中最实用、可直接执行的命令序列。具体 fork/分支以 `$HYPTEST_HOME` 实际指向为准。
 
 ## 1. 环境准备
 
@@ -8,12 +8,11 @@
 
 ```bash
 pwd
-# 期望: 当前目录是 riscv-hyp-tests-nhv5 的 nhv5.1 分支工作目录
+# 期望: 当前目录是 $HYPTEST_HOME
 
 git remote -v
 git branch --show-current
-# 期望: remote 包含 https://github.com/wuyl10/riscv-hyp-tests-nhv5.git
-# 期望: 当前分支为 nhv5.1
+# 期望: remote 与当前分支符合团队约定（常见 `nhv5.1`；以 prompt/团队约定为准）
 
 which riscv64-unknown-elf-gcc
 which make
@@ -138,8 +137,8 @@ python3 get_result.py --platform spike --range 504-556 --dry-run
 
 默认日志目录：
 
-- `result_log/spike/`
-- `result_log/linknan/`
+- `.tmp/result_log/spike/`
+- `.tmp/result_log/linknan/`
 
 `get_result.py` 汇总信息常看字段：
 
@@ -191,7 +190,7 @@ python3 compile_elf.py --plat spike --name <case_name>
 python3 get_result.py --platform spike --case <case_name>
 
 # 3) 看摘要日志
-ls result_log/spike | tail
+ls .tmp/result_log/spike | tail
 
 # 4) 如失败，打开对应 log 分析
 # 关注 returncode、missing_required、found_forbidden、untested_occurrences
@@ -209,6 +208,15 @@ python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform linknan
 ```
 
 `check_env.py` 只检查环境是否足够执行，不会 fallback 到个人路径。
+
+### 7.2 环境常见 troubleshooting
+
+- 本轮需要但当前进程看不到的 `HYPTEST_*` 变量（`HYPTEST_HOME` / `HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` / `HYPTEST_CROSS_COMPILE` / `HYPTEST_TMPDIR`）必须在 prompt 显式给出或先 `export`；不要用 `which spike` 或 PATH 中的其它 `spike` 替代。
+- prompt 写成 `$VAR` 但当前 shell 无法展开时视为**缺失**，不是"延迟解析"。
+- `~/.bashrc` 里的 `export HYPTEST_*` 必须在 `case $-` / `return` 这类非交互 shell 提前返回保护之**前**；自动化脚本多数是非交互 shell，放错位置时交互终端看到正常、`get_result.py` 却读不到。
+- `HYPTEST_SPIKE_BIN` 必须指向社区版/上游 `riscv-isa-sim` 的 Spike；LinkNan/difftest 参考模型走 `HYPTEST_DIFFTEST_REF_SO`，不要把定制 difftest Spike 当作 default gate 的 `HYPTEST_SPIKE_BIN`。
+- Nanhu 源码证据固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导；submodule 没初始化时先 `git submodule update --init` 或修正 `HYPTEST_LINKNAN_HOME`。
+- 平台字段映射：prompt 里 `HYPTEST_SPIKE_BIN` 等 → hyptest 仓库 `make` / `get_result.py` 认识的 `SPIKE_BIN` 等。用支持 `--env` 的 skill 脚本时显式传 `--env HYPTEST_SPIKE_BIN=<path>`。
 
 `HYPTEST_SPIKE_BIN` 尽量指向社区版/上游 riscv-isa-sim Spike，用于 `platform=spike` 的 architecture/default gate。后续 LinkNan/difftest 使用 `HYPTEST_DIFFTEST_REF_SO` 指向定制参考模型，不要把定制 difftest Spike 混作 `HYPTEST_SPIKE_BIN`。
 
@@ -245,7 +253,7 @@ python3 get_result.py --platform spike --range 504-556 --dry-run
 只看最新批跑摘要：
 
 ```bash
-ls -t result_log/spike/spike_batch_result_*.log | head -n 3
+ls -t .tmp/result_log/spike/spike_batch_result_*.log | head -n 3
 ```
 
 ## 10. 失败类型 -> 处理动作映射

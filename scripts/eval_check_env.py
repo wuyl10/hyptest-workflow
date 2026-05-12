@@ -19,7 +19,7 @@ SKILL_ROOT = SCRIPT_DIR.parent
 
 
 def temp_parent() -> Path:
-    path = SKILL_ROOT / ".hyptest_skill_tmp"
+    path = SKILL_ROOT / ".hyptest_workflow_skill" / "tmp" / "eval"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -135,16 +135,7 @@ def main() -> int:
             failures,
             "bare SPIKE_BIN env should not satisfy the HYPTEST_SPIKE_BIN check",
         )
-        expect(
-            "ignored_legacy_env" not in payload,
-            failures,
-            "check_env should not report legacy-env migration blocks",
-        )
-        expect(
-            not any("ignored legacy" in item for item in payload.get("warnings", [])),
-            failures,
-            "bare SPIKE_BIN should fail as missing HYPTEST_SPIKE_BIN without legacy warning noise",
-        )
+        expect(not payload.get("warnings"), failures, "bare SPIKE_BIN should fail without warnings")
 
         rc, payload = run_check(repo, "spike", base_env)
         expect(rc == 1 and payload["ok"] is False, failures, "missing HYPTEST_SPIKE_BIN should fail")
