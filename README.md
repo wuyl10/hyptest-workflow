@@ -29,14 +29,14 @@ skill 被触发后会按 `SKILL.md` 自动执行完整流程（repo 级覆盖检
 
 ### 一句话范例
 
-正常新增 case：
+根据给定测试场景编写用例：
 
 ```
 "帮我给 test_point/memblock_suspected_bug_corner_points_15.md 新增 1 个 case，
 验证 same-page cross-16B sd 在 repair 后再一次 sw 的 boundary image 保持"
 ```
 
-新增测试点条目 + 对应 case + 反标（一次闭环）：
+根据给定测试点新增用例并反标：
 
 ```
 "给 test_point/memblock_suspected_bug_corner_points_15.md 新增 1 个 ### PnX 测试点，
@@ -44,7 +44,7 @@ skill 被触发后会按 `SKILL.md` 自动执行完整流程（repo 级覆盖检
 聚焦 cbo.inval → prefetch_r → AMO 的 owner 串用"
 ```
 
-围绕模块找 bug 点：
+围绕模块找 bug 点、补测试点并新增用例反标：
 
 ```
 "围绕 memblock 找 1 个高价值 suspected bug 点并新增 case，
@@ -91,7 +91,7 @@ test_point_file=test_point/memblock_suspected_bug_corner_points_15.md"
 
 skill 能从 prompt 里自动推断大部分字段。下表按"什么时候写"分两组。
 
-**必写字段**（skill 无法推断）：
+**必写字段**：
 
 | 字段 | 什么时候写 | 取值 |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ skill 能从 prompt 里自动推断大部分字段。下表按"什么时候写"�
 | `case_name` | `run-only` / `fix-case` / 补 assert | 目标 case 名 |
 | `failure_log` | `triage-only` | 失败日志路径 `.tmp/result_log/<platform>/<log>` |
 
-**可选覆盖**（有默认，按需精准控制）：
+**可选覆盖**（不写则用默认值）：
 
 | 字段 | 默认 | 什么时候显式写 |
 | --- | --- | --- |
@@ -112,7 +112,7 @@ skill 能从 prompt 里自动推断大部分字段。下表按"什么时候写"�
 | `target_policy` | `default-first` | `manual-ok` / `compile-only-ok` |
 | `bug_hunt_focus` | 无 | bug hunt 时给方向先验，例 `"CMO / LRSC / fence"` |
 
-**`spec_profile` 具体值**：当前项目默认是 profile registry 里的 `default_profile`。示例（正式任务建议显式写）：
+**`spec_profile` 具体值**：当前项目默认是 profile registry 里的 `default_profile`；不写则用默认值，正式任务建议显式写。示例：
 
 ```text
 spec_profile: nhv5_1_ap
@@ -122,6 +122,8 @@ spec_profile: nhv5_1_ap
 
 ### 两种执行档：快速版 vs 完整 pack
 
+**什么是 pack**：一组把 workflow 各阶段（写前准备 / 编译运行 / 写后核对 / 最终证据卡）**聚合成标准 JSON + Markdown 报告**的脚本（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `make_case_submission_card` / `case_workflow_ledger`）。产物落在 `$HYPTEST_HOME/.hyptest_workflow_skill/reports/`，可审计、可复盘、可批量处理。
+
 skill 有两档执行路径，默认走**快速版**。需要切到**完整 pack** 时在 prompt 里加一句即可。
 
 **快速版（默认）**——约 2-3 分钟，单次新增 case 推荐：
@@ -129,12 +131,12 @@ skill 有两档执行路径，默认走**快速版**。需要切到**完整 pack
 - 预热 `repo_evidence_index` 缓存
 - 直接跑 `find_similar_cases` + `check_case_uniqueness` + `compile_elf` + `get_result`
 - lint / 失败分类 / 回填核对照跑（质量工具不省）
-- **不跑** `case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `make_case_submission_card` / `case_workflow_ledger`
-- 不生成标准 JSON/Markdown 报告，摘要直接写到对话里
+- **不跑** pack 聚合脚本，不生成标准 JSON/Markdown 报告
+- 摘要直接写到对话里
 
 普通个人开发 case、改 case、补 assert 都用这档，不需要在 prompt 里特别声明。
 
-**完整 pack**——多 30-90 秒，适合以下场景：
+**完整 pack**——多 30-90 秒，产出标准证据卡，适合以下场景：
 
 - 多人协作、要交标准证据卡片
 - 复盘耗时（看每步花多久、返工信号）
@@ -146,7 +148,7 @@ skill 有两档执行路径，默认走**快速版**。需要切到**完整 pack
 
 - `"跑完整 pack"` / `"输出 submission card"` / `"记录 timing 和 ledger"` / `"用 case_gate_pack"`
 
-skill 会切到：`case_preflight_pack` → 写 case → `case_gate_pack` → `make_case_submission_card` → （可选）`case_workflow_ledger`。
+skill 会切到：`case_preflight_pack` → 写 case → `case_gate_pack` → `make_case_submission_card` →（可选）`case_workflow_ledger`。
 
 pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 段。
 
