@@ -28,7 +28,17 @@ ALLOWED_PHASES = (
     "submission",
     "cleanup",
 )
-ALLOWED_STATUSES = ("open", "fixed", "obsolete", "info")
+# Memory status enum.
+# New entries should use one of the three current tiers:
+#   - "info"     — agent auto-sunk fact observation, usable directly
+#   - "fixed"    — human-confirmed experience (promoted from Manual_Reference)
+#   - "obsolete" — stale (filtered out on read)
+# "open" is kept ONLY for backwards compatibility with historical records;
+# new code should never write status=open. Things that are "suspicious and
+# pending human confirmation" belong in test_point/Manual_Reference.md, not
+# in memory. Read paths (similar_case_render, find_similar_cases) treat
+# historical "open" entries the same as "info" so old data stays visible.
+ALLOWED_STATUSES = ("info", "fixed", "obsolete", "open")
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,7 +64,18 @@ def parse_args() -> argparse.Namespace:
         help=f"Spec profile. Defaults to {default_spec_profile()} from the profile registry.",
     )
     append.add_argument("--phase", choices=ALLOWED_PHASES, required=True, help="Workflow phase.")
-    append.add_argument("--status", choices=ALLOWED_STATUSES, default="open", help="Record status.")
+    append.add_argument(
+        "--status",
+        choices=ALLOWED_STATUSES,
+        default="info",
+        help=(
+            "Record status. Use 'info' for agent-sunk observations "
+            "(default), 'fixed' for human-confirmed experience (promoted "
+            "from Manual_Reference), or 'obsolete' to retire. 'open' is "
+            "deprecated: suspicious/pending items go in "
+            "test_point/Manual_Reference.md instead of memory."
+        ),
+    )
     append.add_argument("--symptom", required=True, help="Short failure/signal summary.")
     append.add_argument("--reason-code", action="append", default=[], help="Candidate/final reason_code; repeatable.")
     append.add_argument("--tag", action="append", default=[], help="Search tag; repeatable.")

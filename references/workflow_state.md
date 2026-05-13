@@ -50,14 +50,17 @@ python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME
 
 ### Status 分档（读写优先级）
 
+memory 只存**可以直接参考的事实**；"可疑/待确认"一律放 `test_point/Manual_Reference.md`，由人工 audit 后再决定去向（迁进 memory `fixed` / 迁进 profile / 作废）。memory 当前使用 3 档：
+
 | status | 含义 | 典型来源 | 读取优先级 |
 |---|---|---|---|
-| `info` | agent 自动沉淀的事实观察，未经人工确认 | `workflow_memory.py append`（3 门槛过，step 15 触发）| 次级参考 |
-| `open` | 可疑问题，待进一步调查 | agent 主动标记 | 次级参考 |
+| `info` | agent 自动沉淀的事实观察（3 门槛过，可直接复用）；`append` 默认值 | `workflow_memory.py append`（step 15 触发）| 次级参考 |
 | `fixed` | **人工确认过的经验**（从 Manual_Reference 迁入） | `promote-from-manual-reference` 流程（见下文）| **首选** |
 | `obsolete` | 不再成立（audit 过时） | `append --status obsolete` | 过滤掉，不再读取 |
 
-读端（`query` / 相似检索的 commented 判据 / bug hunt 历史复盘）默认过滤 `obsolete`；优先用 `fixed`，`info`/`open` 作辅助。
+**`open` 已废弃**：历史上 `open` 表示"可疑问题待进一步调查"，与 Manual_Reference 职责重叠。现在"可疑/待确认"一律进 Manual_Reference；memory 不写 `open`。`workflow_memory.py` 枚举保留 `open` 仅作兼容（老记录不失效），读端把 `open` 当 `info` 处理，写端默认值已改为 `info`。
+
+读端（`query` / 相似检索的 commented 判据 / bug hunt 历史复盘）默认过滤 `obsolete`；优先用 `fixed`，`info`（含历史 `open`）作辅助。
 
 ### Manual_Reference → memory 迁入流程
 
@@ -90,10 +93,9 @@ python3 scripts/workflow_memory.py append \
 ### 常用 CLI
 
 ```bash
-# 追加一条经验（3 门槛过才跑；默认 status=info 时需显式指定）
+# 追加一条经验（3 门槛过才跑；status 默认 info，可省略）
 python3 scripts/workflow_memory.py append \
   --repo-root $HYPTEST_HOME \
-  --status info \
   --topic <topic> \
   --note "<结论 / 现象 / 关键命令>"
 

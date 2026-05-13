@@ -39,7 +39,7 @@ Agent 执行入口。触发后按以下优先级执行：
 |---|---|---|---|---|
 | `references/spec_profiles/<profile>.md` | **项目真值**：当前架构 Nanhu 实现了 spec 什么、Spike 建模了 spec 什么、Nanhu 未实现 spec 什么；PMA/PBMT/MMIO 表 | 人工长期维护；从 Manual_Reference 人工迁入 | agent 分层/选点必读 | 随项目 + Spike 版本演化 |
 | `test_point/Manual_Reference.md` | **待人工确认的收件箱**：agent 跑出来的新 manual/blocked 观察、待人工判决的问题 | skill step 16 auto-append；人工 audit 后 `> 已解决` | agent 分层决策时查 | 短暂——人工审完就流出去（进 profile 或 memory）|
-| `.hyptest_workflow_skill/memory/events.jsonl` | **agent 可复用的经验线索**：人工确认过的结论 + agent 低风险自动沉淀 | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case query | 长期累积，带 status（info / open / fixed / obsolete）|
+| `.hyptest_workflow_skill/memory/events.jsonl` | **agent 可直接复用的事实**：人工确认过的结论 + agent 低风险自动沉淀。**不放"待确认问题"**——那属于 Manual_Reference.md | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case query | 长期累积，带 status（info / fixed / obsolete）|
 
 ### 三文件之间的流转
 
@@ -61,12 +61,15 @@ agent 后续执行:
 
 ### memory status 分档
 
+memory 只存**可以直接参考的事实**，不存"待确认问题"（那属于 Manual_Reference.md）。3 档 status：
+
 | status | 含义 | 读取优先级 |
 |---|---|---|
-| `info` | agent 自动沉淀的**事实观察**，未经人工确认 | 次级参考 |
-| `open` | 可疑问题，待进一步调查 | 次级参考 |
+| `info` | agent 自动沉淀的**事实观察**（3 门槛过，可直接复用）；`workflow_memory.py append` 的默认值 | 次级参考 |
 | `fixed` | **人工确认过的经验**（从 Manual_Reference 迁入） | **首选** |
 | `obsolete` | 不再成立（audit 过时） | 过滤掉 |
+
+**`open` 已废弃**——历史遗留的 `open` 条目读端会当成 `info` 处理以兼容老数据，新条目不应再写 `open`。"可疑/待确认"一律放 Manual_Reference.md，由人工 audit 后再决定迁进 memory（`fixed`）、迁进 profile、还是作废。
 
 详细维护 CLI、audit 流程和 MR→memory 迁入操作见 `references/workflow_state.md`。
 

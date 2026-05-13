@@ -42,9 +42,11 @@ def load_manual_reference_case_names(repo_root: Path) -> Set[str]:
 
 def load_memory_case_hints(repo_root: Path) -> Set[str]:
     """Scan .hyptest_workflow_skill/memory/events.jsonl and return case names
-    that appear in `case` fields with status in {info, open, fixed} (not
-    obsolete). Used alongside Manual_Reference.md so that agent-sunk
-    experience also counts as a strong signal on commented cases.
+    that appear in `case` fields with status in {info, fixed} (or legacy
+    `open` — kept for backwards compatibility with pre-3-tier records).
+    `obsolete` entries are filtered out. Used alongside Manual_Reference.md
+    so that agent-sunk experience also counts as a strong signal on
+    commented cases.
 
     Returns an empty set if the file is missing. Malformed lines are skipped.
     """
