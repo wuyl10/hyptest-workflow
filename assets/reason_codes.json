@@ -59,6 +59,26 @@
     "keywords": ["rtl-only", "rtl only", "rtl 现象", "waveform", "fsdb", "波形"]
   },
   {
+    "code": "D-MANUAL-SPIKE-GAP",
+    "class": "MANUAL",
+    "default_decision": "manual",
+    "meaning": "Nanhu RTL 按 spec 实现了该语义，Spike 有实现 gap（未建模该 spec 场景）。Spike 过或不过都不能 gate；需 RTL/LinkNan 验证。",
+    "typical_followup": "标为 manual，记录 Spike gap 位置（哪段 spec Spike 没做），并在 Manual_Reference.md 登记；RTL 跑通后可回归。",
+    "owner": "workflow",
+    "next_required_evidence": ["spec reference for the gap", "LinkNan/RTL run evidence"],
+    "keywords": ["spike gap", "spike not modeled", "spike 不建模", "mcontrol6 chain closed bp", "chain closed bp"]
+  },
+  {
+    "code": "D-MANUAL-NANHU-NOT-IMPL",
+    "class": "MANUAL",
+    "default_decision": "manual",
+    "meaning": "目标语义超出 Nanhu 当前实现范围（例如 data trigger / 3+ 层 chain / 当前版本未实现的特性）。case 的设计本身应该回退或改成 Nanhu 已实现的变体；若确实要保留，仅作为未来验证占位。",
+    "typical_followup": "优先回退到 Nanhu 已实现的等价场景（如 chain 限 2 层）；实在要保留的标为 manual 并在 Manual_Reference.md 写清 Nanhu 哪段没实现、何时可回归。",
+    "owner": "workflow",
+    "next_required_evidence": ["Nanhu implementation scope reference", "fallback scenario or placeholder note"],
+    "keywords": ["nanhu not implemented", "nanhu 未实现", "nanhu 不支持", "3-level chain", "data trigger", "未实现"]
+  },
+  {
     "code": "D-COMPILE-ONLY-ENV",
     "class": "COMPILE",
     "default_decision": "compile-only",

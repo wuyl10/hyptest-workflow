@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
-from typing import Dict, List, Tuple
+import re
+from pathlib import Path
+from typing import Dict, List, Set, Tuple
 
 from case_extractor import collect_call_targets
 from similar_case_terms import (
@@ -14,6 +16,28 @@ from similar_case_terms import (
     summarize_terms,
     term_matches_case,
 )
+
+
+MANUAL_REFERENCE_CASE_RE = re.compile(r"`(ai_[A-Za-z_][A-Za-z0-9_]*)`")
+
+
+def load_manual_reference_case_names(repo_root: Path) -> Set[str]:
+    """Scan test_point/Manual_Reference.md and return the set of case names
+    mentioned inside backticks. Used by build_match_notes to distinguish
+    formally-reviewed Spike boundary entries from ad-hoc comment-outs.
+
+    Returns an empty set if the file is missing or empty — callers should
+    treat this as "no Manual_Reference judgement available" and fall back
+    to the weak-signal note.
+    """
+    path = repo_root / "test_point" / "Manual_Reference.md"
+    if not path.is_file():
+        return set()
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return set()
+    return {m.group(1) for m in MANUAL_REFERENCE_CASE_RE.finditer(text)}
 
 
 def build_snippet(body: str, max_lines: int) -> str:
@@ -116,7 +140,11 @@ def build_learning_focus(case: Dict[str, str]) -> List[str]:
     return focus[:3]
 
 
-def build_match_notes(case: Dict[str, str], score_card: Dict[str, object]) -> List[str]:
+def build_match_notes(
+    case: Dict[str, str],
+    score_card: Dict[str, object],
+    manual_reference_case_names: set | None = None,
+) -> List[str]:
     body = case["body"]
     notes: List[str] = []
     matched_terms = score_card.get("matched_terms", [])
@@ -154,12 +182,34 @@ def build_match_notes(case: Dict[str, str], score_card: Dict[str, object]) -> Li
         notes.append("contains boundary or adjacent-side-effect validation")
 
     register_status = case.get("register_status")
+    case_name = case.get("case_name") or ""
     if register_status == "commented":
-        notes.append(
-            "register_status=commented — this case was intentionally disabled "
-            "(likely Spike model boundary or RTL-only scenario); treat as a signal "
-            "to read Manual_Reference.md / profile §5 before choosing a similar angle"
-        )
+        # Two-tier judgment: Manual_Reference.md presence decides signal strength.
+        # - Has Manual_Reference entry → formally-reviewed Spike boundary (strong signal)
+        # - No Manual_Reference entry → likely WIP/manual debug (weak signal, do not gate)
+        has_manual_ref = False
+        if manual_reference_case_names is not None and case_name:
+            has_manual_ref = case_name in manual_reference_case_names
+        if has_manual_ref:
+            notes.append(
+                "register_status=commented + Manual_Reference entry EXISTS — this is a "
+                "formally-reviewed Spike model boundary; MUST read the case source + the "
+                "corresponding Manual_Reference.md entry before choosing a similar angle"
+            )
+        elif manual_reference_case_names is not None:
+            # Explicit Manual_Reference lookup was performed but found no entry.
+            notes.append(
+                "register_status=commented but no Manual_Reference.md entry — likely a "
+                "manual/WIP comment-out (not a Spike boundary signal); still a useful "
+                "reference for similar case structure, but not a hard gate"
+            )
+        else:
+            # No lookup performed (older call path); emit generic signal.
+            notes.append(
+                "register_status=commented — the case was intentionally disabled; check "
+                "Manual_Reference.md to see if it is a formal Spike boundary entry "
+                "(strong signal) or a manual/WIP comment (weak signal)"
+            )
     elif register_status == "unregistered":
         notes.append(
             "register_status=unregistered — source exists but no TEST_REGISTER line; "

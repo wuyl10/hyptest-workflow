@@ -34,6 +34,16 @@
   - 最小证据：场景说明 + 平台限制说明
   - 后续动作：标为 manual，等待 RTL 环境验证
 
+- `D-MANUAL-SPIKE-GAP`
+  - 触发：Nanhu RTL 按 spec 正确实现了该语义，Spike 有实现 gap（未建模该 spec 场景）；Spike 过或不过都不能作为 gate
+  - 最小证据：指向 spec 的引用（spec 哪段要求该行为）+ Spike 实测不一致证据 + LinkNan/RTL 复核证据（或待补记录）
+  - 后续动作：标为 manual，记录 Spike gap 位置并写入 `Manual_Reference.md`；RTL 跑通后可回归
+
+- `D-MANUAL-NANHU-NOT-IMPL`
+  - 触发：目标语义超出 Nanhu 当前实现范围（例如 data trigger / 3+ 层 chain / 本版本未实现的 debug 特性）
+  - 最小证据：Nanhu 实现范围引用（`references/spec_profiles/<profile>.md` 对应段落）+ 说明为什么不回退到已实现等价场景
+  - 后续动作：**优先回退到 Nanhu 已实现的等价角度**；确实要保留的标为 manual，在 `Manual_Reference.md` 写清 Nanhu 哪段没实现、何时可回归
+
 ### 2.3 COMPILE 类（仅编译准入）
 
 - `D-COMPILE-ONLY-ENV`

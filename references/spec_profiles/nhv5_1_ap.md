@@ -281,7 +281,13 @@ MMIO responder matrix：
 - PMA/PBMT/MMIO/cacheability routing 和平台 responder 行为。
 - LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
 - project/custom CSR、custom instruction、NMI/double trap 等非本轮 NHV5.1AP 验证范围或 official Spike 不支持的路径。
-- Debug trigger: `mcontrol6` chain 模式下 AMO 的 breakpoint 语义（chain mismatch 抑制路径在 Spike 上可观测，但 chain 闭合后的 BP 在 Spike 不建模；详见 `test_point/Manual_Reference.md#C7`）。
+- Debug trigger: `mcontrol6` chain 闭合后 AMO 的 breakpoint 语义在 Spike 不建模——chain mismatch 抑制路径在 Spike 上可观测（符合 spec），但 chain 闭合后 spec 要求的 BP 在 Spike 不抛（详见 `test_point/Manual_Reference.md#C7`）。
+
+**Nanhu NHV5.1AP Debug trigger 实现约束**（Nanhu 侧的裁剪，超出部分 **测试点本身不应设计**）：
+
+- chain 最多支持 **2 层**（即只支持两个 trigger 的级联；3 层及以上 chain 不支持，case 不应覆盖）。
+- 仅支持 **address trigger（访存地址）** 和 **execute-PC trigger（取指地址）**。
+- **不支持 data trigger**（trigger 匹配数据值）；相关 case 不应设计。
 
 机器可读 nongate keyword 速查（供 `scripts/query_spec_profile.py --nongate-summary` 使用；与上文 prose 保持一致，prose 仍为真值）：
 
@@ -326,10 +332,18 @@ MMIO responder matrix：
     "module_hints": ["csr", "rob", "trap"]
   },
   {
-    "category": "Debug trigger chain AMO",
-    "keywords": ["mcontrol6_chain", "trigger_chain_amo", "chain_breakpoint_amo"],
+    "category": "Debug trigger chain AMO (Spike gap)",
+    "keywords": ["mcontrol6_chain", "trigger_chain_amo", "chain_breakpoint_amo", "chain_closed_bp"],
     "module_hints": ["atomicsunit", "trigger", "memblock"],
-    "note": "chain mismatch suppression is Spike-observable; chain closed BP is not modeled."
+    "classification": "spike_gap",
+    "note": "Nanhu implements spec correctly (chain mismatch suppression + chain closed BP); Spike only models the suppression path, not the chain-closed BP. Reason code: D-MANUAL-SPIKE-GAP."
+  },
+  {
+    "category": "Debug trigger Nanhu implementation limits",
+    "keywords": ["chain_depth_limit", "data_trigger", "more_than_two_triggers"],
+    "module_hints": ["trigger", "atomicsunit"],
+    "classification": "nanhu_not_impl",
+    "note": "Nanhu only supports 2-level chain, address-trigger and execute-PC trigger; data trigger NOT implemented. Case designs targeting 3+ level chain or data trigger are out of scope. Reason code: D-MANUAL-NANHU-NOT-IMPL."
   }
 ]
 ```

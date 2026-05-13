@@ -85,11 +85,13 @@ Agent 执行入口。触发后按以下优先级执行：
    - **相似检索前先做 query 提炼**（无 tool call）：把"想找什么"拆成 3-5 条具体 term（目标指令/结构、硬件单元、特殊 condition、profile 类别、预期断言类型），用提炼后的 term 作 `--query` 参数。
    - `--limit` 按任务分档：补已有 `### PnX` 且只加 assert / 小改 `--limit 2-3`；补已有 `### PnX` 新增 case `--limit 3-4`；新增 `### PnX` 或跨模块 `--limit 5`；bug hunt / 跨模块扩点 `--limit 5-8`。
    - **读 top 结果时先看 `note` 字段再决定 Read**：`matched terms` 判真命中还是 term alias 溢出；`observability density` / `contains explicit cause/tval checking` 判质量；`calls related helpers` 判 helper 复用。
-   - **`register_status=commented` 是硬门**：top-3 结果中只要有 commented case，**必须**先 Read 该 case 源文件 + `test_point/Manual_Reference.md` 对应条目；选同类角度前必须能解释"它为什么被注释，本次还要不要选同样的角度"。仅看 `note` 不算完成此门。
+   - **`register_status=commented` 按来源分档处理**：commented 有多种原因（正式流程标 manual / 用户手动调试禁用 / WIP 暂停等），不能一刀切当硬信号。**判据是 Manual_Reference.md 是否有对应条目**——相似检索 render 会在 note 里标出分档：
+     - `commented` 且 Manual_Reference.md 有对应条目：**建议深入**——这是正式流程判过的 Spike 边界，有人工记录，**必须**先 Read 该 case 源文件 + 对应 Manual_Reference 条目再选同类角度
+     - `commented` 但 Manual_Reference.md 无对应条目：**当噪音处理**——大概率是手动调试 / WIP 注释，不作为硬信号，但写怀疑点时仍应 Read 那个 case 看场景（作为相似检索的普通参考）
 4. **profile 标记**（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 才需要；`run-only` / `writeback-only` / `preflight-only` / `triage-only` 跳过本步）：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`（bug hunt 可用 `python3 scripts/query_spec_profile.py --spec-profile <p> --nongate-summary --json` 拿压缩版 §5 nongate keyword 列表，避免每次重读全文 profile）。标记 `spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位）。
 5. **写前两问**（无 tool call，纯文本，所有写 case 类任务必跑）：在动笔前用文字回答两个问题——
    1. 本 case 的 `spike_gate_applicable` 是 true 还是 false？依据是 profile §5 / `query_spec_profile --nongate-summary` 的哪条？
-   2. 步骤 3 相似检索 top 中有 `register_status=commented` 同主题 case 吗？若有，已读了那 case + Manual_Reference 对应条目吗？本次为什么仍要选这个角度？
+   2. 步骤 3 相似检索 top 中有 `register_status=commented` **且 Manual_Reference.md 有对应条目**的同主题 case 吗？若有，已读了那 case + 对应 Manual_Reference 条目吗？本次为什么仍要选这个角度？（只有 Manual_Reference 有对应条目才触发本问；没对应条目的 commented 视作普通 case）
 
    两问都答得出 + 答案对得上证据 → 进入步骤 6 写 case；任一答不出 → 回去补步骤 3-4 证据，**不要直接下笔**。这一步成本是几行文字，省的是写错一次 case 的 ~3-5 分钟返工。
 6. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
@@ -172,11 +174,11 @@ bug hunt 主线是从 **RTL 源码 + profile 边界 + 已有 test_point** 找当
 
 ### 三类资料按优先级读
 
-1. **`references/spec_profiles/<spec_profile>.md` §5 "Spike 不适合 gate 的场景"**——profile 维护者已标出的已知高风险领域（TLB/cache/CBO/refill/replay/sbuffer/MSHR/reservation/PMA CSR 等）。target_module 若落在其中，优先在这些类别里找 corner。用 `scripts/query_spec_profile.py --nongate-summary --json` 拿机器可读 keyword 列表，避免重读全文 profile。
-2. **target_module 的 RTL 源码**（`$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`）——扫典型 anti-pattern。**anti-pattern 清单与代表性引用例**见 `references/writing_cases.md` §15。
-3. **现有 `test_point/**/*.md` 覆盖情况**——用 `rg` 或 `find_similar_cases` 查已覆盖场景，找"profile 关心但 test_point 未覆盖"的交集。
+1. **`references/spec_profiles/<spec_profile>.md` §5 "Spike 不适合 gate 的场景"**——profile 维护者已标出的 **分层事后判据**：这些类别的 case 若跑 Spike 不通，属 Spike 模型边界（走 manual/compile-only）而不是 RTL bug。**§5 只影响事后归因 + reason_code 选择，不替代选点**。用 `scripts/query_spec_profile.py --nongate-summary --match-module <m> --json` 快速拿机器可读 nongate keyword；结合 profile "Nanhu 实现约束" 段识别当前 Nanhu 不支持的场景（不应设计对应 case）。
+2. **target_module 的 RTL 源码**（`$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`）——**bug hunt 的选点主力来源**。扫典型 anti-pattern；**anti-pattern 清单与代表性引用例**见 `references/rtl_bug_patterns.md`。
+3. **现有 `test_point/**/*.md` 覆盖情况**——用 `rg` 或 `find_similar_cases` 查已覆盖场景，找"RTL 有风险但 test_point 未覆盖"的交集。
 
-**短路规则**：若第 1 条已给出 ≥3 个与 target_module 直接相关的 nongate 场景（从 `--nongate-summary` 或 profile §5 中匹配到），可跳过第 2 条 RTL 源码阅读，直接用第 3 条覆盖检查选点；摘要里注明"profile §5 已足够，跳过 RTL 阅读"。若第 1 条给出 <3 个命中，继续读 RTL 源码。
+三类资料**串行读**，不短路：§5 给事后归因口径，RTL 给选点候选，test_point 给去重和覆盖空隙。选完点再组合证据写怀疑点。
 
 写 test_point 的"怀疑点"段时，用自然语言描述从源码或 profile 得到的具体线索（`<file>.scala:<line>` + 一句话说明为什么可疑）。推测就是推测，不要包装成已验证的 bug。
 
@@ -221,6 +223,6 @@ Bug hunt 场景最终交付摘要额外包含：
 - 跨文件测试点覆盖检查或 case 去重：`references/coverage_and_dedupe.md`
 - workflow 状态 / cache / memory CLI：`references/workflow_state.md`
 - `excpt.cause` 常量怎么选：`references/cause_code_catalog.md`
-- RTL 怀疑点示例：`references/writing_cases.md` §15
+- RTL 怀疑点示例：`references/rtl_bug_patterns.md`
 - 用户侧用法、触发范例、字段速查、反例：`README.md`
 - 完整资源索引：`references/resource_index.md`
