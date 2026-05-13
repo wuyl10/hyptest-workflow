@@ -211,7 +211,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
 | 新增测试点 `new-case-only`（有明确模块特征的 `test_point_file`） | ✓ 按 test_point 文件名模块部分 | ✓ |
 | `fix-case` 遇到非平凡失败 | ✓ 按 `case_name` / `cause` | ✓ |
 | 用户明确提到"以前的 XX 问题 / 复盘 / 历史问题" | 强制查 | 强制自问 |
-| **用户本轮给出 Manual_Reference 条目的人工确认结论 / LinkNan 复核结果** | 强制查同 topic 历史 | ✓ 强制 append（`--status fixed`，附结论） |
+| **用户本轮给出 Manual_Reference 条目的人工确认结论 / LinkNan 复核结果** | 强制查同 topic 历史 | ✓ 强制 append（`--status confirmed`，附结论） |
 | 补已有 `### PnX` 小改 / `run-only` / `preflight-only` / `writeback-only` | ✗ | ✗ |
 | `triage-only` | triage skill 自决 | triage skill 自决 |
 

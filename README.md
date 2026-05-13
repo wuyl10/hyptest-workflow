@@ -187,7 +187,7 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 
 `default-first` 的意思是优先争取 default，不是无条件放 default。PMA/PBMT/MMIO/cache/TLB/CBO 等场景必须先看 profile；如果 `spike_gate_applicable=false`，不能只凭 official Spike 结果作为 default gate。
 
-**`manual` / `blocked` 会自动写回 Manual_Reference**：如果分层落到 `manual` 或 `blocked` 且原因涉及**新的模型边界 / Spike nongate / 待人工规则裁定**（不是 profile §5 已收录的场景），skill 会在 `test_point/Manual_Reference.md` 对应 section 末尾 append 一条 `#### <id>.（**自动生成，待人工确认**）`，含涉及文件、涉及用例、怀疑点源码引用、本轮 Spike 观察和 3 条待人工确认问题。下次遇到相同 topic 时，人工确认结论会自动同步回 memory（`status=fixed`）和 Manual_Reference 条目（加 `> 已解决` 行）。
+**`manual` / `blocked` 会按 4 档 verdict 路由到 Manual_Reference**：如果分层落到 `manual` 或 `blocked`，skill 先跑 `scripts/check_manual_reference_topic.py` 判 verdict：`profile_covered`（profile §5 已收录 → 引用不新增）/ `memory_confirmed`（memory `confirmed` 已覆盖 → 复用不新增）/ `manual_reference_open`（已有未解决 MR 条目 → 在其下补"本轮也碰到"一行）/ `new_entry_needed`（auto-append 新 `#### <id>.（**自动生成，待人工确认**）`，含涉及文件、涉及用例、怀疑点源码引用、本轮 Spike 观察和 3 条待人工确认问题）。人工 audit 结论会同步回 memory（`--status confirmed`，从 Manual_Reference 迁入）和 Manual_Reference 条目（加 `> 已解决` 行）；判"作废 / 过时"则直接删 MR 整条 + 删同 case memory 行。
 
 ## 目标仓库和环境
 

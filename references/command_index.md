@@ -226,7 +226,7 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
 - `workflow-memory-append`: 追加一条本地 workflow memory，用于记录失败、修复或流程教训。
 
   ```bash
-  python3 scripts/workflow_memory.py --repo-root $HYPTEST_HOME append --phase compile --status fixed --case <case_name> --module <module> --platform spike --symptom '<short symptom>' --fix '<short fix>'
+  python3 scripts/workflow_memory.py --repo-root $HYPTEST_HOME append --phase compile --status confirmed --case <case_name> --module <module> --platform spike --symptom '<short symptom>' --fix '<short fix>'
   ```
 
 - `workflow-memory-query`: 检索本地 workflow memory，作为避免重复踩坑的证据线索。

@@ -194,7 +194,7 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
             },
             {
                 "name": "workflow-memory-append",
-                "cmd": "python3 scripts/workflow_memory.py --repo-root $HYPTEST_HOME append --phase compile --status fixed --case <case_name> --module <module> --platform spike --symptom '<short symptom>' --fix '<short fix>'",
+                "cmd": "python3 scripts/workflow_memory.py --repo-root $HYPTEST_HOME append --phase compile --status confirmed --case <case_name> --module <module> --platform spike --symptom '<short symptom>' --fix '<short fix>'",
                 "desc": "Append one local memory record for a failure, fix, or workflow lesson.",
             },
             {
