@@ -32,16 +32,15 @@ skill 被触发后会按 `SKILL.md` 自动执行完整流程（repo 级覆盖检
 根据给定测试场景编写用例：
 
 ```
-"帮我给 test_point/suspected/memblock/memblock_suspected_bug_corner_points_15.md 新增 1 个 case，
+"帮我新增 1 个 case：
 验证 same-page cross-16B sd 在 repair 后再一次 sw 的 boundary image 保持"
 ```
 
 根据给定测试点新增用例并反标：
 
 ```
-"给 test_point/suspected/memblock/memblock_suspected_bug_corner_points_15.md 新增 1 个 ### PnX 测试点，
-再写对应 ai_micro_* case 并反标到该条目的'已实现 case'段；
-聚焦 cbo.inval → prefetch_r → AMO 的 owner 串用"
+"给 <某测试点文件路径> 进行测试点的用例编写并反标，
+针对未反标的测试点按照测试点描述严格覆盖"
 ```
 
 围绕模块找 bug 点、补测试点并新增用例反标：
