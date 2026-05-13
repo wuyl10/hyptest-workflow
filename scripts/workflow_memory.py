@@ -28,17 +28,18 @@ ALLOWED_PHASES = (
     "submission",
     "cleanup",
 )
-# Memory status enum.
-# New entries should use one of the three current tiers:
-#   - "info"     — agent auto-sunk fact observation, usable directly
-#   - "fixed"    — human-confirmed experience (promoted from Manual_Reference)
-#   - "obsolete" — stale (filtered out on read)
-# "open" is kept ONLY for backwards compatibility with historical records;
-# new code should never write status=open. Things that are "suspicious and
-# pending human confirmation" belong in test_point/Manual_Reference.md, not
-# in memory. Read paths (similar_case_render, find_similar_cases) treat
-# historical "open" entries the same as "info" so old data stays visible.
-ALLOWED_STATUSES = ("info", "fixed", "obsolete", "open")
+# Memory status enum (only two values; memory holds facts, not pending items):
+#   - "unconfirmed" — agent auto-sunk fact observation (default; usable as a
+#                     reference hint but NOT human-confirmed)
+#   - "confirmed"  — human-confirmed experience (promoted from Manual_Reference
+#                     after audit)
+# If a record becomes stale, **human edits events.jsonl directly to delete
+# the line(s) in question** — there is no `obsolete` placeholder. events.jsonl
+# is small (~20-50 rows per year); direct edits keep the file as a single-
+# source truth of currently-valid facts.
+# "open" and "obsolete" are NOT legal values; pending/suspicious items belong
+# in test_point/Manual_Reference.md, stale records should be removed.
+ALLOWED_STATUSES = ("unconfirmed", "confirmed")
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,13 +68,13 @@ def parse_args() -> argparse.Namespace:
     append.add_argument(
         "--status",
         choices=ALLOWED_STATUSES,
-        default="info",
+        default="unconfirmed",
         help=(
-            "Record status. Use 'info' for agent-sunk observations "
-            "(default), 'fixed' for human-confirmed experience (promoted "
-            "from Manual_Reference), or 'obsolete' to retire. 'open' is "
-            "deprecated: suspicious/pending items go in "
-            "test_point/Manual_Reference.md instead of memory."
+            "Record status. 'unconfirmed' (default) for agent-sunk fact "
+            "observations; 'confirmed' for human-confirmed experience "
+            "promoted from Manual_Reference. Stale records should be "
+            "deleted directly from events.jsonl by a human, not marked "
+            "obsolete."
         ),
     )
     append.add_argument("--symptom", required=True, help="Short failure/signal summary.")

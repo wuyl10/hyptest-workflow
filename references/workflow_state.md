@@ -37,49 +37,38 @@ python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME
 
 ## Memory
 
-- `memory/` 记录本 repo 范围内的**经验线索**（历史失败现象、debug 路径、发现的 RTL quirk 等），不替代当前源码/日志/`spec_profile`/平台证据。
+- `memory/` 记录本 repo 范围内**已知对的事实**——agent 可以直接复用的经验线索（历史失败现象、debug 路径、发现的 RTL quirk 等），**不替代**当前源码/日志/`spec_profile`/平台证据。
 - 做 `default / manual / compile-only / blocked` 决策时，仍以**本轮证据**为准；memory 只是检索线索。
-- 不要默认删除；经验过期改为追加一条 `status=obsolete` 的废弃说明：
-  ```bash
-  python3 scripts/workflow_memory.py append \
-    --repo-root $HYPTEST_HOME \
-    --status obsolete \
-    --topic <topic> \
-    --note "<为什么废弃>"
-  ```
+- **过时处理**：events.jsonl 是 append-only 但文件手工可编辑。某条记录因 Spike/RTL 升级不再成立 → **人工直接打开 `events.jsonl` 删除对应 JSON 行**，同时审阅 `test_point/Manual_Reference.md` 是否有相关条目需要一起删除。memory 没有 `obsolete` 占位——"memory 里每条都是当前仍然成立的事实"是单一真值约束。
 
 ### Status 分档（读写优先级）
 
-memory 只存**可以直接参考的事实**；"可疑/待确认"一律放 `test_point/Manual_Reference.md`，由人工 audit 后再决定去向（迁进 memory `fixed` / 迁进 profile / 作废）。memory 当前使用 3 档：
+memory 只存**可以直接参考的事实**；"可疑/待确认"一律放 `test_point/Manual_Reference.md`。2 档 status：
 
 | status | 含义 | 典型来源 | 读取优先级 |
 |---|---|---|---|
-| `info` | agent 自动沉淀的事实观察（3 门槛过，可直接复用）；`append` 默认值 | `workflow_memory.py append`（step 15 触发）| 次级参考 |
-| `fixed` | **人工确认过的经验**（从 Manual_Reference 迁入） | `promote-from-manual-reference` 流程（见下文）| **首选** |
-| `obsolete` | 不再成立（audit 过时） | `append --status obsolete` | 过滤掉，不再读取 |
+| `unconfirmed` | agent 自动沉淀的事实观察（3 门槛过）；**未经人工确认**——供参考但不作硬证据。`append` 默认值 | `workflow_memory.py append`（step 15 触发）| 次级参考 |
+| `confirmed` | **人工确认过的经验**（从 Manual_Reference 迁入） | audit 迁入流程（见下文）| **首选** |
 
-**`open` 已废弃**：历史上 `open` 表示"可疑问题待进一步调查"，与 Manual_Reference 职责重叠。现在"可疑/待确认"一律进 Manual_Reference；memory 不写 `open`。`workflow_memory.py` 枚举保留 `open` 仅作兼容（老记录不失效），读端把 `open` 当 `info` 处理，写端默认值已改为 `info`。
+读端（`query` / 相似检索的 commented 判据 / bug hunt 历史复盘）两档状态都直接返回；优先用 `confirmed`，`unconfirmed` 作辅助参考。
 
-读端（`query` / 相似检索的 commented 判据 / bug hunt 历史复盘）默认过滤 `obsolete`；优先用 `fixed`，`info`（含历史 `open`）作辅助。
+**历史数据迁移**：commit d1151bf 前的 `info` / `fixed` 状态已分别等同为 `unconfirmed` / `confirmed`；历史 `open` / `obsolete` 条目极罕见——遇到请人工删行清理（不留占位）。
 
 ### Manual_Reference → memory 迁入流程
 
 当人工 audit `test_point/Manual_Reference.md` 的一条 auto-append 条目时，结果分三档：
 
 1. **"规则真值"**：把内容迁进 `references/spec_profiles/<profile>.md`（例如新的 Nanhu 实现约束、新的 Spike gap 类别，同步 `hyptest-nongate-keywords` JSON 块）；Manual_Reference 该条标 `> 已解决（<日期>）：已进 profile §X`，**不进 memory**（规则真值在 profile）。
-2. **"复用线索"**：结论简化后 append memory `status=fixed`；Manual_Reference 该条标 `> 已解决（<日期>）：已进 memory`。
-3. **"作废 / 误报"**：Manual_Reference 该条标 `> 已解决（<日期>）：作废，<原因>`；不进 profile 也不进 memory。
+2. **"复用线索"**：结论简化后 append memory `status=confirmed`；Manual_Reference 该条标 `> 已解决（<日期>）：已进 memory`。
+3. **"作废 / 过时"**：**直接从 Manual_Reference 删除该条目**（不留 `> 已解决` 墓碑）；若 memory 里有对应的 `unconfirmed` 行，**同时从 `events.jsonl` 删除**。保持两边"干净 + 当前仍成立"的单一真值。
 
-对应 CLI（当前靠手工，未来可加 `workflow_memory.py promote-from-manual-reference` 自动化）：
+对应 CLI（"复用线索" 路径）：
 
 ```bash
-# 规则真值：编辑 profile 后在 Manual_Reference 条目末尾手工加 `> 已解决` 行
-
-# 复用线索：从 Manual_Reference #C7 迁经验到 memory
 python3 scripts/workflow_memory.py append \
   --repo-root $HYPTEST_HOME \
   --module <m> --platform <plat> --spec-profile <profile> \
-  --phase case_design --status fixed \
+  --phase case_design --status confirmed \
   --case <case_name> \
   --symptom "<一句话症状>" \
   --reason-code <reason_code_from_catalog> \
@@ -88,12 +77,31 @@ python3 scripts/workflow_memory.py append \
   --note "promoted from Manual_Reference after human confirmation <YYYY-MM-DD>"
 ```
 
-`--status fixed` + `--source test_point/Manual_Reference.md#<id>` 的组合让后续 query 能区分"人工确认的"与"agent 沉淀的"。
+`--status confirmed` + `--source test_point/Manual_Reference.md#<id>` 的组合让后续 query 能区分"人工确认的"与"agent 沉淀的"。
+
+### Step 16 判 4 档路由
+
+写回 Manual_Reference 前先跑 `check_manual_reference_topic.py` 判 verdict，避免重复 append：
+
+```bash
+python3 scripts/check_manual_reference_topic.py \
+  --repo-root $HYPTEST_HOME \
+  --case <case_name> --module <m> \
+  --topic <kw1> --topic <kw2> \
+  --spec-profile <profile>
+```
+
+| verdict | 动作 |
+|---|---|
+| `profile_covered` | 不新增 MR 条目；交付摘要里引用 profile §X |
+| `memory_confirmed` | 不新增 MR 条目；复用 memory 条目的 fix/reason_code |
+| `manual_reference_open` | **不新开条目**，在已有 MR 条目末尾补一行 `- 本轮也碰到：<case_name>，<关键现象>` |
+| `new_entry_needed` | auto-append 新的 `#### <id>.（**自动生成，待人工确认**）` |
 
 ### 常用 CLI
 
 ```bash
-# 追加一条经验（3 门槛过才跑；status 默认 info，可省略）
+# 追加一条经验（3 门槛过才跑；status 默认 unconfirmed，可省略）
 python3 scripts/workflow_memory.py append \
   --repo-root $HYPTEST_HOME \
   --topic <topic> \
@@ -119,7 +127,7 @@ python3 scripts/workflow_paths.py --repo-root $HYPTEST_HOME
 
 ## 膨胀控制
 
-- 3 门槛把关（写端） + `status=obsolete` 过滤（读端） + 按需 audit 清过时的
+- 3 门槛把关（写端） + 按需 audit 人工删行 + 过时记录不留占位
 - 典型规模：一年 20-50 条、几十 KB、按 topic 检索不会线性变慢
 
 ## 按需 audit（用户 prompt 触发）
@@ -133,12 +141,12 @@ python3 scripts/workflow_paths.py --repo-root $HYPTEST_HOME
    - 一条内容同时讲多件事（违反"一条一事"）
    - 日期早于 6 个月，但 topic 近期没被任何任务 query 命中（低复用）
    - 内容已在 SKILL.md / references / test_point 中正式文档化（不符合"非平凡"）
-3. 把候选清单列给用户：`topic / 写入日期 / note 摘要 / 可疑原因`
-4. 用户**逐条确认**后，agent 跑 `workflow_memory.py append --topic <t> --status obsolete --note "<废弃原因>"` 标记
-5. 完成后给用户出**audit 报告**：保留 X 条、标 obsolete Y 条、建议重写 Z 条
+3. 把候选清单列给用户：`timestamp / case / module / symptom / 可疑原因`
+4. 用户**逐条确认**后，**人工直接在 `events.jsonl` 中删除对应 JSON 行**（memory 没有 obsolete 占位，审完即清）；同时审阅 `test_point/Manual_Reference.md` 是否有相关条目一起删除。
+5. 完成后给用户出**audit 报告**：保留 X 条、删除 Y 条、建议人工再核 Z 条
 
 **约束**：
-- **不直接删除 memory 文件**（append obsolete 是可逆的，delete 不是）
+- **agent 不自动改** `events.jsonl`；只列候选 + 让用户决定，最后由用户亲手编辑文件
 - **不自动判定**过时，只列候选 + 让用户决定
 - 建议频次：每积累 50 条 entry 或每 3 个月手工触发一次，不定时
 

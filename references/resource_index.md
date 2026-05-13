@@ -125,6 +125,8 @@
   - 检查 repo anchors、工具链、`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` 等平台环境变量，以及 LinkNan submodule 中的 Nanhu source；支持 `--platform all` 和 `--explain`。默认 **12h TTL** 缓存 + 路径 re-stat，同 session 内后续调用秒级返回；`--invalidate-cache` / `--no-cache` 可强制刷新，`--cache-ttl-hours` 调整 TTL。
 - `scripts/check_target_module.py`
   - bug hunt 开工前校验 `target_module` 名称：exact / snake↔Camel / Levenshtein edit-distance≤2 fuzzy 三层匹配。exact 和 snake↔Camel 命中自动归一化，fuzzy 候选只列出不自动替换。用 `$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 作默认源树。
+- `scripts/check_manual_reference_topic.py`
+  - Workflow step 16 前置判定：按 `profile_covered` / `memory_confirmed` / `manual_reference_open` / `new_entry_needed` 四档 verdict 决定是否新增 Manual_Reference 条目。扫 profile 的 `hyptest-nongate-keywords` JSON 块（keyword + module_hints 联合判）+ `events.jsonl` 的 `confirmed` 条目 + MR 未解决条目。避免 step 16 重复 append 相同主题。
 - `scripts/new_spec_profile.py`
   - 从 profile template 创建新 profile skeleton，可同步更新 profile registry。
 - `scripts/check_hyptest_cli_contract.py`
@@ -274,6 +276,7 @@
 - `scripts/check_env.py`
 - `scripts/check_get_result_log_contract.py`
 - `scripts/check_hyptest_cli_contract.py`
+- `scripts/check_manual_reference_topic.py`
 - `scripts/check_readme_commands.py`
 - `scripts/check_reason_codes.py`
 - `scripts/check_resource_index.py`

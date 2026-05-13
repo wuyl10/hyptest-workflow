@@ -99,6 +99,12 @@
       "self_check": true
     },
     {
+      "path": "scripts/check_manual_reference_topic.py",
+      "group": "check",
+      "public": true,
+      "self_check": false
+    },
+    {
       "path": "scripts/check_readme_commands.py",
       "group": "check",
       "public": true,

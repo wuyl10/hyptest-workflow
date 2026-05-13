@@ -58,6 +58,11 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
                 "desc": "Compact Spike-nongate keyword summary for a target_module, driven by the profile's hyptest-nongate-keywords block. Used at Workflow step 4 to avoid reading the full profile markdown.",
             },
             {
+                "name": "manual-reference-topic",
+                "cmd": "python3 scripts/check_manual_reference_topic.py --repo-root $HYPTEST_HOME --case <case_name> --module <target_module> --topic <kw1> --topic <kw2> --spec-profile <spec_profile>",
+                "desc": "Workflow step 16 pre-check: decide whether to append a new Manual_Reference entry by consulting profile nongate keywords, memory confirmed entries, and unresolved MR entries. Returns verdict = profile_covered / memory_confirmed / manual_reference_open / new_entry_needed.",
+            },
+            {
                 "name": "doctor-all",
                 "cmd": "python3 scripts/doctor.py --repo-root $HYPTEST_HOME --platform all --pre-submit --spec-profile <spec_profile>",
                 "desc": "Run grouped doctor checks including both Spike and LinkNan env checks.",

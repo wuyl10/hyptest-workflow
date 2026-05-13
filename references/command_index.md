@@ -65,6 +65,12 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
   python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --nongate-summary --match-module <target_module> --json
   ```
 
+- `manual-reference-topic`: Workflow step 16 pre-check: decide whether to append a new Manual_Reference entry by consulting profile nongate keywords, memory confirmed entries, and unresolved MR entries. Returns verdict = profile_covered / memory_confirmed / manual_reference_open / new_entry_needed.
+
+  ```bash
+  python3 scripts/check_manual_reference_topic.py --repo-root $HYPTEST_HOME --case <case_name> --module <target_module> --topic <kw1> --topic <kw2> --spec-profile <spec_profile>
+  ```
+
 - `doctor-all`: 运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。
 
   ```bash

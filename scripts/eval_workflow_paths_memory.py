@@ -114,7 +114,7 @@ def main() -> int:
                     "--phase",
                     "compile",
                     "--status",
-                    "fixed",
+                    "confirmed",
                     "--symptom",
                     "missing TEST_SETUP_EXCEPT caused compile warning",
                     "--reason-code",
@@ -131,7 +131,7 @@ def main() -> int:
         )
         if append:
             expect((custom_memory / "events.jsonl").is_file(), failures, "append should create events.jsonl")
-            expect(append.get("record", {}).get("status") == "fixed", failures, "append should preserve status")
+            expect(append.get("record", {}).get("status") == "confirmed", failures, "append should preserve status")
 
         query = load_json(
             run(

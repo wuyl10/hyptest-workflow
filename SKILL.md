@@ -38,40 +38,55 @@ Agent 执行入口。触发后按以下优先级执行：
 | 文件 | 定位 | 谁写 | 谁读 | 生命周期 |
 |---|---|---|---|---|
 | `references/spec_profiles/<profile>.md` | **项目真值**：当前架构 Nanhu 实现了 spec 什么、Spike 建模了 spec 什么、Nanhu 未实现 spec 什么；PMA/PBMT/MMIO 表 | 人工长期维护；从 Manual_Reference 人工迁入 | agent 分层/选点必读 | 随项目 + Spike 版本演化 |
-| `test_point/Manual_Reference.md` | **待人工确认的收件箱**：agent 跑出来的新 manual/blocked 观察、待人工判决的问题 | skill step 16 auto-append；人工 audit 后 `> 已解决` | agent 分层决策时查 | 短暂——人工审完就流出去（进 profile 或 memory）|
-| `.hyptest_workflow_skill/memory/events.jsonl` | **agent 可直接复用的事实**：人工确认过的结论 + agent 低风险自动沉淀。**不放"待确认问题"**——那属于 Manual_Reference.md | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case query | 长期累积，带 status（info / fixed / obsolete）|
+| `test_point/Manual_Reference.md` | **待人工确认的收件箱**：agent 跑出来的新 manual/blocked 观察、待人工判决的问题；以及**原信息过时 → 人工直接审阅并删除相关信息** | skill step 16 auto-append；人工 audit 后 `> 已解决` 或**直接删条目** | agent 分层决策时查 | 短暂——人工审完就流出去（进 profile / memory / 删除） |
+| `.hyptest_workflow_skill/memory/events.jsonl` | **agent 可直接复用的事实**：人工确认过的结论 + agent 低风险自动沉淀。**不放"待确认问题"**——那属于 Manual_Reference.md；**原信息不再成立时由人工直接删对应行**（无 obsolete 占位） | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case query | 长期累积，带 status（unconfirmed / confirmed） |
 
 ### 三文件之间的流转
 
 ```
 agent 写 case 遇到新 manual/blocked
-  → step 16 auto-append Manual_Reference `#### <id>.（待人工确认）`
-  → 同时 step 15 按 3 门槛 append memory（status=info）
+  → step 16 判断（按顺序）：
+    1. profile §5 / reason_code_catalog 已覆盖？     → 是 → 不新增 MR，摘要引用 profile
+    2. memory 有 confirmed 条目覆盖本主题？          → 是 → 不新增 MR，复用 memory 条目
+    3. Manual_Reference 有未解决同主题条目？         → 是 → 不新增 MR，在已有条目下补"本轮也碰到"一行
+    4. 以上都否                                       → auto-append 新的 `#### <id>.（待人工确认）`
+  → 同时 step 15 按 3 门槛 append memory（status=unconfirmed）
 
   [人工 audit Manual_Reference 条目]
   ├─ 判为"规则真值" → 内容迁进 spec_profiles/<profile>.md，MR 该条标 `> 已解决：已进 profile §X`
-  ├─ 判为"复用线索" → append memory（status=fixed），MR 标 `> 已解决：已进 memory`
-  └─ 判为"作废"   → MR 标 `> 已解决：作废，<原因>`（不进其它地方）
+  ├─ 判为"复用线索" → append memory（status=confirmed），MR 标 `> 已解决：已进 memory`
+  └─ 判为"作废 / 过时" → **直接从 Manual_Reference 删除该条目**；相关 memory 行也一并删除
 
 agent 后续执行:
   profile 做分层决策时读
-  memory 做相似检索 commented 判据 / bug hunt query 时读（优先 fixed，info 作辅助）
+  memory 做相似检索 commented 判据 / bug hunt query 时读（优先 confirmed，unconfirmed 作辅助）
   Manual_Reference 检查是否有本 case 的待确认条目（强信号）
 ```
 
+判断 1-3 可用脚本辅助：
+
+```bash
+python3 scripts/check_manual_reference_topic.py \
+  --repo-root $HYPTEST_HOME \
+  --case <case_name> --module <m> \
+  --topic <kw1> --topic <kw2> \
+  --spec-profile <profile>
+```
+
+返回 `verdict` ∈ `{profile_covered, memory_confirmed, manual_reference_open, new_entry_needed}` 以及 `next_action`。
+
 ### memory status 分档
 
-memory 只存**可以直接参考的事实**，不存"待确认问题"（那属于 Manual_Reference.md）。3 档 status：
+memory 只存**可以直接参考的事实**，不存"待确认问题"（那属于 Manual_Reference.md）、也不存"过时占位"（过时记录由人工直接编辑 `events.jsonl` 删除对应行）。2 档 status：
 
 | status | 含义 | 读取优先级 |
 |---|---|---|
-| `info` | agent 自动沉淀的**事实观察**（3 门槛过，可直接复用）；`workflow_memory.py append` 的默认值 | 次级参考 |
-| `fixed` | **人工确认过的经验**（从 Manual_Reference 迁入） | **首选** |
-| `obsolete` | 不再成立（audit 过时） | 过滤掉 |
+| `unconfirmed` | agent 自动沉淀的**未经人工确认的事实观察**（3 门槛过，可作辅助线索）；`workflow_memory.py append` 的默认值 | 次级参考 |
+| `confirmed` | **人工确认过的经验**（从 Manual_Reference 迁入） | **首选** |
 
-**`open` 已废弃**——历史遗留的 `open` 条目读端会当成 `info` 处理以兼容老数据，新条目不应再写 `open`。"可疑/待确认"一律放 Manual_Reference.md，由人工 audit 后再决定迁进 memory（`fixed`）、迁进 profile、还是作废。
+过时处理：`events.jsonl` 是 append-only 但手工可编辑；若某条记录因 Spike/RTL 升级不再成立，**人工直接打开文件删除对应行**（Manual_Reference.md 相关条目同时删除）。memory 没有 `obsolete` 占位——保持"memory 里每条都是当前成立的事实"的单一真值。
 
-详细维护 CLI、audit 流程和 MR→memory 迁入操作见 `references/workflow_state.md`。
+详细维护 CLI、Manual_Reference → memory 迁入操作见 `references/workflow_state.md`。
 
 ## Non-Negotiables
 
@@ -174,7 +189,15 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
    ```
    `--check-reason-code` 校验非 default 状态的 `已实现 case` 行**必须**带 `reason_code:` 注释，且 code 必须在 `assets/reason_codes.json` 枚举里（当前 15 个——1 个 default + 5 个 manual + 2 个 compile-only + 7 个 blocked；见 §reason_code Catalog 或 `references/reason_code_catalog.md`）。**禁止编造** `manual.<...>` / 自由式 `D-MANUAL-<自造名>` 这类 code；catalog 不够用 → 用 `OTHER-PROPOSE:<一句话>` 占位（提示 skill 维护者扩 catalog），同时摘要里醒目标"⚠️ 待 catalog 扩展"。
 15. **memory append 自问**（仅 bug hunt / 新增测试点 / `fix-case` 发现工具坑 / 非预期运行结果等场景）：按 `Workflow Memory` 段的 3 门槛处理。其它任务类型跳过。
-16. **Manual_Reference 写回**（仅分层落到 `manual` / `blocked` 且原因涉及**新的模型边界 / Spike nongate / 待人工规则裁定**，不是 profile §5 / `reason_code_catalog` 已明确收录的场景时）：在 `test_point/Manual_Reference.md` 对应 section 末尾 append 一条 `#### <id>. <title>（**自动生成，待人工确认**）`，含涉及文件 / 涉及用例 / 怀疑点源码引用 / 本轮 Spike 观察 / 三条待人工确认问题（是否补入 profile、是否 LinkNan 复核、`reason_code` 确认）。**非 default 分层必须同时跑 `make_case_submission_card.py` 生成机器可读交付卡**作为 reason_code / Manual_Reference 的统一证据来源。`default` / `compile-only` 不触发本步。**人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status fixed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。
+16. **Manual_Reference 写回**：分层落到 `manual` / `blocked` 时**先跑 `scripts/check_manual_reference_topic.py`** 判 4 档 verdict：
+    - `profile_covered` → profile §5 / reason_code_catalog 已明确收录，**不新增 MR 条目**，交付摘要里引用 profile 对应条目
+    - `memory_confirmed` → memory 已有 `confirmed` 条目覆盖本主题，**不新增 MR 条目**，复用 memory 条目的 fix/reason_code 结论
+    - `manual_reference_open` → Manual_Reference 已有**未解决**条目，**不新开**，在已有条目末尾补一行 `- 本轮也碰到：<case_name>，<关键现象>`，摘要注明"已叠加到 MR #<id>"
+    - `new_entry_needed` → 才 auto-append 新的 `#### <id>. <title>（**自动生成，待人工确认**）`，含涉及文件 / 涉及用例 / 怀疑点源码引用 / 本轮 Spike 观察 / 三条待人工确认问题（是否补入 profile、是否 LinkNan 复核、`reason_code` 确认）
+
+    **非 default 分层必须同时跑 `make_case_submission_card.py` 生成机器可读交付卡**作为 reason_code / Manual_Reference 的统一证据来源。`default` / `compile-only` 不触发本步。
+
+    **人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status confirmed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。若人工判决"作废/过时"，**直接从 Manual_Reference 删除该条目**；memory 如有对应记录也一并删除对应 JSON 行。
 
 ## Workflow Memory
 
@@ -192,7 +215,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
 | 补已有 `### PnX` 小改 / `run-only` / `preflight-only` / `writeback-only` | ✗ | ✗ |
 | `triage-only` | triage skill 自决 | triage skill 自决 |
 
-查询按 topic 精确匹配，自动过滤 `status=obsolete`，100+ 条也只返回相关 10-20 条。
+查询按 topic 精确匹配，memory 2 档状态都直接返回（`unconfirmed` / `confirmed`），人工删行的过时记录自然不再出现；即使总量 100+ 条也只返回相关 10-20 条。
 
 ### 写端 3 条强门槛（同时满足才 append；任一不过 → 摘要里写"无经验可沉淀"）
 
@@ -268,7 +291,7 @@ profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spi
 - `compile-only` 时显式写 Gate D=`N/A` 与不运行原因。
 - 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须明确说明原因，不能把旧条目或旧 case 当成"新增结果"。
 - **memory 动作**（仅在 Workflow 步骤 15 触发的任务类型输出）：列本轮 query 了哪些 topic（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 15 的任务不用列。
-- **Manual_Reference 动作**（仅在 Workflow 步骤 16 触发时输出）：说明是否在 `test_point/Manual_Reference.md` 对应 section append 了 `#### <id>.（**自动生成，待人工确认**）` 条目 + 附的 3 条待人工确认问题；或本轮收到人工 / LinkNan 复核结论、给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status fixed`。`default` / `compile-only` 不触发本步，摘要里明确"未触发"。
+- **Manual_Reference 动作**（仅在 Workflow 步骤 16 触发时输出）：说明 `check_manual_reference_topic.py` 的 `verdict`（`profile_covered` / `memory_confirmed` / `manual_reference_open` / `new_entry_needed`）以及对应动作：是否引用了 profile 条目 / 复用了 memory confirmed 条目 / 在已有 MR 条目下补"本轮也碰到"行 / 新 append 了 `#### <id>.（**自动生成，待人工确认**）`；或本轮收到人工 / LinkNan 复核结论，给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status confirmed`，或者人工判决"作废/过时"**直接删除了 MR 条目 + 对应 memory 行**。`default` / `compile-only` 不触发本步，摘要里明确"未触发"。
 
 ## What To Read
 
