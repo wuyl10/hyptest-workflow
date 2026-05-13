@@ -83,7 +83,7 @@
 
 必须满足：
 
-- 与 `Manual_Reference.md`、`references/spec_and_model_limits.md` 和 `references/spec_profiles/<spec_profile>.md` 一致
+- 与 `references/spec_and_model_limits.md`、`references/spec_profiles/<spec_profile>.md` 以及 memory `events.jsonl` 中 `status=confirmed` 的相关条目一致
 - 或已标注该场景不走 Spike gate
 
 证据：

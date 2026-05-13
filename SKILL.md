@@ -18,8 +18,8 @@ Agent 执行入口。触发后按以下优先级执行：
 
 冲突时按以下顺序裁决：
 
-1. `test_point/Manual_Reference.md`（人工确认的规则真值 + 待人工确认条目；已确认条目会迁进 profile 或 memory）
-2. `references/spec_profiles/<spec_profile>.md` + `references/spec_and_model_limits.md`（**当前项目规格实现 + Spike 建模边界 + Nanhu 实现约束**——项目真值，通用规则下方应让位于本层）
+1. `references/spec_profiles/<spec_profile>.md` + `references/spec_and_model_limits.md`（**当前项目规格实现 + Spike 建模边界 + Nanhu 实现约束**——项目真值）
+2. `.hyptest_workflow_skill/memory/events.jsonl` 中 `status=confirmed` 的条目（人工 audit 迁入的复用线索）
 3. `references/quality_gate.md` + `references/tiering_decision.md` + `references/reason_code_catalog.md` + `references/submission_card.md`（分层/Gate/reason_code/交付口径）
 4. `references/writing_cases.md` + `references/framework_usage_pitfalls.md` + `references/build_run_debug.md`（写 case / 环境细节）
 5. `references/repo_layout.md`
@@ -29,7 +29,7 @@ Agent 执行入口。触发后按以下优先级执行：
 
 - 顺序问题一律以日志和最小复现实验为准，不以视觉顺序经验做硬判断。
 - 存量 case 是学习样本，不高于项目规则。
-- `$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是**经验线索**，**不参与规则冲突裁决**；仅作为 agent 的查询辅助（见下文 `Data Sources and Roles`）。
+- memory 中 `status=unconfirmed` 的条目仅作辅助线索，不参与冲突裁决。
 
 ## Data Sources and Roles
 
@@ -37,9 +37,9 @@ Agent 执行入口。触发后按以下优先级执行：
 
 | 文件 | 定位 | 谁写 | 谁读 | 生命周期 |
 |---|---|---|---|---|
-| `references/spec_profiles/<profile>.md` | **项目真值**：当前架构 Nanhu 实现了 spec 什么、Spike 建模了 spec 什么、Nanhu 未实现 spec 什么；PMA/PBMT/MMIO 表 | 人工长期维护；从 Manual_Reference 人工迁入 | agent 分层/选点必读 | 随项目 + Spike 版本演化 |
-| `test_point/Manual_Reference.md` | **待人工确认的收件箱**：agent 跑出来的新 manual/blocked 观察、待人工判决的问题；以及**原信息过时 → 人工直接审阅并删除相关信息** | skill step 16 auto-append；人工 audit 后 `> 已解决` 或**直接删条目** | agent 分层决策时查 | 短暂——人工审完就流出去（进 profile / memory / 删除） |
-| `.hyptest_workflow_skill/memory/events.jsonl` | **agent 可直接复用的事实**：人工确认过的结论 + agent 低风险自动沉淀。**不放"待确认问题"**——那属于 Manual_Reference.md；**原信息不再成立时由人工直接删对应行**（无 obsolete 占位） | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case query | 长期累积，带 status（unconfirmed / confirmed） |
+| `references/spec_profiles/<profile>.md` | **项目真值**：当前架构 Nanhu 实现了 spec 什么、Spike 建模了 spec 什么、Nanhu 未实现 spec 什么；PMA/PBMT/MMIO 表 | 人工长期维护；audit 后迁入 | agent 分层/选点**必读**（Source Priority §1） | 随项目 + Spike 版本演化 |
+| `.hyptest_workflow_skill/memory/events.jsonl` | **可直接复用的事实**：人工确认过的结论 + agent 低风险自动沉淀；原信息不再成立时由人工直接删对应行（无 obsolete 占位） | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case / 相似检索查询；`status=confirmed` 进 Source Priority §2，`status=unconfirmed` 仅作辅助 | 长期累积，带 status（unconfirmed / confirmed） |
+| `test_point/Manual_Reference.md` | **面向人的收件箱**：agent 跑出来的新 manual/blocked 观察、待人工判决的问题；所有"人工确认后的结论"会被迁出到 profile 或 memory，本文件只承载待办 | skill step 16 auto-append；人工 audit 后迁出 + `> 已解决` 或直接删条目 | 人工 audit；agent 仅在 step 16 `check_manual_reference_topic.py` 查重时读一次 | 短暂——人工审完就流出去（进 profile / memory / 删除） |
 
 ### 三文件之间的流转
 

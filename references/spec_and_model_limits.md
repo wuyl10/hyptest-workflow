@@ -24,7 +24,7 @@ profile 参数：
 
 写 case 或判断 Spike 结果前，必须先回答：
 
-- 规格来源是什么：ISA/privileged spec、项目 `Manual_Reference.md`、当前项目 profile，还是已确认历史规则？
+- 规格来源是什么：ISA/privileged spec、当前项目 profile（`references/spec_profiles/<spec_profile>.md`），还是 memory `events.jsonl` 中 `status=confirmed` 的已确认历史规则？
 - 目标地址类型是什么：DRAM/cacheable、PBMT=NC、PBMT=IO、PMA IO/device、PMP deny/restore、bad PA、MMIO responder？
 - 目标语义来自哪里：PMA、PBMT、PMP、页表权限、trigger、异常优先级，还是微架构路径？
 - 是否依赖 Spike 缺失或弱化的 TLB/cache/CBO/refill/replay/sbuffer/MSHR/reservation-timeout 行为？

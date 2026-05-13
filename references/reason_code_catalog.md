@@ -37,13 +37,13 @@
 - `D-MANUAL-SPIKE-GAP`
   - 触发：Nanhu RTL 按 spec 正确实现了该语义，Spike 有实现 gap（未建模该 spec 场景）；Spike 过或不过都不能作为 gate
   - 最小证据：指向 spec 的引用（spec 哪段要求该行为）+ Spike 实测不一致证据 + LinkNan/RTL 复核证据（或待补记录）
-  - 后续动作：标为 manual，记录 Spike gap 位置并写入 `Manual_Reference.md`；RTL 跑通后可回归
+  - 后续动作：标为 manual；step 16 `check_manual_reference_topic.py` 按 verdict 路由（profile §5 已覆盖则引用、memory confirmed 已覆盖则复用、MR 已有未解决条目则叠加、否则 auto-append `#### <id>.（**自动生成，待人工确认**）` 记录 Spike gap 位置）；RTL 跑通后可回归
 
 - `D-MANUAL-NANHU-NOT-IMPL`
   - 触发：目标语义超出 Nanhu 当前实现范围（例如 data trigger / 3+ 层 chain / 本版本未实现的 debug 特性）
   - **硬规则（SKILL.md Non-Negotiable §3 第 4 条）**：遇到此类 corner **默认禁止编写 case**——应回退到 Nanhu 已实现的等价角度，或停下来请用户确认。只有用户**显式确认**作为"未来 Nanhu 支持后的占位"（极罕见）才允许用这个 code；否则不该出现在交付里。
   - 最小证据：Nanhu 实现范围引用（`references/spec_profiles/<profile>.md` 对应段落）+ 用户显式确认保留的依据 + 为什么不回退到已实现等价场景
-  - 后续动作：**优先回退**；`check_writeback_format.py --check-reason-code` 会对此 code 抛 `reason_code_nanhu_not_impl` warning 提示 reviewer 复核（不硬 fail，给占位留出口）；在 `Manual_Reference.md` 写清 Nanhu 哪段没实现、何时可回归
+  - 后续动作：**优先回退**；`check_writeback_format.py --check-reason-code` 会对此 code 抛 `reason_code_nanhu_not_impl` warning 提示 reviewer 复核（不硬 fail，给占位留出口）；step 16 走 verdict 路由落条目（未覆盖时 auto-append 待人工确认），写清 Nanhu 哪段没实现、何时可回归
 
 ### 2.3 COMPILE 类（仅编译准入）
 

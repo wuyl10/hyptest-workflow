@@ -18,7 +18,7 @@ Makefile             low-level build recipe
 linker.ld            linker script
 test_point/                             test point documents and mapping notes
 ├── CRITICAL_ISSUES_LOG.md               known issues narrative (non-PnX)
-├── Manual_Reference.md                  human-confirmed rules + pending manual items (non-PnX)
+├── Manual_Reference.md                  human-facing inbox for pending manual/blocked items (non-PnX)
 ├── suspected/<module>/*.md              PnX test-point entries (organized by module)
 └── reference_tables/<module>/*          machine-readable reference tables (non-PnX)
 ```

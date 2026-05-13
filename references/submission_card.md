@@ -37,7 +37,7 @@ python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME
 
 ## D. 语义与分层
 
-- [ ] 与项目规则一致（`Manual_Reference.md` + `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`）
+- [ ] 与项目规则一致（`references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md` + memory `events.jsonl` 中 `status=confirmed` 的相关条目）
 - [ ] 已确认 `spike_gate_applicable`
 - [ ] PMA/PBMT/MMIO/cache/TLB/CBO 等模型边界场景已正确标注
 - [ ] 分层结论与 `test_register.c` 注册状态一致

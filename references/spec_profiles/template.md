@@ -23,8 +23,8 @@ linknan_mmio_requires_responder: <true|false|unknown>
 
 语义/规格冲突时按项目约定列出裁决顺序，例如：
 
-1. `test_point/Manual_Reference.md`
-2. 本文
+1. 本文（项目真值）
+2. memory `events.jsonl` 中 `status=confirmed` 的已确认历史
 3. `references/spec_and_model_limits.md`
 4. `test_point/CRITICAL_ISSUES_LOG.md`（历史问题库，主要用于线索，不直接覆盖当前门禁）
 

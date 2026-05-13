@@ -70,7 +70,7 @@
   - 看断言文案和 `cause/tval/data/guard` 的组合习惯
   - 看相似路径下常见的特权态切换、页表/PMP/PBMT 处理顺序
 - 但存量 case 不是高于规则的真值。遇到冲突时，优先级始终是：
-  - `test_point/Manual_Reference.md`
+  - `references/spec_profiles/<spec_profile>.md`（项目真值）+ memory `events.jsonl` 中 `status=confirmed` 的已确认历史
   - 本 skill 的门禁/分层/规则文档
   - 存量 case
 - 不要机械照抄存量 case。必须先比对：

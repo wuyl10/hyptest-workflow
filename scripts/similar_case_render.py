@@ -350,7 +350,7 @@ def render_reading_pack(payload: Dict[str, object]) -> str:
         lines.append("- No close analog was found; treat all listed results as partial hints rather than a reusable template.")
     lines.append("- Read these cases before writing the new case; do not copy blindly.")
     lines.append("- Prefer reusing structure, assertion shape, and environment setup order.")
-    lines.append("- Reconcile any borrowed pattern with Manual_Reference and writing_cases.md.")
+    lines.append("- Reconcile any borrowed pattern with the active spec_profile and writing_cases.md.")
     lines.append("- If a result is a thin wrapper, inspect the related helper first.")
     fallback_plan = payload.get("fallback_plan", [])
     if fallback_plan:
