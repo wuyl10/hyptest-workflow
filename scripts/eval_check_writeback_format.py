@@ -119,6 +119,126 @@ def run_eval_case(script_path: Path, case: Dict[str, object]) -> List[str]:
     return failures
 
 
+def run_reason_code_eval(script_path: Path) -> List[str]:
+    """Validate --check-reason-code and --check-failure-classified flags."""
+    failures: List[str] = []
+    with tempfile.TemporaryDirectory(
+        prefix="hyptest_writeback_reason_eval_",
+        dir=temp_parent(),
+    ) as tmpdir:
+        repo_root = Path(tmpdir)
+        test_point_dir = repo_root / "test_point"
+        test_point_dir.mkdir(parents=True, exist_ok=True)
+        write_text(repo_root / "test_register.c", "// TEST_REGISTER(ai_manual_case);\n")
+
+        # Case A: non-default status WITHOUT reason_code → should FAIL on --check-reason-code.
+        md_no_rc = (
+            "### P1A. sample manual\n\n"
+            "测试点：\n\n- sample\n\n"
+            "构建场景：\n\n- sample\n\n"
+            "已实现 case：\n\n"
+            "- `ai_manual_case`（已注释，manual）\n"
+        )
+        no_rc_file = test_point_dir / "no_rc.md"
+        write_text(no_rc_file, md_no_rc)
+        completed = subprocess.run(
+            [
+                sys.executable, str(script_path),
+                "--repo-root", str(repo_root),
+                "--file", str(no_rc_file),
+                "--check-register", "--check-reason-code",
+                "--json",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if completed.returncode == 0:
+            failures.append("non-default without reason_code should fail --check-reason-code")
+        elif "reason_code" not in completed.stdout:
+            failures.append("--check-reason-code error message should mention reason_code")
+
+        # Case B: non-default status WITH valid D-MANUAL-NONGATE reason_code → should PASS.
+        md_valid_rc = md_no_rc + "\nreason_code: D-MANUAL-NONGATE\n"
+        valid_file = test_point_dir / "valid_rc.md"
+        write_text(valid_file, md_valid_rc)
+        completed = subprocess.run(
+            [
+                sys.executable, str(script_path),
+                "--repo-root", str(repo_root),
+                "--file", str(valid_file),
+                "--check-register", "--check-reason-code",
+                "--json",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if completed.returncode != 0:
+            failures.append(
+                "non-default with D-MANUAL-NONGATE should pass --check-reason-code: "
+                + (completed.stdout or completed.stderr)
+            )
+
+        # Case C: invalid (fabricated) reason_code → should FAIL.
+        md_bad_rc = md_no_rc + "\nreason_code: D-MANUAL-INVENTED-BY-AGENT\n"
+        bad_file = test_point_dir / "bad_rc.md"
+        write_text(bad_file, md_bad_rc)
+        completed = subprocess.run(
+            [
+                sys.executable, str(script_path),
+                "--repo-root", str(repo_root),
+                "--file", str(bad_file),
+                "--check-register", "--check-reason-code",
+                "--json",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if completed.returncode == 0:
+            failures.append("fabricated reason_code should fail --check-reason-code")
+
+        # Case D: OTHER-PROPOSE escape hatch → should PASS but emit a warning.
+        md_other_propose = md_no_rc + "\nreason_code: OTHER-PROPOSE: chain BP not in catalog\n"
+        other_file = test_point_dir / "other_rc.md"
+        write_text(other_file, md_other_propose)
+        completed = subprocess.run(
+            [
+                sys.executable, str(script_path),
+                "--repo-root", str(repo_root),
+                "--file", str(other_file),
+                "--check-register", "--check-reason-code",
+                "--json",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if completed.returncode != 0:
+            failures.append(
+                "OTHER-PROPOSE: should pass but emit warning; got failure: "
+                + (completed.stdout or completed.stderr)
+            )
+        else:
+            payload = json.loads(completed.stdout)
+            warnings = payload.get("results", [{}])[0].get("warnings", [])
+            if not any(w.get("warning_code") == "reason_code_other_propose" for w in warnings):
+                failures.append("OTHER-PROPOSE: should emit reason_code_other_propose warning")
+
+        # Case E: --check-failure-classified on non-default with D-MANUAL-NONGATE → should PASS
+        # (D-MANUAL is valid classifier evidence).
+        completed = subprocess.run(
+            [
+                sys.executable, str(script_path),
+                "--repo-root", str(repo_root),
+                "--file", str(valid_file),
+                "--check-register", "--check-reason-code", "--check-failure-classified",
+                "--json",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if completed.returncode != 0:
+            failures.append(
+                "D-MANUAL-NONGATE should satisfy --check-failure-classified: "
+                + (completed.stdout or completed.stderr)
+            )
+
+    return failures
+
+
 def run_all_test_points_eval(script_path: Path) -> List[str]:
     failures: List[str] = []
     with tempfile.TemporaryDirectory(
@@ -232,7 +352,7 @@ def main() -> int:
         if description:
             print(f"  desc: {description}")
 
-    total = len(eval_cases) + 2
+    total = len(eval_cases) + 3
     all_failures = run_all_test_points_eval(script_path)
     if all_failures:
         print("FAIL all-test-points")
@@ -250,6 +370,15 @@ def main() -> int:
     else:
         passed += 1
         print("PASS profile-warning")
+
+    reason_failures = run_reason_code_eval(script_path)
+    if reason_failures:
+        print("FAIL reason-code-enforcement")
+        for failure in reason_failures:
+            print(f"  - {failure}")
+    else:
+        passed += 1
+        print("PASS reason-code-enforcement")
 
     print(f"summary: {passed}/{total} passed")
     return 0 if passed == total else 1

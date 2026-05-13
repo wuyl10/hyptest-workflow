@@ -32,8 +32,6 @@
   - `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册、编译脚本、运行脚本等 harness/工具坑点。
 - `references/coverage_and_dedupe.md`
   - 测试点覆盖检查、repo/file 级排重口径、case 相似检索和唯一性检索模板。
-- `references/rtl_bug_patterns.md`
-  - 当前项目中可参考的 RTL 怀疑点示例；不是规格真值。
 - `references/workflow_state.md`
   - `.hyptest_workflow_skill/` 的目录布局、清理策略、memory append/query/summarize CLI；SKILL.md 只保留精要提醒，细节放这里。
 - `references/cause_code_catalog.md`
@@ -298,6 +296,7 @@
 - `scripts/eval_check_case_lint.py`
 - `scripts/eval_check_case_uniqueness.py`
 - `scripts/eval_check_env.py`
+- `scripts/eval_check_target_module.py`
 - `scripts/eval_check_writeback_format.py`
 - `scripts/eval_failure_log_workflow.py`
 - `scripts/eval_find_similar_cache.py`
@@ -308,6 +307,7 @@
 - `scripts/eval_listed_commands_help.py`
 - `scripts/eval_profile_decisions.py`
 - `scripts/eval_profile_portability.py`
+- `scripts/eval_query_spec_profile_nongate.py`
 - `scripts/eval_reason_code_suggestions.py`
 - `scripts/eval_repo_evidence_index.py`
 - `scripts/eval_spec_profile.py`

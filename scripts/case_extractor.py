@@ -14,25 +14,12 @@ from similar_case_terms import (
     REGISTER_RE,
     read_text,
 )
+from writeback_register import load_registration_status as _load_registration_status
 
 
 def load_registration_status(repo_root: Path) -> Dict[str, str]:
-    status: Dict[str, str] = {}
-    register_path = repo_root / "test_register.c"
-    if not register_path.exists():
-        return status
-
-    for line in read_text(register_path).splitlines():
-        match = REGISTER_RE.search(line)
-        if not match:
-            continue
-        case_name = match.group(1)
-        stripped = line.strip()
-        if stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*"):
-            status[case_name] = "commented"
-        else:
-            status[case_name] = "enabled"
-    return status
+    """Delegate to writeback_register.py — single source of truth for register parsing."""
+    return _load_registration_status(repo_root)
 
 
 def find_line_number(text: str, offset: int) -> int:

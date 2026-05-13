@@ -53,6 +53,11 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
                 "desc": "Bug-hunt prerequisite: validate target_module name with exact/CamelCase/Levenshtein fuzzy matching against the Nanhu RTL source tree before reading source.",
             },
             {
+                "name": "nongate-summary",
+                "cmd": "python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --nongate-summary --match-module <target_module> --json",
+                "desc": "Compact Spike-nongate keyword summary for a target_module, driven by the profile's hyptest-nongate-keywords block. Used at Workflow step 4 to avoid reading the full profile markdown.",
+            },
+            {
                 "name": "doctor-all",
                 "cmd": "python3 scripts/doctor.py --repo-root $HYPTEST_HOME --platform all --pre-submit --spec-profile <spec_profile>",
                 "desc": "Run grouped doctor checks including both Spike and LinkNan env checks.",

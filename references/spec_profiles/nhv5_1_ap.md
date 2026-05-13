@@ -281,6 +281,58 @@ MMIO responder matrix：
 - PMA/PBMT/MMIO/cacheability routing 和平台 responder 行为。
 - LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
 - project/custom CSR、custom instruction、NMI/double trap 等非本轮 NHV5.1AP 验证范围或 official Spike 不支持的路径。
+- Debug trigger: `mcontrol6` chain 模式下 AMO 的 breakpoint 语义（chain mismatch 抑制路径在 Spike 上可观测，但 chain 闭合后的 BP 在 Spike 不建模；详见 `test_point/Manual_Reference.md#C7`）。
+
+机器可读 nongate keyword 速查（供 `scripts/query_spec_profile.py --nongate-summary` 使用；与上文 prose 保持一致，prose 仍为真值）：
+
+```hyptest-nongate-keywords
+[
+  {
+    "category": "TLB/cache consistency",
+    "keywords": ["tlb", "cache", "stale_translation", "cache_residency", "dirty_line", "refill", "cacheline"],
+    "module_hints": ["dcache", "icache", "mmu", "tlb", "ptw", "load_queue", "store_queue", "memblock"],
+    "note": "Spike has no TLB/cache model; route to RTL/LinkNan."
+  },
+  {
+    "category": "PMA CSR",
+    "keywords": ["pmaaddr", "pmacfg", "pma_csr"],
+    "module_hints": ["csr", "pma", "mmu"],
+    "note": "PMA CSR not implemented in this Spike."
+  },
+  {
+    "category": "CBO internal line state",
+    "keywords": ["cbo_line_state", "cbo_refill", "cbo_side_effect"],
+    "module_hints": ["dcache", "cbo", "memblock"],
+    "note": "Architectural CBO exceptions are fine; internal state is not."
+  },
+  {
+    "category": "Ordering / queues",
+    "keywords": ["replay_queue", "sbuffer", "uncache_buffer", "mshr", "rob_head", "response_context"],
+    "module_hints": ["memblock", "load_queue", "store_queue", "sbuffer", "mshr", "rob"]
+  },
+  {
+    "category": "PMA/PBMT/MMIO routing",
+    "keywords": ["pma_routing", "pbmt_routing", "mmio_responder", "cacheability_routing"],
+    "module_hints": ["memblock", "dcache", "pbmt", "pma"]
+  },
+  {
+    "category": "LR/SC timeout / alias",
+    "keywords": ["lr_timeout", "sc_timeout", "same_pa_diff_va", "reservation_timeout", "reservation_policy"],
+    "module_hints": ["memblock", "load_queue", "atomicsunit", "reservation"]
+  },
+  {
+    "category": "Custom CSR / instruction",
+    "keywords": ["custom_csr", "custom_instruction", "nmi", "double_trap"],
+    "module_hints": ["csr", "rob", "trap"]
+  },
+  {
+    "category": "Debug trigger chain AMO",
+    "keywords": ["mcontrol6_chain", "trigger_chain_amo", "chain_breakpoint_amo"],
+    "module_hints": ["atomicsunit", "trigger", "memblock"],
+    "note": "chain mismatch suppression is Spike-observable; chain closed BP is not modeled."
+  }
+]
+```
 
 Spike 结果使用口径：
 

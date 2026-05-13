@@ -281,6 +281,8 @@ def main() -> int:
     record("eval_profile_decisions", [sys.executable, "scripts/eval_profile_decisions.py"])
     record("eval_check_env", [sys.executable, "scripts/eval_check_env.py"])
     record("eval_hyptest_cli_contract", [sys.executable, "scripts/eval_hyptest_cli_contract.py"])
+    record("eval_check_target_module", [sys.executable, "scripts/eval_check_target_module.py"])
+    record("eval_query_spec_profile_nongate", [sys.executable, "scripts/eval_query_spec_profile_nongate.py"])
     record("eval_case_generation_contract", [sys.executable, "scripts/eval_case_generation_contract.py"])
     record("eval_workflow_smoke", [sys.executable, "scripts/eval_workflow_smoke.py"])
     record("eval_workflow_paths_memory", [sys.executable, "scripts/eval_workflow_paths_memory.py"])

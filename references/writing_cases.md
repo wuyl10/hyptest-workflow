@@ -279,7 +279,7 @@ TEST_ASSERT("normal load should keep triggered=false",
 - 每个测试点条目都先写标题，再选默认模板或扩展模板。
 - 默认优先简版模板；满足以下任一条件时启用扩展模板：新增/修改了源码怀疑点、需要引用 RTL/源码位置解释判定、分层结论依赖模块实现细节。
 - 简版模板中的 `构建场景` 与扩展模板中的 `对应场景` 都应可直接指导 case 构造，避免只写抽象结论。
-- 需要项目内具体 RTL 怀疑点示例时，看 `references/rtl_bug_patterns.md`；不要把那里的项目路径写成通用规则。
+- 需要项目内具体 RTL 怀疑点示例时，看本文件 §15（末尾）；不要把那里的项目路径写成通用规则。
 - `new-case-only` 场景通常只写到 `已实现 case` 即可；只有复用已有 case 时才出现 `复用依据` 四行。
 - `已实现 case` 段只放与该测试点一一对应的 case；默认只写 `case_name`，只有确有必要时才附短状态说明；不要在这里写文件名、函数签名、日志、Gate 结果或分层块。若当前无新增且无可复用 case，写 `暂无（原因：...）`。
 - 若复用已有 case，必须补"复用依据"，且固定为四行字段：`顺序一致性`、`断言一致性`、`关键变量一致性`、`覆盖粒度一致性`。任一行差异非"无"，就不能把旧 case 当作复用，应新增 case 或标 `blocked`。
@@ -415,3 +415,36 @@ test_point 要求 → case 断言位置
 - 补已有 `### PnX` 只加 assert 时，映射表也要做，只是只列本次改动的那几条
 
 映射表的时间开销 < 1 分钟，但能抓到 20-30% 的"写完才发现漏"类错误。
+
+## 15. RTL 怀疑点示例与 anti-pattern（bug hunt 时查阅）
+
+本节只是**历史示例集**，不是权威清单，也不是找 bug 时的第一入口：
+
+- bug hunt 主线是按 `SKILL.md` 的 `Bug Hunt Evidence` 段读 profile §5 + target_module 的 RTL 源码 + 现有 test_point 覆盖情况。
+- 本节里的路径和场景属于某个时间点的快照，可能已经被 RTL 重构、文件重命名或 bug 修过；不要把这里的路径当成通用规则。
+- 规格/profile 仍以 `references/spec_and_model_limits.md` 和 `references/spec_profiles/<spec_profile>.md` 为准。
+
+### 15.1 扫 RTL 源码时常见的 anti-pattern
+
+读 target_module 的 RTL 时，优先留意以下几类结构——命中其中一类通常就是值得写 test_point 的怀疑点候选：
+
+- `WireDefault(false.B)` 或其它默认值后，条件分支不完整（某些 case 未显式赋值）
+- `Valid` 输出但无对应 `ready` 握手；或 `ready/valid` 配对但 retire/cancel 路径不对称
+- `Reg(Vec)` 之类资源池被多路共用，但缺乏显式 retire/dealloc 或清零路径
+- 粘性 CSR（`trigger` / `pmp` / `mstatus` / `mcause` 等）在异常/特权态切换路径上未清
+- 特权态（U/HS/M/VS）切换或 trap entry 时，模块内部状态未统一重置
+- 跨页 / 跨 16B 等 split 路径有"快速完成"分支，但 fault / refault / replay 分支复用同一模板寄存器
+
+引用前先 `ls` / `grep` 确认该 `<file>.scala:<line>` 在当前 RTL 中仍然存在、语义未变；若已重构以当前源码为准。
+
+### 15.2 示例：Store Misalign / Fake-Crosspage Template Reuse
+
+怀疑点示例：
+
+- `src/main/scala/xiangshan/mem/lsqueue/StoreQueue.scala:807-820` 把 same-page scalar cross-16B store 固定送进 fake-crosspage 路径，可能导致模板退场不干净。
+- `src/main/scala/xiangshan/mem/lsqueue/StoreMisalignBuffer.scala:257-258` 可能让 retry 结束后的 owner/template 状态被下一条 width-switch store 继续复用。
+
+可构造场景示例：
+
+- `sd(1B+7B)` repeated `SAF` -> repair -> upper-half aligned `sd(8B)` success x4 -> refault `SAF` -> repair -> retried `sd(1B+7B)` success -> immediate `sw(1B+3B)` success
+- 最终要求 `sw` trap-free，只覆盖 bytes7-10，不破坏其余 boundary image。

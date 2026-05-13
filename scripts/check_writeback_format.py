@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from skill_config import resolve_path
+from skill_config import SKILL_ROOT, resolve_path
 from writeback_register import load_registration_status
 
 
@@ -66,6 +66,41 @@ ALLOWED_STATUS_SUFFIXES = {
     "（compile-only，未跑Spike）",
 }
 
+# Match `reason_code: D-MANUAL-NONGATE` or `reason_code: OTHER-PROPOSE: <text>`
+# anywhere in a test_point entry body (one line per occurrence).
+REASON_CODE_LINE_RE = re.compile(
+    r"reason_code\s*:\s*(D-[A-Z0-9\-]+|OTHER-PROPOSE\s*:\s*[^\n]+)",
+    re.IGNORECASE,
+)
+
+# Status suffixes that require a reason_code / classifier reference.
+NON_DEFAULT_STATUS_SUFFIXES = {
+    "（已注释，manual）",
+    "已注释（manual）",
+    "（compile-only，未跑Spike）",
+}
+
+# Classifier output markers — presence indicates the agent actually ran
+# classify_failure_log.py for the failing case.
+CLASSIFIER_EVIDENCE_RE = re.compile(
+    r"classify_failure_log|reason_code_candidates|classifier_output|scenario\s*:\s*\["
+)
+
+
+def load_valid_reason_codes(skill_root: Path) -> set[str]:
+    path = skill_root / "assets" / "reason_codes.json"
+    if not path.is_file():
+        return set()
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return set()
+    codes: set[str] = set()
+    for row in rows if isinstance(rows, list) else []:
+        if isinstance(row, dict) and isinstance(row.get("code"), str):
+            codes.add(row["code"])
+    return codes
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -96,6 +131,24 @@ def parse_args() -> argparse.Namespace:
         "--check-register",
         action="store_true",
         help="Check writeback status text against test_register.c when repo-root is given",
+    )
+    parser.add_argument(
+        "--check-reason-code",
+        action="store_true",
+        help=(
+            "For non-default status entries (manual / compile-only / blocked), "
+            "require a `reason_code: <code>` line inside the entry body. Code must "
+            "be one of assets/reason_codes.json or start with OTHER-PROPOSE:."
+        ),
+    )
+    parser.add_argument(
+        "--check-failure-classified",
+        action="store_true",
+        help=(
+            "For entries with non-default status, also require evidence that "
+            "classify_failure_log.py was consulted (reason_code line with D-BLOCK-* "
+            "class, or explicit classifier output reference in the block)."
+        ),
     )
     parser.add_argument(
         "--spec-profile",
@@ -188,6 +241,9 @@ def collect_implemented_case_lines(block: List[str], start_index: int) -> List[s
             break
         if stripped.startswith("[") and stripped.endswith("]"):
             break
+        # reason_code annotation line ends the 已实现 case section.
+        if REASON_CODE_LINE_RE.search(stripped):
+            break
         if not stripped:
             continue
         case_lines.append(stripped)
@@ -267,11 +323,101 @@ def validate_case_lines(
     return issues, warnings
 
 
+def validate_entry_reason_code(
+    title: str,
+    block: List[str],
+    block_text: str,
+    case_lines: List[str],
+    valid_reason_codes: set[str],
+    check_reason_code: bool,
+    check_failure_classified: bool,
+) -> Tuple[List[str], List[dict[str, str]]]:
+    """Validate reason_code / classifier evidence for non-default status entries.
+
+    Returns (issues, warnings). No-op when both flags are off.
+    """
+    issues: List[str] = []
+    warnings: List[dict[str, str]] = []
+    if not (check_reason_code or check_failure_classified):
+        return issues, warnings
+
+    # Any case on this entry marked as non-default status?
+    has_non_default = False
+    for line in case_lines:
+        content = line[1:].strip() if line.startswith("-") else line
+        for suffix in NON_DEFAULT_STATUS_SUFFIXES:
+            if suffix in content:
+                has_non_default = True
+                break
+        if has_non_default:
+            break
+        if DEPENDENCY_STATUS_RE.search(content):
+            has_non_default = True
+            break
+
+    if not has_non_default:
+        return issues, warnings
+
+    reason_codes_found: List[str] = []
+    for match in REASON_CODE_LINE_RE.finditer(block_text):
+        code_text = match.group(1).strip()
+        reason_codes_found.append(code_text)
+
+    if check_reason_code:
+        if not reason_codes_found:
+            issues.append(
+                f"{title}: 非 default 状态条目必须带 `reason_code:` 注释行；"
+                "code 需在 assets/reason_codes.json 里，或以 `OTHER-PROPOSE:` 开头作为 catalog 扩展候选"
+            )
+        else:
+            for code_text in reason_codes_found:
+                normalized = code_text.split(":", 1)[0].strip().upper() \
+                    if code_text.upper().startswith("OTHER-PROPOSE") else code_text.strip().upper()
+                if normalized.startswith("OTHER-PROPOSE"):
+                    warnings.append({
+                        "entry": title,
+                        "warning_code": "reason_code_other_propose",
+                        "message": (
+                            f"{title}: 使用 `{code_text}` 作为 catalog 扩展候选；"
+                            "请在交付摘要里醒目标注 ⚠️ 待 catalog 扩展并 @ skill 维护者"
+                        ),
+                    })
+                elif valid_reason_codes and normalized not in valid_reason_codes:
+                    issues.append(
+                        f"{title}: `reason_code: {code_text}` 不在 assets/reason_codes.json 里；"
+                        "请从 catalog 挑选合法 code，或改用 `OTHER-PROPOSE:<描述>`"
+                    )
+
+    if check_failure_classified:
+        classifier_ok = False
+        # Any D-MANUAL-* or D-BLOCK-* reason_code implies classifier/profile evidence.
+        # D-COMPILE-ONLY-* is valid for compile-only status without running Spike.
+        for code_text in reason_codes_found:
+            up = code_text.strip().upper()
+            if up.startswith("D-MANUAL") or up.startswith("D-BLOCK") or up.startswith("D-COMPILE-ONLY"):
+                classifier_ok = True
+                break
+        if not classifier_ok and CLASSIFIER_EVIDENCE_RE.search(block_text):
+            classifier_ok = True
+        if not classifier_ok:
+            issues.append(
+                f"{title}: 非 default 状态条目要求附失败/边界证据——"
+                "在 entry 里写一条 `reason_code: D-MANUAL-* / D-COMPILE-ONLY-* / D-BLOCK-*` "
+                "或引用 classify_failure_log 输出（scenario/reason_code_candidates 字样）"
+            )
+
+    return issues, warnings
+
+
 def validate_entry(
     entry_index: int,
     block: List[str],
     register_status: Dict[str, str],
     check_register: bool,
+    *,
+    valid_reason_codes: set[str] | None = None,
+    check_reason_code: bool = False,
+    check_failure_classified: bool = False,
 ) -> Tuple[List[str], List[dict[str, str]]]:
     issues: List[str] = []
     warnings: List[dict[str, str]] = []
@@ -341,6 +487,24 @@ def validate_entry(
                 }
             )
 
+    if check_reason_code or check_failure_classified:
+        case_lines_for_rc = (
+            collect_implemented_case_lines(block, implemented_index)
+            if implemented_index is not None
+            else []
+        )
+        rc_issues, rc_warnings = validate_entry_reason_code(
+            title,
+            block,
+            block_text,
+            case_lines_for_rc,
+            valid_reason_codes or set(),
+            check_reason_code,
+            check_failure_classified,
+        )
+        issues.extend(rc_issues)
+        warnings.extend(rc_warnings)
+
     return issues, warnings
 
 
@@ -349,6 +513,10 @@ def validate_file(
     register_status: Dict[str, str],
     check_register: bool,
     profile_text: str = "",
+    *,
+    valid_reason_codes: set[str] | None = None,
+    check_reason_code: bool = False,
+    check_failure_classified: bool = False,
 ) -> Dict[str, object]:
     text = read_text(path)
     lines = text.splitlines()
@@ -365,10 +533,21 @@ def validate_file(
     else:
         for idx, (start, end) in enumerate(entries, start=1):
             block = lines[start:end]
-            entry_issues, entry_warnings = validate_entry(idx, block, register_status, check_register)
+            entry_issues, entry_warnings = validate_entry(
+                idx,
+                block,
+                register_status,
+                check_register,
+                valid_reason_codes=valid_reason_codes,
+                check_reason_code=check_reason_code,
+                check_failure_classified=check_failure_classified,
+            )
             issues.extend(entry_issues)
-            if profile_text:
-                warnings.extend(entry_warnings)
+            # reason_code / classifier warnings always surface, regardless of profile_text.
+            rc_warning_codes = {"reason_code_other_propose"}
+            for warning in entry_warnings:
+                if profile_text or warning.get("warning_code") in rc_warning_codes:
+                    warnings.append(warning)
 
     return {
         "file": str(path),
@@ -417,8 +596,20 @@ def main() -> int:
             return 2
         register_status = load_registration_status(resolve_path(args.repo_root))
 
+    valid_reason_codes: set[str] = set()
+    if args.check_reason_code or args.check_failure_classified:
+        valid_reason_codes = load_valid_reason_codes(SKILL_ROOT)
+
     results = [
-        validate_file(path, register_status, args.check_register, profile_text)
+        validate_file(
+            path,
+            register_status,
+            args.check_register,
+            profile_text,
+            valid_reason_codes=valid_reason_codes,
+            check_reason_code=args.check_reason_code,
+            check_failure_classified=args.check_failure_classified,
+        )
         for path in files
     ]
     warning_count = sum(len(item["warnings"]) for item in results)

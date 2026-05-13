@@ -243,6 +243,12 @@
       "self_check": true
     },
     {
+      "path": "scripts/eval_check_target_module.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
       "path": "scripts/eval_check_writeback_format.py",
       "group": "eval",
       "public": true,
@@ -298,6 +304,12 @@
     },
     {
       "path": "scripts/eval_profile_portability.py",
+      "group": "eval",
+      "public": true,
+      "self_check": true
+    },
+    {
+      "path": "scripts/eval_query_spec_profile_nongate.py",
       "group": "eval",
       "public": true,
       "self_check": true

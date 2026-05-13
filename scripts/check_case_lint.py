@@ -16,6 +16,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from writeback_register import load_registration_status as _load_registration_status
+
 
 CASE_NAME_RE = r"[A-Za-z_][A-Za-z0-9_]*"
 FUNC_RE = re.compile(
@@ -122,18 +124,13 @@ def line_number(text: str, offset: int) -> int:
 
 
 def load_registration_status(repo_root: Path) -> dict[str, str]:
-    status: dict[str, str] = {}
-    register_path = repo_root / "test_register.c"
-    if not register_path.is_file():
-        return status
+    """Delegate to the canonical implementation in writeback_register.py.
 
-    for line in read_text(register_path).splitlines():
-        match = REGISTER_RE.search(line)
-        if not match:
-            continue
-        stripped = line.strip()
-        status[match.group(1)] = "commented" if stripped.startswith("//") else "enabled"
-    return status
+    Kept as a thin wrapper so existing callers in this module continue to work
+    while the real parsing (block comments, #if/#else gating) lives in a single
+    source.
+    """
+    return _load_registration_status(repo_root)
 
 
 def changed_case_files(repo_root: Path) -> list[Path]:

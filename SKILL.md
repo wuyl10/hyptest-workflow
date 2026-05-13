@@ -7,7 +7,7 @@ description: hyptest 测试点到用例落地 skill。**必须触发**：新增/
 
 Agent 执行入口。触发后按以下优先级执行：
 
-1. **Workflow**（下文）是默认 14 步流程；每步都要遵守 **Non-Negotiables** 的 4 组硬规则
+1. **Workflow**（下文）是默认 16 步流程；每步都要遵守 **Non-Negotiables** 的 4 组硬规则
 2. 规则冲突按 **Source Priority** 裁决
 3. bug hunt 场景在 Workflow 步骤 3 的"选点"环节用 **Bug Hunt Evidence** 的三类资料替代普通相似检索；其它步骤（唯一性 / profile 标记 / 写 case / 编译运行 / 回填）仍按 Workflow 正常执行
 4. 输出必满足 **Output Defaults**
@@ -72,49 +72,60 @@ Agent 执行入口。触发后按以下优先级执行：
 
 默认走"**预热 + 轻量直通**"：`repo_evidence_index` 预热 → `find_similar_cases` → `check_case_uniqueness` → 写 case → `compile_elf` → `get_result` → `check_case_lint` →（失败时）`classify_failure_log` → 回填 → `check_writeback_format --check-register`。**不默认跑 pack 聚合工具**（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `make_case_submission_card` / `case_workflow_ledger`）；只有用户明确要求"跑完整 pack"、"输出 submission card"、"复盘耗时"时才走完整 pipeline。质量工具（lint / 失败分类 / 注册一致性）在轻量路径仍必须保留。
 
-1. **锁定输入 + 按需预热**：确认 `HYPTEST_HOME`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）；本轮需要运行平台时跑 `scripts/check_env.py --repo-root $HYPTEST_HOME --platform <plat>`——默认 **12h TTL 缓存 + 路径 re-stat**，同 session 内后续调用是秒级；`--invalidate-cache` 或 `--no-cache` 可以强制刷新。输入字段多或存在旧平台名/不确定模式时用 `scripts/validate_task_request.py` 做 preflight。**repo 级预热按任务分档**：
-   - 需要查覆盖 / 唯一性 / 相似 case 的任务（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 遇到非平凡失败）：**必须预热**
-   - 只操作已知 case / 只看日志的任务（`run-only` / `preflight-only` / `writeback-only` / `triage-only`）：**跳过预热**
+1. **锁定输入 + 按需预热**：确认 `HYPTEST_HOME`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）。**`check_env.py` 与 repo evidence 预热都按任务分档**——必须 / 跳过条件相同：
+   - 需要运行平台 / 查覆盖 / 唯一性 / 相似 case 的任务（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 遇到非平凡失败）：**必须**跑 `check_env.py` + 预热 evidence index
+   - 只看日志或回填的任务（`run-only` / `preflight-only` / `writeback-only` / `triage-only`）：**两者都跳过**
    ```bash
-   python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --json > /dev/null
+   python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform <plat>     # 12h TTL 缓存 + 路径 re-stat；--invalidate-cache 强刷
+   python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --json > /dev/null   # 增量重建：cases/test_points/register 段独立 digest
    ```
-   预热缓存是**增量**：只有 case 源变化才重建 cases 段、只有 test_point 变化才重建 test_points 段；同 session 多次调用大部分走 partial rebuild（<0.5s）。
+   输入字段多或存在旧平台名/不确定模式时用 `scripts/validate_task_request.py` 做 preflight。
 2. **识别任务模式**：新增测试点模式 vs 补已有测试点模式（见 Non-Negotiables §3 第 1-2 条）。bug hunt 任务**开工前必须**跑一次 `scripts/check_target_module.py --module <target_module>` 验证模块名——exact / snake↔Camel / edit-distance≤2 fuzzy 三层匹配；fuzzy 候选必须让用户确认，不能自动替换。
 3. **覆盖检查 + 相似 + 唯一性**：按 `references/coverage_and_dedupe.md` 做测试点覆盖检查、repo 级 case 相似检索、精确唯一性检索（`check_case_uniqueness.py --expect absent`）。
    - **相似检索前先做 query 提炼**（无 tool call）：把"想找什么"拆成 3-5 条具体 term（目标指令/结构、硬件单元、特殊 condition、profile 类别、预期断言类型），用提炼后的 term 作 `--query` 参数。
    - `--limit` 按任务分档：补已有 `### PnX` 且只加 assert / 小改 `--limit 2-3`；补已有 `### PnX` 新增 case `--limit 3-4`；新增 `### PnX` 或跨模块 `--limit 5`；bug hunt / 跨模块扩点 `--limit 5-8`。
-   - **读 top 结果时先看 `note` 字段再决定 Read**：`matched terms` 判真命中还是 term alias 溢出；`observability density` / `contains explicit cause/tval checking` 判质量；`calls related helpers` 判 helper 复用；`register_status=commented` 是 **Spike 边界信号**——同主题的 commented case 暗示该角度属 profile §5 类边界，选同类角度前优先读 Manual_Reference.md 和 profile §5。
-4. **profile 标记**：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`，标记 `spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位）。
-5. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
-6. **调整 `test_register.c`** 注册状态，使其与目标分层一致。
-7. **单 case 编译**：
+   - **读 top 结果时先看 `note` 字段再决定 Read**：`matched terms` 判真命中还是 term alias 溢出；`observability density` / `contains explicit cause/tval checking` 判质量；`calls related helpers` 判 helper 复用。
+   - **`register_status=commented` 是硬门**：top-3 结果中只要有 commented case，**必须**先 Read 该 case 源文件 + `test_point/Manual_Reference.md` 对应条目；选同类角度前必须能解释"它为什么被注释，本次还要不要选同样的角度"。仅看 `note` 不算完成此门。
+4. **profile 标记**（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 才需要；`run-only` / `writeback-only` / `preflight-only` / `triage-only` 跳过本步）：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`（bug hunt 可用 `python3 scripts/query_spec_profile.py --spec-profile <p> --nongate-summary --json` 拿压缩版 §5 nongate keyword 列表，避免每次重读全文 profile）。标记 `spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位）。
+5. **写前两问**（无 tool call，纯文本，所有写 case 类任务必跑）：在动笔前用文字回答两个问题——
+   1. 本 case 的 `spike_gate_applicable` 是 true 还是 false？依据是 profile §5 / `query_spec_profile --nongate-summary` 的哪条？
+   2. 步骤 3 相似检索 top 中有 `register_status=commented` 同主题 case 吗？若有，已读了那 case + Manual_Reference 对应条目吗？本次为什么仍要选这个角度？
+
+   两问都答得出 + 答案对得上证据 → 进入步骤 6 写 case；任一答不出 → 回去补步骤 3-4 证据，**不要直接下笔**。这一步成本是几行文字，省的是写错一次 case 的 ~3-5 分钟返工。
+6. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
+7. **预编译 lint**（`new-case-only` / `supplement-existing-point` / `fix-case` 改 case 体后必跑；`run-only` / `writeback-only` 跳过）：
+   ```bash
+   python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --file <new_case_file> --strict-case-end
+   ```
+   pre-compile lint 拦截 `TEST_END` 多写 / `TEST_SETUP_EXCEPT()` 漏调 / 多余 register 等结构错；命中 error 立即修，**不要先 compile**——一次 compile 在 NFS 上 ~30-60s，预编译 lint 只 1-2s。
+8. **调整 `test_register.c`** 注册状态，使其与目标分层一致。
+9. **单 case 编译**：
    ```bash
    python3 compile_elf.py --plat spike --name <case_name>
    ```
-8. **单 case 运行**（非 `compile-only`）：
+10. **单 case 运行**（非 `compile-only`）：
    ```bash
    python3 get_result.py --platform spike --case <case_name>
    ```
    运行前确认平台环境变量在当前进程可见。`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
-9. **lint + 失败分类**：
+11. **失败分类（强制）**：运行结果出现 `FAILED` / `untested exception` / `timeout` 时**必须**跑：
    ```bash
-   python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
+   python3 scripts/classify_failure_log.py --log-file <log> --spec-profile <spec_profile> --json
    ```
-   运行失败或 `untested exception` 时补一次失败分类（`FAILED` 不是分层结论）：
-   ```bash
-   python3 scripts/classify_failure_log.py --log-file <log> --json
-   ```
-10. **test_point → case 映射表自查**：运行通过后，对照 `test_point` 正文逐条列出每个要求落在 case 哪一行断言。发现漏项立即补；发现偏移立即改。详见 `references/writing_cases.md` §14.1。
-11. **回填 `test_point`**：默认轻量回填（只写 `case_name` + 必要短状态；不追加审计块）。详细模板和复用口径见 `references/writing_cases.md`。
-12. **回填核对**：
+   并把 `scenario` / `error_points` / `reason_code_candidates` 写进交付摘要——分层归因必须以 classifier 输出为依据，**禁止凭旁证或感觉直接归 manual / blocked**。跳过此步等同于 `D-BLOCK-EVIDENCE`，不能交付非 default 分层。运行成功（`PASSED` 单独出现）的 case 跳过此步。
+12. **test_point → case 映射表自查**：运行通过后，对照 `test_point` 正文逐条列出每个要求落在 case 哪一行断言。发现漏项立即补；发现偏移立即改。详见 `references/writing_cases.md` §14.1。
+13. **回填 `test_point`**：默认轻量回填（只写 `case_name` + 必要短状态；不追加审计块）。详细模板和复用口径见 `references/writing_cases.md`。
+14. **回填核对（含 `reason_code` 强制查表）**：
    ```bash
    python3 scripts/check_writeback_format.py \
      --repo-root $HYPTEST_HOME \
      --file <test_point_file> \
-     --check-register
+     --check-register \
+     --check-reason-code
    ```
-13. **memory append 自问**（仅 bug hunt / 新增测试点 / `fix-case` 发现工具坑 / 非预期运行结果等场景）：按 `Workflow Memory` 段的 3 门槛处理。其它任务类型跳过。
-14. **Manual_Reference 写回**（仅分层落到 `manual` / `blocked` 且原因涉及**新的模型边界 / Spike nongate / 待人工规则裁定**，不是 profile §5 / `reason_code_catalog` 已明确收录的场景时）：在 `test_point/Manual_Reference.md` 对应 section 末尾 append 一条 `#### <id>. <title>（**自动生成，待人工确认**）`，含涉及文件 / 涉及用例 / 怀疑点源码引用 / 本轮 Spike 观察 / 三条待人工确认问题（是否补入 profile、是否 LinkNan 复核、`reason_code` 确认）。`default` / `compile-only` 不触发本步。**人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status fixed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。
+   `--check-reason-code` 校验非 default 状态的 `已实现 case` 行**必须**带 `reason_code:` 注释，且 code 必须在 `assets/reason_codes.json` 13 个枚举里。**禁止编造** `manual.<...>` / 自由式 `D-MANUAL-<自造名>` 这类 code；catalog 不够用 → 用 `OTHER-PROPOSE:<一句话>` 占位（提示 skill 维护者扩 catalog），同时摘要里醒目标"⚠️ 待 catalog 扩展"。
+15. **memory append 自问**（仅 bug hunt / 新增测试点 / `fix-case` 发现工具坑 / 非预期运行结果等场景）：按 `Workflow Memory` 段的 3 门槛处理。其它任务类型跳过。
+16. **Manual_Reference 写回**（仅分层落到 `manual` / `blocked` 且原因涉及**新的模型边界 / Spike nongate / 待人工规则裁定**，不是 profile §5 / `reason_code_catalog` 已明确收录的场景时）：在 `test_point/Manual_Reference.md` 对应 section 末尾 append 一条 `#### <id>. <title>（**自动生成，待人工确认**）`，含涉及文件 / 涉及用例 / 怀疑点源码引用 / 本轮 Spike 观察 / 三条待人工确认问题（是否补入 profile、是否 LinkNan 复核、`reason_code` 确认）。**非 default 分层必须同时跑 `make_case_submission_card.py` 生成机器可读交付卡**作为 reason_code / Manual_Reference 的统一证据来源。`default` / `compile-only` 不触发本步。**人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status fixed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。
 
 ## Workflow Memory
 
@@ -161,9 +172,11 @@ bug hunt 主线是从 **RTL 源码 + profile 边界 + 已有 test_point** 找当
 
 ### 三类资料按优先级读
 
-1. **`references/spec_profiles/<spec_profile>.md` §5 "Spike 不适合 gate 的场景"**——profile 维护者已标出的已知高风险领域（TLB/cache/CBO/refill/replay/sbuffer/MSHR/reservation/PMA CSR 等）。target_module 若落在其中，优先在这些类别里找 corner。
-2. **target_module 的 RTL 源码**（`$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`）——扫典型 anti-pattern。**anti-pattern 清单与代表性引用例**见 `references/rtl_bug_patterns.md`。
+1. **`references/spec_profiles/<spec_profile>.md` §5 "Spike 不适合 gate 的场景"**——profile 维护者已标出的已知高风险领域（TLB/cache/CBO/refill/replay/sbuffer/MSHR/reservation/PMA CSR 等）。target_module 若落在其中，优先在这些类别里找 corner。用 `scripts/query_spec_profile.py --nongate-summary --json` 拿机器可读 keyword 列表，避免重读全文 profile。
+2. **target_module 的 RTL 源码**（`$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`）——扫典型 anti-pattern。**anti-pattern 清单与代表性引用例**见 `references/writing_cases.md` §15。
 3. **现有 `test_point/**/*.md` 覆盖情况**——用 `rg` 或 `find_similar_cases` 查已覆盖场景，找"profile 关心但 test_point 未覆盖"的交集。
+
+**短路规则**：若第 1 条已给出 ≥3 个与 target_module 直接相关的 nongate 场景（从 `--nongate-summary` 或 profile §5 中匹配到），可跳过第 2 条 RTL 源码阅读，直接用第 3 条覆盖检查选点；摘要里注明"profile §5 已足够，跳过 RTL 阅读"。若第 1 条给出 <3 个命中，继续读 RTL 源码。
 
 写 test_point 的"怀疑点"段时，用自然语言描述从源码或 profile 得到的具体线索（`<file>.scala:<line>` + 一句话说明为什么可疑）。推测就是推测，不要包装成已验证的 bug。
 
@@ -208,6 +221,6 @@ Bug hunt 场景最终交付摘要额外包含：
 - 跨文件测试点覆盖检查或 case 去重：`references/coverage_and_dedupe.md`
 - workflow 状态 / cache / memory CLI：`references/workflow_state.md`
 - `excpt.cause` 常量怎么选：`references/cause_code_catalog.md`
-- RTL 怀疑点示例：`references/rtl_bug_patterns.md`
+- RTL 怀疑点示例：`references/writing_cases.md` §15
 - 用户侧用法、触发范例、字段速查、反例：`README.md`
 - 完整资源索引：`references/resource_index.md`

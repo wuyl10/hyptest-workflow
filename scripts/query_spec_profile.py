@@ -44,6 +44,24 @@ def parse_args() -> argparse.Namespace:
         help="Print only matching default_decision values, one per line.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
+    parser.add_argument(
+        "--nongate-summary",
+        action="store_true",
+        help=(
+            "Emit a machine-readable summary of Spike-nongate scenarios for this profile: "
+            "(a) the `hyptest-nongate-keywords` JSON block (if present in the profile), and "
+            "(b) the set of PMA/PBMT rows with spike_gate_applicable=false. Intended for bug "
+            "hunt tasks so agents can check target_module against the nongate surface without "
+            "re-reading the full profile markdown."
+        ),
+    )
+    parser.add_argument(
+        "--match-module",
+        help=(
+            "Together with --nongate-summary: return only nongate categories whose keyword "
+            "matches the given target_module name (substring, case-insensitive)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -102,6 +120,82 @@ def responder_summary(row: dict[str, Any]) -> str:
     return " ".join(fields)
 
 
+def nongate_summary(
+    text: str,
+    pma_rows: list[dict[str, Any]],
+    responder_rows: list[dict[str, Any]],
+    match_module: str | None = None,
+) -> dict[str, Any]:
+    """Collect Spike-nongate keywords and PMA/PBMT rows for quick bug-hunt lookup."""
+    try:
+        keywords = load_json_block(text, "hyptest-nongate-keywords")
+        if not isinstance(keywords, list):
+            keywords = []
+    except (ValueError, json.JSONDecodeError):
+        keywords = []
+
+    nongate_pma = [row for row in pma_rows if row.get("spike_gate_applicable") is False]
+    nongate_responder = [
+        row for row in responder_rows if row.get("spike_gate_applicable") is False
+    ]
+
+    def matches_module(keyword_entry: Any) -> bool:
+        if not match_module:
+            return True
+        needle = match_module.lower().replace("_", "").replace("-", "")
+        hay_parts: list[str] = []
+        if isinstance(keyword_entry, dict):
+            for field in ("category", "keywords", "module_hints", "note"):
+                value = keyword_entry.get(field)
+                if isinstance(value, str):
+                    hay_parts.append(value)
+                elif isinstance(value, list):
+                    hay_parts.extend(str(v) for v in value)
+        elif isinstance(keyword_entry, str):
+            hay_parts.append(keyword_entry)
+        hay = " ".join(hay_parts).lower().replace("_", "").replace("-", "")
+        return needle in hay
+
+    filtered = [entry for entry in keywords if matches_module(entry)]
+
+    return {
+        "match_module": match_module,
+        "keyword_category_count": len(filtered),
+        "keyword_categories": filtered,
+        "nongate_pma_match_count": len(nongate_pma),
+        "nongate_pma_rows": nongate_pma,
+        "nongate_responder_match_count": len(nongate_responder),
+        "nongate_responder_rows": nongate_responder,
+    }
+
+
+def render_nongate_summary_text(summary: dict[str, Any]) -> str:
+    lines: list[str] = []
+    if summary.get("match_module"):
+        lines.append(f"nongate summary (module filter: {summary['match_module']})")
+    else:
+        lines.append("nongate summary (no module filter)")
+    categories = summary.get("keyword_categories", [])
+    if categories:
+        lines.append(f"nongate keyword categories: {len(categories)}")
+        for entry in categories:
+            if isinstance(entry, dict):
+                cat = entry.get("category", "<unnamed>")
+                kws = entry.get("keywords") or []
+                lines.append(f"  - {cat}: {', '.join(str(k) for k in kws[:6])}")
+            else:
+                lines.append(f"  - {entry}")
+    else:
+        lines.append("nongate keyword categories: 0 (profile has no hyptest-nongate-keywords block or no match)")
+    if summary.get("nongate_pma_match_count"):
+        lines.append(f"spike_gate_applicable=false PMA/PBMT rows: {summary['nongate_pma_match_count']}")
+    if summary.get("nongate_responder_match_count"):
+        lines.append(
+            f"spike_gate_applicable=false MMIO responder rows: {summary['nongate_responder_match_count']}"
+        )
+    return "\n".join(lines)
+
+
 def main() -> int:
     args = parse_args()
     try:
@@ -122,6 +216,21 @@ def main() -> int:
         responder_matches = [
             row for row in responder_rows if match_responder_row(row, args.responder_target)
         ]
+
+    if args.nongate_summary:
+        summary = nongate_summary(text, pma_rows, responder_rows, args.match_module)
+        payload = {
+            "ok": True,
+            "profile": args.spec_profile,
+            "profile_path": str(profile_path),
+            "nongate": summary,
+        }
+        if args.json:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(f"profile: {profile_path}")
+            print(render_nongate_summary_text(summary))
+        return 0
 
     payload = {
         "ok": True,

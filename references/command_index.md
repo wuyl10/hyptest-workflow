@@ -59,6 +59,12 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
   python3 scripts/check_target_module.py --module <target_module>
   ```
 
+- `nongate-summary`: Compact Spike-nongate keyword summary for a target_module, driven by the profile's hyptest-nongate-keywords block. Used at Workflow step 4 to avoid reading the full profile markdown.
+
+  ```bash
+  python3 scripts/query_spec_profile.py --spec-profile <spec_profile> --nongate-summary --match-module <target_module> --json
+  ```
+
 - `doctor-all`: 运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。
 
   ```bash
