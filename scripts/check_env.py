@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import sys
+import time
 from pathlib import Path
 
 from skill_config import (
@@ -22,6 +23,7 @@ from skill_config import (
     process_env_value,
     resolve_path,
 )
+from workflow_paths import cache_file
 
 
 REQUIRED_REPO_FILES = [
@@ -91,6 +93,173 @@ ENV_IMPACTS = {
     ],
 }
 
+# env probe cache
+CACHE_VERSION = 1
+CACHE_FILENAME = "env_probe.json"
+DEFAULT_CACHE_TTL_HOURS = 12
+
+
+def env_probe_cache_path(repo_root: Path, cache_dir_arg: str | None = None) -> Path:
+    return cache_file(repo_root, CACHE_FILENAME, cache_dir_arg)
+
+
+def _cache_key(
+    repo_root: Path,
+    platform: str,
+    task_mode: str | None,
+    platform_env_optional: bool,
+    env_overrides: dict[str, str],
+) -> dict[str, object]:
+    # Include only fields that, if they change, should invalidate the cache.
+    # HYPTEST_* values are captured so that a user override change invalidates.
+    return {
+        "repo_root": str(repo_root),
+        "platform": platform,
+        "task_mode": task_mode,
+        "platform_env_optional": platform_env_optional,
+        "env_overrides": {k: v for k, v in sorted(env_overrides.items())},
+        "env_snapshot": {
+            name: os.environ.get(name, "")
+            for name in (
+                "HYPTEST_CROSS_COMPILE",
+                "HYPTEST_SPIKE_BIN",
+                "HYPTEST_LINKNAN_HOME",
+                "HYPTEST_DIFFTEST_REF_SO",
+                "HYPTEST_TMPDIR",
+            )
+        },
+    }
+
+
+def _restat_cached_paths(report: dict[str, object]) -> list[str]:
+    """Cheap re-stat of paths already recorded in a cached report.
+
+    Returns a list of invalidation reasons. Empty list means cache is still valid.
+    """
+    reasons: list[str] = []
+    for check in report.get("env_checks", []):
+        if not isinstance(check, dict):
+            continue
+        # Toolchain check records the resolved gcc path under "gcc_path".
+        gcc_path = check.get("gcc_path")
+        if isinstance(gcc_path, str) and gcc_path.startswith("/"):
+            if not Path(gcc_path).is_file():
+                reasons.append(f"toolchain gone: {gcc_path}")
+        # Platform env check records the resolved value as "value" and sets is_file/exists.
+        name = check.get("name")
+        value = check.get("value")
+        if (
+            name in ("SPIKE_BIN", "DIFFTEST_REF_SO")
+            and isinstance(value, str)
+            and value.startswith("/")
+        ):
+            if not Path(value).is_file():
+                reasons.append(f"{name} gone: {value}")
+        if name == "LINKNAN_HOME" and isinstance(value, str) and value.startswith("/"):
+            if not Path(value).is_dir():
+                reasons.append(f"{name} gone: {value}")
+        if (
+            name == "NANHU_SOURCE"
+            and isinstance(value, str)
+            and value.startswith("/")
+            and not Path(value).is_dir()
+        ):
+            reasons.append(f"{name} gone: {value}")
+    for check in report.get("repo_checks", []):
+        if not isinstance(check, dict):
+            continue
+        rel = check.get("path")
+        if rel and isinstance(rel, str):
+            full = Path(str(report["repo_root"])) / rel
+            kind = check.get("kind")
+            if kind == "file" and not full.is_file():
+                reasons.append(f"repo file gone: {rel}")
+            elif kind == "dir" and not full.is_dir():
+                reasons.append(f"repo dir gone: {rel}")
+    return reasons
+
+
+def load_env_probe_cache(
+    repo_root: Path,
+    key: dict[str, object],
+    ttl_hours: float,
+    cache_dir_arg: str | None = None,
+) -> tuple[dict[str, object] | None, dict[str, object]]:
+    """Return (cached_report, cache_info). cached_report is None on miss."""
+    path = env_probe_cache_path(repo_root, cache_dir_arg)
+    info: dict[str, object] = {"path": str(path), "hit": False}
+    if not path.is_file():
+        info["miss_reason"] = "no cache file"
+        return None, info
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        info["miss_reason"] = f"cache parse error: {exc}"
+        return None, info
+    if data.get("version") != CACHE_VERSION:
+        info["miss_reason"] = "cache version mismatch"
+        return None, info
+    if data.get("key") != key:
+        info["miss_reason"] = "cache key mismatch"
+        return None, info
+    timestamp = data.get("timestamp", 0)
+    age_seconds = max(time.time() - timestamp, 0)
+    info["age_seconds"] = age_seconds
+    info["ttl_hours"] = ttl_hours
+    if age_seconds > ttl_hours * 3600:
+        info["miss_reason"] = f"cache expired ({age_seconds/3600:.1f}h > {ttl_hours}h TTL)"
+        return None, info
+    cached_report = data.get("report")
+    if not isinstance(cached_report, dict):
+        info["miss_reason"] = "cache report missing"
+        return None, info
+    restat_reasons = _restat_cached_paths(cached_report)
+    if restat_reasons:
+        info["miss_reason"] = "re-stat failed: " + "; ".join(restat_reasons[:3])
+        return None, info
+    info["hit"] = True
+    return cached_report, info
+
+
+def save_env_probe_cache(
+    repo_root: Path,
+    key: dict[str, object],
+    report: dict[str, object],
+    cache_dir_arg: str | None = None,
+) -> Path:
+    path = env_probe_cache_path(repo_root, cache_dir_arg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": CACHE_VERSION,
+        "timestamp": time.time(),
+        "key": key,
+        "report": report,
+    }
+    # Unique tmp suffix per process to avoid races when multiple check_env
+    # invocations target the same repo in parallel (e.g. case_multi_platform_gate_pack).
+    tmp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    try:
+        os.replace(tmp_path, path)
+    except OSError:
+        # Best-effort cleanup; cache save is advisory.
+        if tmp_path.is_file():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+    return path
+
+
+def invalidate_env_probe_cache(repo_root: Path, cache_dir_arg: str | None = None) -> None:
+    path = env_probe_cache_path(repo_root, cache_dir_arg)
+    if path.is_file():
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -141,6 +310,29 @@ def parse_args() -> argparse.Namespace:
             "Can be repeated for HYPTEST_LINKNAN_HOME, "
             "HYPTEST_DIFFTEST_REF_SO, HYPTEST_CROSS_COMPILE, HYPTEST_TMPDIR."
         ),
+    )
+    parser.add_argument(
+        "--cache-ttl-hours",
+        type=float,
+        default=DEFAULT_CACHE_TTL_HOURS,
+        help=(
+            f"Cache TTL in hours; default {DEFAULT_CACHE_TTL_HOURS}. Cached reports are reused "
+            "only when key matches AND all recorded paths still re-stat successfully."
+        ),
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable env probe cache for this call (always re-run checks and skip write).",
+    )
+    parser.add_argument(
+        "--invalidate-cache",
+        action="store_true",
+        help="Remove the env probe cache file before running and exit.",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        help="Override the cache directory (same flag semantics as repo_evidence_index.py).",
     )
     return parser.parse_args()
 
@@ -537,13 +729,40 @@ def main() -> int:
         print(f"invalid --env: {exc}", file=sys.stderr)
         return 2
     repo_root = resolve_path(args.repo_root)
-    report = build_report(
+
+    if args.invalidate_cache:
+        invalidate_env_probe_cache(repo_root, args.cache_dir)
+        print("env probe cache invalidated")
+        return 0
+
+    cache_info: dict[str, object] = {"hit": False, "enabled": not args.no_cache}
+    report: dict[str, object] | None = None
+    key = _cache_key(
         repo_root,
         args.platform,
         args.task_mode,
-        platform_env_optional=args.platform_env_optional,
-        env_overrides=env_overrides,
+        args.platform_env_optional,
+        env_overrides,
     )
+    if not args.no_cache:
+        report, cache_info = load_env_probe_cache(
+            repo_root, key, args.cache_ttl_hours, args.cache_dir
+        )
+        cache_info["enabled"] = True
+
+    if report is None:
+        report = build_report(
+            repo_root,
+            args.platform,
+            args.task_mode,
+            platform_env_optional=args.platform_env_optional,
+            env_overrides=env_overrides,
+        )
+        if not args.no_cache and report.get("ok"):
+            save_env_probe_cache(repo_root, key, report, args.cache_dir)
+            cache_info["saved"] = True
+
+    report["cache"] = cache_info
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -553,6 +772,14 @@ def main() -> int:
             print_explanations(report)
         if args.print_exports:
             print_export_hints(report)
+        if cache_info.get("hit"):
+            age = cache_info.get("age_seconds", 0)
+            print(
+                f"cache: hit (age {float(age)/60:.1f} min, ttl {cache_info.get('ttl_hours')}h)"
+            )
+        elif cache_info.get("enabled"):
+            reason = cache_info.get("miss_reason", "first run")
+            print(f"cache: miss ({reason})")
 
     return 0 if report["ok"] else 1
 

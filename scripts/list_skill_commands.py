@@ -45,7 +45,12 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
             {
                 "name": "platform-env",
                 "cmd": "python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain --print-exports",
-                "desc": "Check hyptest, Spike, LinkNan and difftest-ref environment variables, plus the Nanhu source path derived from the LinkNan submodule.",
+                "desc": "Check hyptest, Spike, LinkNan and difftest-ref environment variables, plus the Nanhu source path derived from the LinkNan submodule. Cached for 12h with path re-stat; pass --no-cache or --invalidate-cache to refresh.",
+            },
+            {
+                "name": "target-module-check",
+                "cmd": "python3 scripts/check_target_module.py --module <target_module>",
+                "desc": "Bug-hunt prerequisite: validate target_module name with exact/CamelCase/Levenshtein fuzzy matching against the Nanhu RTL source tree before reading source.",
             },
             {
                 "name": "doctor-all",

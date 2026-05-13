@@ -53,6 +53,12 @@ python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-
   python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain --print-exports
   ```
 
+- `target-module-check`: Bug-hunt prerequisite: validate target_module name with exact/CamelCase/Levenshtein fuzzy matching against the Nanhu RTL source tree before reading source.
+
+  ```bash
+  python3 scripts/check_target_module.py --module <target_module>
+  ```
+
 - `doctor-all`: 运行 doctor 分组检查，包含 Spike 和 LinkNan 环境检查。
 
   ```bash

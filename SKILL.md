@@ -72,16 +72,18 @@ Agent 执行入口。触发后按以下优先级执行：
 
 默认走"**预热 + 轻量直通**"：`repo_evidence_index` 预热 → `find_similar_cases` → `check_case_uniqueness` → 写 case → `compile_elf` → `get_result` → `check_case_lint` →（失败时）`classify_failure_log` → 回填 → `check_writeback_format --check-register`。**不默认跑 pack 聚合工具**（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `make_case_submission_card` / `case_workflow_ledger`）；只有用户明确要求"跑完整 pack"、"输出 submission card"、"复盘耗时"时才走完整 pipeline。质量工具（lint / 失败分类 / 注册一致性）在轻量路径仍必须保留。
 
-1. **锁定输入 + 预热缓存**：确认 `HYPTEST_HOME`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）；本轮需要运行平台时先用 `scripts/check_env.py` 检查环境。输入字段多或存在旧平台名/不确定模式时用 `scripts/validate_task_request.py` 做 preflight。要做 repo 级检索/唯一性时先预热：
+1. **锁定输入 + 按需预热**：确认 `HYPTEST_HOME`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）；本轮需要运行平台时跑 `scripts/check_env.py --repo-root $HYPTEST_HOME --platform <plat>`——默认 **12h TTL 缓存 + 路径 re-stat**，同 session 内后续调用是秒级；`--invalidate-cache` 或 `--no-cache` 可以强制刷新。输入字段多或存在旧平台名/不确定模式时用 `scripts/validate_task_request.py` 做 preflight。**repo 级预热按任务分档**：
+   - 需要查覆盖 / 唯一性 / 相似 case 的任务（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 遇到非平凡失败）：**必须预热**
+   - 只操作已知 case / 只看日志的任务（`run-only` / `preflight-only` / `writeback-only` / `triage-only`）：**跳过预热**
    ```bash
    python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --json > /dev/null
    ```
-2. **识别任务模式**：新增测试点模式 vs 补已有测试点模式（见 Non-Negotiables §3 第 1-2 条）。
-3. **覆盖检查 + 相似 + 唯一性**：按 `references/coverage_and_dedupe.md` 做测试点覆盖检查、repo 级 case 相似检索、精确唯一性检索（`check_case_uniqueness.py --expect absent`）。相似检索 `--limit` 按任务分档：
-   - 补已有 `### PnX` 且只加 assert / 小改：`--limit 2-3`
-   - 补已有 `### PnX` 新增 case：`--limit 3-4`
-   - 新增 `### PnX` 或跨模块：`--limit 5`
-   - bug hunt / 跨模块扩点：`--limit 5-8`
+   预热缓存是**增量**：只有 case 源变化才重建 cases 段、只有 test_point 变化才重建 test_points 段；同 session 多次调用大部分走 partial rebuild（<0.5s）。
+2. **识别任务模式**：新增测试点模式 vs 补已有测试点模式（见 Non-Negotiables §3 第 1-2 条）。bug hunt 任务**开工前必须**跑一次 `scripts/check_target_module.py --module <target_module>` 验证模块名——exact / snake↔Camel / edit-distance≤2 fuzzy 三层匹配；fuzzy 候选必须让用户确认，不能自动替换。
+3. **覆盖检查 + 相似 + 唯一性**：按 `references/coverage_and_dedupe.md` 做测试点覆盖检查、repo 级 case 相似检索、精确唯一性检索（`check_case_uniqueness.py --expect absent`）。
+   - **相似检索前先做 query 提炼**（无 tool call）：把"想找什么"拆成 3-5 条具体 term（目标指令/结构、硬件单元、特殊 condition、profile 类别、预期断言类型），用提炼后的 term 作 `--query` 参数。
+   - `--limit` 按任务分档：补已有 `### PnX` 且只加 assert / 小改 `--limit 2-3`；补已有 `### PnX` 新增 case `--limit 3-4`；新增 `### PnX` 或跨模块 `--limit 5`；bug hunt / 跨模块扩点 `--limit 5-8`。
+   - **读 top 结果时先看 `note` 字段再决定 Read**：`matched terms` 判真命中还是 term alias 溢出；`observability density` / `contains explicit cause/tval checking` 判质量；`calls related helpers` 判 helper 复用；`register_status=commented` 是 **Spike 边界信号**——同主题的 commented case 暗示该角度属 profile §5 类边界，选同类角度前优先读 Manual_Reference.md 和 profile §5。
 4. **profile 标记**：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`，标记 `spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位）。
 5. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
 6. **调整 `test_register.c`** 注册状态，使其与目标分层一致。
@@ -150,15 +152,12 @@ CLI 入口（`append` / `query` / `summarize` / 按需 audit）、膨胀控制�
 
 bug hunt 主线是从 **RTL 源码 + profile 边界 + 已有 test_point** 找当前未被覆盖的可疑点。
 
-**开工前先校验 `target_module` 拼写**——在 RTL 源码里确认模块名真实存在（自动展开大驼峰，如 `memblock` → `MemBlock`）：
+**开工前先校验 `target_module` 拼写**（见 Workflow 步骤 2 已要求跑一次 `check_target_module.py`）——在 RTL 源码里确认模块名真实存在。验证器支持：
 
-```bash
-ls $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main 2>/dev/null \
-  | grep -iE "^<target_module>$|<target_module>\.scala$" \
-  || find $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main -type f -iname "*<target_module>*" | head -5
-```
-
-查不到任何匹配文件时**停下提醒用户**确认拼写（`memblock` 而非 `mmemblock`），不能静默继续——静默继续会让 bug hunt 跑偏成"什么都找不到"误导用户"该模块没 bug"。
+- **exact** 匹配（大小写不敏感）：`memblock` / `MemBlock` / `MEMBLOCK` 都命中 `MemBlock`
+- **命名规范展开**：`mem_block` / `store_queue` / `load-queue` 自动归一化到 CamelCase
+- **fuzzy 候选**（edit distance ≤ 2）：`mmemblock` / `memblck` 列出 `MemBlock` 等候选**让用户确认**，不自动替换
+- 候选为空 → 停下报告："`target_module=<值>` 在 RTL 源码里找不到对应文件，请确认拼写"。不能静默继续——静默继续会让 bug hunt 跑偏成"什么都找不到"误导用户"该模块没 bug"。
 
 ### 三类资料按优先级读
 

@@ -135,6 +135,12 @@
       "self_check": true
     },
     {
+      "path": "scripts/check_target_module.py",
+      "group": "check",
+      "public": true,
+      "self_check": false
+    },
+    {
       "path": "scripts/check_writeback_format.py",
       "group": "check",
       "public": true,

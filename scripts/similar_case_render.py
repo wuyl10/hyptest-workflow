@@ -153,6 +153,19 @@ def build_match_notes(case: Dict[str, str], score_card: Dict[str, object]) -> Li
     if "guard" in body.lower() or "adjacent" in body.lower() or "boundary" in body.lower():
         notes.append("contains boundary or adjacent-side-effect validation")
 
+    register_status = case.get("register_status")
+    if register_status == "commented":
+        notes.append(
+            "register_status=commented — this case was intentionally disabled "
+            "(likely Spike model boundary or RTL-only scenario); treat as a signal "
+            "to read Manual_Reference.md / profile §5 before choosing a similar angle"
+        )
+    elif register_status == "unregistered":
+        notes.append(
+            "register_status=unregistered — source exists but no TEST_REGISTER line; "
+            "check if the case is a helper or was omitted intentionally"
+        )
+
     return notes
 
 

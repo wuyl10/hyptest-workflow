@@ -122,7 +122,9 @@
 - `scripts/check_spec_profile.py`
   - 校验 profile 必备结构和机器可读 PMA/PBMT/MMIO 表。
 - `scripts/check_env.py`
-  - 检查 repo anchors、工具链、`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` 等平台环境变量，以及 LinkNan submodule 中的 Nanhu source；支持 `--platform all` 和 `--explain`。
+  - 检查 repo anchors、工具链、`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` 等平台环境变量，以及 LinkNan submodule 中的 Nanhu source；支持 `--platform all` 和 `--explain`。默认 **12h TTL** 缓存 + 路径 re-stat，同 session 内后续调用秒级返回；`--invalidate-cache` / `--no-cache` 可强制刷新，`--cache-ttl-hours` 调整 TTL。
+- `scripts/check_target_module.py`
+  - bug hunt 开工前校验 `target_module` 名称：exact / snake↔Camel / Levenshtein edit-distance≤2 fuzzy 三层匹配。exact 和 snake↔Camel 命中自动归一化，fuzzy 候选只列出不自动替换。用 `$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 作默认源树。
 - `scripts/new_spec_profile.py`
   - 从 profile template 创建新 profile skeleton，可同步更新 profile registry。
 - `scripts/check_hyptest_cli_contract.py`
@@ -278,6 +280,7 @@
 - `scripts/check_skill_consistency.py`
 - `scripts/check_spec_profile.py`
 - `scripts/check_spec_profile_registry.py`
+- `scripts/check_target_module.py`
 - `scripts/check_writeback_format.py`
 - `scripts/classify_failure_log.py`
 - `scripts/clean_generated.py`

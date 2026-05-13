@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -16,7 +17,7 @@ from skill_config import resolve_path
 from workflow_paths import cache_file
 
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 HEADING_RE = re.compile(r"^(###\s+P[0-9A-Za-z][^\n]*)", re.MULTILINE)
 IMPLEMENTED_CASE_RE = re.compile(r"^\s*-\s*`([A-Za-z_][A-Za-z0-9_]*)`", re.MULTILINE)
 # Reference files and subdirs under test_point/ that do not carry PnX entries.
@@ -74,6 +75,30 @@ def source_fingerprint(repo_root: Path) -> dict[str, Any]:
     return {"version": CACHE_VERSION, "digest": digest.hexdigest(), "entries": entries}
 
 
+def _split_sections_digest(fingerprint: dict[str, Any]) -> dict[str, str]:
+    """Per-section digests so we can detect which section changed.
+
+    Returns {"cases": <hex>, "test_points": <hex>, "register": <hex>}.
+    """
+    cases = hashlib.sha256()
+    test_points = hashlib.sha256()
+    register = hashlib.sha256()
+    for entry in fingerprint.get("entries", []):
+        rel = entry.get("path", "")
+        blob = f"{rel}|{entry.get('mtime_ns')}|{entry.get('size')}".encode("ascii", errors="ignore")
+        if rel.startswith("ai_test_cases/") or rel.startswith("manual_test_cases/"):
+            cases.update(blob)
+        elif rel.startswith("test_point/"):
+            test_points.update(blob)
+        elif rel == "test_register.c":
+            register.update(blob)
+    return {
+        "cases": cases.hexdigest(),
+        "test_points": test_points.hexdigest(),
+        "register": register.hexdigest(),
+    }
+
+
 def cache_path(repo_root: Path, cache_dir_arg: str | None) -> Path:
     if cache_dir_arg:
         return resolve_path(cache_dir_arg) / "repo_evidence_index.json"
@@ -129,60 +154,130 @@ def register_summary(cases: list[dict[str, Any]]) -> dict[str, int]:
     return summary
 
 
-def build_index(repo_root: Path) -> dict[str, Any]:
-    cases = extract_cases(repo_root)
-    test_points = build_test_point_entries(repo_root)
-    case_refs: dict[str, list[dict[str, Any]]] = {}
-    for entry in test_points:
-        for case_name in entry.get("implemented_cases", []):
-            case_refs.setdefault(case_name, []).append(
-                {"file": entry["file"], "line": entry["line"], "heading": entry["heading"]}
-            )
-    compact_cases = [
+def _compact_cases(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
         {
             "case_name": item.get("case_name"),
             "file": item.get("file"),
             "line": item.get("line"),
             "symbol_kind": item.get("symbol_kind"),
             "register_status": item.get("register_status"),
-            "test_point_refs": case_refs.get(str(item.get("case_name")), []),
         }
         for item in cases
     ]
+
+
+def _attach_refs(cases: list[dict[str, Any]], test_points: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    case_refs: dict[str, list[dict[str, Any]]] = {}
+    for entry in test_points:
+        for case_name in entry.get("implemented_cases", []):
+            case_refs.setdefault(case_name, []).append(
+                {"file": entry["file"], "line": entry["line"], "heading": entry["heading"]}
+            )
+    return [
+        {**case, "test_point_refs": case_refs.get(str(case.get("case_name")), [])}
+        for case in cases
+    ]
+
+
+def _summary(cases: list[dict[str, Any]], test_points: list[dict[str, Any]]) -> dict[str, Any]:
     return {
-        "cases": compact_cases,
+        "case_count": len(cases),
+        "test_point_entry_count": len(test_points),
+        "implemented_case_ref_count": sum(len(item.get("implemented_cases", [])) for item in test_points),
+        "register_status": register_summary(cases),
+    }
+
+
+def build_index(repo_root: Path) -> dict[str, Any]:
+    cases = _compact_cases(extract_cases(repo_root))
+    test_points = build_test_point_entries(repo_root)
+    return {
+        "cases": _attach_refs(cases, test_points),
         "test_points": test_points,
-        "summary": {
-            "case_count": len(compact_cases),
-            "test_point_entry_count": len(test_points),
-            "implemented_case_ref_count": sum(len(item.get("implemented_cases", [])) for item in test_points),
-            "register_status": register_summary(compact_cases),
-        },
+        "summary": _summary(cases, test_points),
     }
 
 
 def load_or_build(repo_root: Path, args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
     fingerprint = source_fingerprint(repo_root)
+    section_digests = _split_sections_digest(fingerprint)
     path = cache_path(repo_root, args.cache_dir)
+
+    cached_payload: dict[str, Any] | None = None
+    cached_section_digests: dict[str, str] | None = None
     if not args.no_cache and path.is_file():
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-            if payload.get("fingerprint") == fingerprint and isinstance(payload.get("index"), dict):
-                return payload["index"], {
-                    "enabled": True,
-                    "hit": True,
-                    "path": str(path),
-                    "fingerprint_digest": fingerprint["digest"],
-                    "build_seconds": 0.0,
-                }
+            if (
+                payload.get("fingerprint", {}).get("version") == CACHE_VERSION
+                and isinstance(payload.get("index"), dict)
+            ):
+                cached_payload = payload
+                cached_section_digests = payload.get("section_digests") or {}
+                if cached_payload.get("fingerprint") == fingerprint:
+                    # Whole-index hit.
+                    return cached_payload["index"], {
+                        "enabled": True,
+                        "hit": True,
+                        "mode": "full",
+                        "path": str(path),
+                        "fingerprint_digest": fingerprint["digest"],
+                        "build_seconds": 0.0,
+                    }
         except (json.JSONDecodeError, OSError, TypeError):
-            pass
+            cached_payload = None
+            cached_section_digests = None
 
     started = time.monotonic()
-    index = build_index(repo_root)
+    rebuild_cases = True
+    rebuild_test_points = True
+    if cached_payload and cached_section_digests:
+        # Cases are extracted from ai_test_cases/*.c + manual_test_cases/*.c + register.
+        # If neither the case source dirs nor test_register.c changed, skip case extraction.
+        if (
+            cached_section_digests.get("cases") == section_digests["cases"]
+            and cached_section_digests.get("register") == section_digests["register"]
+            and isinstance(cached_payload["index"].get("cases"), list)
+        ):
+            rebuild_cases = False
+        if (
+            cached_section_digests.get("test_points") == section_digests["test_points"]
+            and isinstance(cached_payload["index"].get("test_points"), list)
+        ):
+            rebuild_test_points = False
+
+    if rebuild_cases:
+        cases = _compact_cases(extract_cases(repo_root))
+    else:
+        # Strip test_point_refs so we can re-attach with the (possibly fresh) test_points.
+        cases = [
+            {k: v for k, v in entry.items() if k != "test_point_refs"}
+            for entry in cached_payload["index"]["cases"]
+        ]
+    if rebuild_test_points:
+        test_points = build_test_point_entries(repo_root)
+    else:
+        test_points = cached_payload["index"]["test_points"]
+
+    index = {
+        "cases": _attach_refs(cases, test_points),
+        "test_points": test_points,
+        "summary": _summary(cases, test_points),
+    }
+
+    mode = "full"
+    if not rebuild_cases and rebuild_test_points:
+        mode = "partial_test_points_only"
+    elif rebuild_cases and not rebuild_test_points:
+        mode = "partial_cases_only"
+    elif not rebuild_cases and not rebuild_test_points:
+        mode = "reattach_only"
+
     cache = {
         "enabled": not args.no_cache,
-        "hit": False,
+        "hit": mode != "full" and cached_payload is not None,
+        "mode": mode,
         "path": str(path) if not args.no_cache else None,
         "fingerprint_digest": fingerprint["digest"],
         "build_seconds": round(time.monotonic() - started, 3),
@@ -190,10 +285,24 @@ def load_or_build(repo_root: Path, args: argparse.Namespace) -> tuple[dict[str, 
     if not args.no_cache:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(
-                json.dumps({"fingerprint": fingerprint, "index": index}, ensure_ascii=False, indent=2) + "\n",
+            payload = {
+                "fingerprint": fingerprint,
+                "section_digests": section_digests,
+                "index": index,
+            }
+            tmp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+            tmp_path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
+            try:
+                os.replace(tmp_path, path)
+            except OSError:
+                if tmp_path.is_file():
+                    try:
+                        tmp_path.unlink()
+                    except OSError:
+                        pass
         except OSError as exc:
             cache["write_error"] = str(exc)
     return index, cache
