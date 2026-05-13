@@ -32,15 +32,16 @@
 1. 若 `compile_pass = false`：
    - 结论：`blocked`
    - 动作：先修编译问题
-2. 若 `spike_gate_applicable = true`：
+2. 若 `spike_gate_applicable = true`（default-first 路径）：
    - 且 `run_attempted = false`：结论 `blocked`
    - 且 `run_pass = true`：结论 `default`
    - 且 `run_pass = false` 且 `run_explainable = true`：结论 `manual`
+     - **前置要求**：`run_explainable=true` 必须以 `classify_failure_log.py` 的机器输出为依据（SKILL.md step 11 强制）——没跑 classifier 即 `run_explainable=false`，直接落 `blocked (D-BLOCK-EVIDENCE)`。
    - 且 `run_attempted = true` 且 `run_explainable = false`：结论 `blocked`
    - 其他：结论 `blocked`
-3. 若 `spike_gate_applicable = false`：
-   - 且 `run_attempted = true` 且 `run_explainable = true`：结论 `manual`
-   - 且 `run_attempted = false`：结论 `compile-only`
+3. 若 `spike_gate_applicable = false`（manual-first 路径）：
+   - 且 `target_policy = manual-ok` 或 `spike_gate_applicable=false` 由 step 5 Q2 显式判出：结论 `manual`（**不需要 `run_attempted`**；case 注册注释 + `--include-commented` 编译即可；step 10 可选跑 Spike 看行为但 Spike PASS 不翻 default）
+   - 且 `target_policy = compile-only-ok` 或 `run_attempted = false` 且用户未明确要求 manual：结论 `compile-only`
    - 且 `run_attempted = true` 但结果不可归因：结论 `blocked`
 4. 其他情况：
    - 结论：`manual`
@@ -50,18 +51,29 @@
 
 ## 4. 建议原因码（用于追溯）
 
-标准来源：`references/reason_code_catalog.md`
+标准来源：`references/reason_code_catalog.md`（**权威列表 15 个**；本节只列最常用的，遇到本节未列的请直接查 catalog）
 
-- `D-PASS-DEFAULT`: 编译通过 + 运行通过 + 规则一致 + 可作为 Spike gate
-- `D-MANUAL-NONGATE`: 场景不宜 Spike gate（PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等）
-- `D-MANUAL-UNSTABLE`: 运行不稳定但语义可解释
-- `D-COMPILE-ONLY-ENV`: 仅具备编译条件，且本轮不执行运行 gate
-- `D-BLOCK-RUN-NOT-ATTEMPTED`: 需要运行 gate 但本轮未执行
-- `D-BLOCK-RUN-UNEXPLAINED`: 已运行但结果不可归因
-- `D-BLOCK-UNTSTD`: 存在原因不明 untested exception
-- `D-BLOCK-RULE`: 规则未对齐
-- `D-BLOCK-EVIDENCE`: 证据不完整
-- `D-BLOCK-REGISTER`: 分层与注册状态不一致
+- `D-PASS-DEFAULT`：编译通过 + 运行通过 + 规则一致 + 可作为 Spike gate
+
+manual 档（5 个）：
+- `D-MANUAL-NONGATE`：场景不宜 Spike gate 的通用兜底（PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等 profile §5 类）
+- `D-MANUAL-UNSTABLE`：Spike 运行不稳定但语义可解释（flaky）
+- `D-MANUAL-RTL-ONLY`：需要 RTL/波形才能观察的现象，LinkNan difftest 或 FSDB 分析为主
+- `D-MANUAL-SPIKE-GAP`：Nanhu 按 spec 实现，Spike 有实现 gap（例：mcontrol6 chain 闭合后 AMO BP Spike 不抛）
+- `D-MANUAL-NANHU-NOT-IMPL`：超出 Nanhu 当前实现范围（应回退；仅作为未来支持的占位）
+
+compile-only 档（2 个）：
+- `D-COMPILE-ONLY-ENV`：仅具备编译条件，平台环境缺失
+- `D-COMPILE-ONLY-STAGE`：本阶段不跑 gate，阶段性暂停
+
+blocked 档（7 个）：
+- `D-BLOCK-COMPILE`：编译挂
+- `D-BLOCK-RUN-NOT-ATTEMPTED`：需要运行 gate 但本轮未执行
+- `D-BLOCK-RUN-UNEXPLAINED`：已运行但结果不可归因（含 classifier 跳过）
+- `D-BLOCK-UNTSTD`：存在原因不明 untested exception
+- `D-BLOCK-RULE`：规则未对齐
+- `D-BLOCK-EVIDENCE`：证据不完整
+- `D-BLOCK-REGISTER`：分层与注册状态不一致
 
 ## 5. 输出格式（建议直接贴到交付摘要）
 

@@ -97,9 +97,16 @@ python3 scripts/case_preflight_pack.py \
 2. 再检索 2~5 个相似存量 case，优先复用已有写法中的结构、断言和环境构造。
    如果测试点描述较长、分支较多，优先让脚本先生成 reading pack，再由模型抽象哪些结构值得学、哪些不能照搬。
 3. 命名确定后，先做精确唯一性检查；新增 case 用 `--expect absent`，不要等写完后才第一次发现撞名。
-4. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
-5. 在合适的 case 目录写或改 case：AI/批量生成 case 默认放 `ai_test_cases/`，人工维护 case 放 `manual_test_cases/<module>/`。
-6. 按 `references/framework_usage_pitfalls.md` 复核 `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册和工具使用风险。
+4. **写前三问**（`SKILL.md` Workflow step 5 硬要求，无 tool call，纯文本）：
+   - **Q1**：本 corner 是否落在 **Nanhu 未实现**范围内（data trigger / 3+ 层 chain / `classification=nanhu_not_impl`）？**是 → STOP**，回退到已实现的等价角度或请用户确认，不动笔。
+   - **Q2**：本 case 的 `spike_gate_applicable` 是 true 还是 false？依据 profile §5 哪条？
+     - **true → default-first 路径**：注册开启、必须跑 Spike、结果决定分层。
+     - **false → manual-first 捷径**：`// TEST_REGISTER(...)` 注释注册 → `compile_elf.py --include-commented` → step 10 可选跑 Spike 看行为但**不翻 default** → step 14 `reason_code:` 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY`。省一次 compile+run。
+   - **Q3**：相似检索 top 中有 `register_status=commented` **且（Manual_Reference.md 有对应条目 _或_ memory/events.jsonl 有对应历史）**的同主题 case 吗？若有，Read case 源 + 命中来源条目后再决定。
+5. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
+6. 在合适的 case 目录写或改 case：AI/批量生成 case 默认放 `ai_test_cases/`，人工维护 case 放 `manual_test_cases/<module>/`。
+7. **预编译 lint**：`python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --file <new_case_file> --strict-case-end`——命中 error 立即修，不要先 compile（lint 1-2s，NFS 上 compile 30-60s）。
+8. 按 `references/framework_usage_pitfalls.md` 复核 `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册和工具使用风险。
 
 建议命令：
 

@@ -30,10 +30,12 @@ linknan_mmio_requires_responder: true
 
 - `references/quality_gate.md`
 - `references/tiering_decision.md`
-- `references/reason_code_catalog.md`
+- `references/reason_code_catalog.md`（**reason_code 的权威来源**；任何分层归因时先查这里）
 - `references/submission_card.md`
 - `references/writing_cases.md`
 - `references/build_run_debug.md`
+
+注：完整 Source Priority 见 `SKILL.md`（本文在 SKILL.md 的 §2，位于通用 Gate/tiering 规则之上；memory 不参与规则冲突裁决，仅作查询辅助）。
 
 ## 2. 项目范围
 

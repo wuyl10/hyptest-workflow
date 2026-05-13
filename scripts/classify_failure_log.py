@@ -239,6 +239,53 @@ def classify(text: str) -> dict[str, object]:
             evidence="cache/TLB microarchitectural model boundary",
         )
         next_actions.append("treat cache/TLB flows as RTL-only unless profile says otherwise")
+    # Spike implementation gap (Nanhu implements the spec, Spike does not).
+    # Keywords are chosen to match wording a user is likely to put in a log
+    # or narrative summary when they spot an unmodeled behavior in Spike.
+    if (
+        "spike gap" in lowered
+        or "spike not modeled" in lowered
+        or "not modeled in spike" in lowered
+        or "chain closed bp" in lowered
+        or ("mcontrol6" in lowered and "chain" in lowered)
+    ):
+        add_reason(
+            reason_codes,
+            reason_details,
+            catalog,
+            "D-MANUAL-SPIKE-GAP",
+            evidence="Spike implementation gap (Nanhu follows spec, Spike lacks model)",
+        )
+        error_points.append(
+            "Spike implementation gap detected; Nanhu may behave correctly but Spike cannot gate"
+        )
+        next_actions.extend([
+            "confirm Nanhu behavior matches spec (profile §5)",
+            "route to LinkNan/RTL for authoritative gate",
+        ])
+    # Nanhu implementation out-of-scope (spec exists but Nanhu did not implement).
+    # These corners must not be written per Non-Negotiable §3 rule 4; the
+    # classifier surfaces the match so the agent/reviewer can roll back.
+    if (
+        "data trigger" in lowered
+        or "nanhu not impl" in lowered
+        or "not implemented in nanhu" in lowered
+        or ("chain" in lowered and ("3 layer" in lowered or "three layer" in lowered or "3-layer" in lowered))
+    ):
+        add_reason(
+            reason_codes,
+            reason_details,
+            catalog,
+            "D-MANUAL-NANHU-NOT-IMPL",
+            evidence="corner appears to exceed current Nanhu implementation scope",
+        )
+        error_points.append(
+            "Nanhu implementation out-of-scope; Non-Negotiable §3 says do not write these cases"
+        )
+        next_actions.extend([
+            "fall back to a Nanhu-implemented equivalent angle",
+            "confirm with user before keeping the case as a placeholder",
+        ])
 
     dedup_reason = list(dict.fromkeys(reason_codes))
     return {

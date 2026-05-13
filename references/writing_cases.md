@@ -21,6 +21,18 @@
 - [14. 提交前硬检查](#14-提交前硬检查可复制到-pr-描述) — PR 前勾选清单
 - [14.1 test_point → case 映射表自查](#141-test_point--case-映射表自查写完运行通过后必做) — 覆盖完整性核对
 
+## 0. 动笔前（`SKILL.md` Workflow step 5 硬要求）
+
+在按本文档写任何 case 前，**先回答三问**（纯文本，无 tool call）：
+
+1. **本 corner 是否落在 Nanhu 未实现范围内**（data trigger / 3+ 层 chain / profile `classification=nanhu_not_impl`）？**是 → STOP**，回退或请用户确认，不动笔；`D-MANUAL-NANHU-NOT-IMPL` 只作占位逃生口，默认不写这类 case。
+2. **`spike_gate_applicable` 是 true 还是 false**？依据 profile §5 哪条？
+   - true → default-first 路径（注册开启、必须跑 Spike、结果决定分层）
+   - false → **manual-first 捷径**：`// TEST_REGISTER(...)` 注释 → `compile_elf.py --include-commented` → step 10 可选跑 Spike 看行为但不翻 default → `reason_code:` 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY`
+3. 相似检索 top 中有 `register_status=commented` **且（Manual_Reference.md 或 memory/events.jsonl 有对应历史）**的同主题 case 吗？有 → 先 Read 该 case 源 + 命中来源条目，再决定选同类角度的理由。
+
+写前两条任一答不出 / 证据对不上 → 回补覆盖检查和 profile 标记证据，不要动笔；写错一次 case 的 compile+run 返工在 NFS 上 ~60-90s。
+
 ## 1. 放置位置与命名
 
 - AI/批量生成的新用例默认放在 `ai_test_cases/*.c`。

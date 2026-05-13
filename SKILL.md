@@ -99,7 +99,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
   - **新增测试点模式**（`task_mode=new-case-only` 或未指定条目）：默认 `coverage_scope=repo` 做全仓 `test_point/**/*.md` 覆盖检查，必须新增新的 `### PnX` 条目和新的 `ai_*` case。新条目编号沿当前文件前缀继续递增（如 `*_points_7.md` 继续补 `P7D/P7E`）。
   - **补已有测试点模式**（`task_mode=supplement-existing-point` 或用户明确指定 `### PnX`）：默认 `coverage_scope=file` 围绕该条目/文件做局部测试点检查，优先在旧条目下补 case，不强行新增新条目。
 - **写新 case 或判断 Spike 结果前必须先确定规格/平台口径 `spec_profile`**（未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，**标记**规格来源、平台模型边界、`spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位，见 `Source Priority`）。Why: 同一个断言在不同 profile 下的结论可能相反（例如 PMA=IO 非对齐在某些 profile 下走 AF，通用 RISC-V 走 AM）。不定口径就判 Spike 结果会把"profile 限制"误认为"RTL bug"。
-- **Nanhu 未实现的 corner 直接不编 case**：若目标 corner 落在当前 profile 的 Nanhu 实现约束之外（例如 `spec_profiles/<profile>.md` §5 "Nanhu NHV5.1AP Debug trigger 实现约束"段、或 `query_spec_profile.py --nongate-summary --match-module <m> --json` 里 `classification=nanhu_not_impl` 的类别——data trigger、3+ 层 chain、本版本未实现的 debug 特性等），**禁止直接编写 case**——应先回退到 Nanhu 已实现的等价角度，或停下来请用户确认。写这类 case 即使标 `D-MANUAL-NANHU-NOT-IMPL` 也违反本规则——跑不动、review 验不了，属工程浪费。Why: 两类 Spike 边界语义截然不同——(a) Nanhu **实现**了 spec、Spike 有 gap（`D-MANUAL-SPIKE-GAP`/`D-MANUAL-NONGATE`）→ **照常编 case 但不以 Spike 为 gate**；(b) Nanhu **未实现**该 spec 场景 → **根本不该写对应 case**，必须回退到 Nanhu 已实现的等价角度。混淆两者会让 workflow 产出永远跑不动的僵尸 case，也污染后续覆盖统计。
+- **Nanhu 未实现的 corner 直接不编 case**：若目标 corner 落在当前 profile 的 Nanhu 实现约束之外（例如 `spec_profiles/<profile>.md` §5 "Nanhu NHV5.1AP Debug trigger 实现约束"段、或 `query_spec_profile.py --nongate-summary --match-module <m> --json` 里 `classification=nanhu_not_impl` 的类别——data trigger、3+ 层 chain、本版本未实现的 debug 特性等），**默认禁止直接编写 case**——应先回退到 Nanhu 已实现的等价角度，或停下来请用户确认。**唯一例外**：用户**显式确认**作为"未来 Nanhu 支持后的回归占位"（极罕见）→ 可以标 `D-MANUAL-NANHU-NOT-IMPL`，`check_writeback_format.py --check-reason-code` 会抛 `reason_code_nanhu_not_impl` warning 让 reviewer 复核；没有这个显式确认就写 = 违反本规则。Why: 两类 Spike 边界语义截然不同——(a) Nanhu **实现**了 spec、Spike 有 gap（`D-MANUAL-SPIKE-GAP`/`D-MANUAL-NONGATE`）→ **照常编 case 但不以 Spike 为 gate**；(b) Nanhu **未实现**该 spec 场景 → 默认**不该写**，产出的是永远跑不动的僵尸 case，也污染覆盖统计。
 - **写新 case 前先检索 2~5 个相似存量 case**；模板只作骨架提醒，不替代存量 case 学习。Why: 模板只给形状，存量 case 含本 repo 的**特权态切换顺序、页表/PMP 处理习惯、断言文案风格**。跳过学习容易写出和仓库风格脱节的 case，review 阶段被打回。
 - **写新 case 前必须同时做 repo 级 case 相似检索 + 精确唯一性检索**；"相似检索未命中"和"函数名唯一"不是同一件事，两者都要留证据。命名确定后优先用 `scripts/check_case_uniqueness.py --expect absent` 走缓存索引快路径；缓存由 `scripts/repo_evidence_index.py` 预热（见 Workflow 步骤 1），**没预热时脚本会 fallback 到全仓 rg，等于违反此条**。写完后的 postcheck 只作复核，不能替代写前唯一性拦截。`case` 去重始终是 repo 级；`find_similar_cases.py` 始终搜索全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。详见 `references/coverage_and_dedupe.md`。
 - **新增测试点前必须先做测试点覆盖检查**；默认按全仓 `test_point/**/*.md` 扫描，不能只看当前文件就声称"全仓未覆盖"。Why: test_point 按模块分文件但**同一怀疑点可能散落在多个文件**。只看当前文件就声称"新点"会造成跨文件重复。
@@ -115,7 +115,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
 
 ## Workflow
 
-默认走"**预热 + 轻量直通**"：`repo_evidence_index` 预热 → `find_similar_cases` → `check_case_uniqueness` → 写 case → `compile_elf` → `get_result` → `check_case_lint` →（失败时）`classify_failure_log` → 回填 → `check_writeback_format --check-register`。**不默认跑 pack 聚合工具**（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `make_case_submission_card` / `case_workflow_ledger`）；只有用户明确要求"跑完整 pack"、"输出 submission card"、"复盘耗时"时才走完整 pipeline。质量工具（lint / 失败分类 / 注册一致性）在轻量路径仍必须保留。
+默认走"**预热 + 轻量直通**"：`repo_evidence_index` 预热 → `find_similar_cases` → `check_case_uniqueness` → 写 case → `compile_elf` → `get_result` → `check_case_lint` →（失败时）`classify_failure_log` → 回填 → `check_writeback_format --check-register`。**不默认跑 pack 聚合工具**（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `case_workflow_ledger`）；只有用户明确要求"跑完整 pack"、"复盘耗时"时才走完整 pipeline。质量工具（lint / 失败分类 / 注册一致性）在轻量路径仍必须保留。**例外**：`make_case_submission_card.py` 在 **非 default 分层**（manual / compile-only / blocked）时**必须跑**（由 step 16 触发），作为 reason_code 与 Manual_Reference 的机器可读统一证据来源；default 分层不跑。
 
 1. **锁定输入 + 按需预热**：确认 `HYPTEST_HOME`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）。**`check_env.py` 与 repo evidence 预热都按任务分档**——必须 / 跳过条件相同：
    - 需要运行平台 / 查覆盖 / 唯一性 / 相似 case 的任务（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 遇到非平凡失败）：**必须**跑 `check_env.py` + 预热 evidence index
@@ -172,7 +172,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
      --check-register \
      --check-reason-code
    ```
-   `--check-reason-code` 校验非 default 状态的 `已实现 case` 行**必须**带 `reason_code:` 注释，且 code 必须在 `assets/reason_codes.json` 13 个枚举里。**禁止编造** `manual.<...>` / 自由式 `D-MANUAL-<自造名>` 这类 code；catalog 不够用 → 用 `OTHER-PROPOSE:<一句话>` 占位（提示 skill 维护者扩 catalog），同时摘要里醒目标"⚠️ 待 catalog 扩展"。
+   `--check-reason-code` 校验非 default 状态的 `已实现 case` 行**必须**带 `reason_code:` 注释，且 code 必须在 `assets/reason_codes.json` 枚举里（当前 15 个——1 个 default + 5 个 manual + 2 个 compile-only + 7 个 blocked；见 §reason_code Catalog 或 `references/reason_code_catalog.md`）。**禁止编造** `manual.<...>` / 自由式 `D-MANUAL-<自造名>` 这类 code；catalog 不够用 → 用 `OTHER-PROPOSE:<一句话>` 占位（提示 skill 维护者扩 catalog），同时摘要里醒目标"⚠️ 待 catalog 扩展"。
 15. **memory append 自问**（仅 bug hunt / 新增测试点 / `fix-case` 发现工具坑 / 非预期运行结果等场景）：按 `Workflow Memory` 段的 3 门槛处理。其它任务类型跳过。
 16. **Manual_Reference 写回**（仅分层落到 `manual` / `blocked` 且原因涉及**新的模型边界 / Spike nongate / 待人工规则裁定**，不是 profile §5 / `reason_code_catalog` 已明确收录的场景时）：在 `test_point/Manual_Reference.md` 对应 section 末尾 append 一条 `#### <id>. <title>（**自动生成，待人工确认**）`，含涉及文件 / 涉及用例 / 怀疑点源码引用 / 本轮 Spike 观察 / 三条待人工确认问题（是否补入 profile、是否 LinkNan 复核、`reason_code` 确认）。**非 default 分层必须同时跑 `make_case_submission_card.py` 生成机器可读交付卡**作为 reason_code / Manual_Reference 的统一证据来源。`default` / `compile-only` 不触发本步。**人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status fixed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。
 
@@ -267,8 +267,8 @@ profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spi
 - **test_point → case 映射表**：逐条列出 test_point 每个要求对应到 case 哪一行断言（详见 `references/writing_cases.md` §14.1）。
 - `compile-only` 时显式写 Gate D=`N/A` 与不运行原因。
 - 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须明确说明原因，不能把旧条目或旧 case 当成"新增结果"。
-- **memory 动作**（仅在 Workflow 步骤 13 触发的任务类型输出）：列本轮 query 了哪些 topic（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 13 的任务不用列。
-- **Manual_Reference 动作**（仅在 Workflow 步骤 14 触发时输出）：说明是否在 `test_point/Manual_Reference.md` 对应 section append 了 `#### <id>.（**自动生成，待人工确认**）` 条目 + 附的 3 条待人工确认问题；或本轮收到人工 / LinkNan 复核结论、给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status fixed`。`default` / `compile-only` 不触发本步，摘要里明确"未触发"。
+- **memory 动作**（仅在 Workflow 步骤 15 触发的任务类型输出）：列本轮 query 了哪些 topic（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 15 的任务不用列。
+- **Manual_Reference 动作**（仅在 Workflow 步骤 16 触发时输出）：说明是否在 `test_point/Manual_Reference.md` 对应 section append 了 `#### <id>.（**自动生成，待人工确认**）` 条目 + 附的 3 条待人工确认问题；或本轮收到人工 / LinkNan 复核结论、给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status fixed`。`default` / `compile-only` 不触发本步，摘要里明确"未触发"。
 
 ## What To Read
 
