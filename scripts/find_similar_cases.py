@@ -35,6 +35,7 @@ from similar_case_render import (
     build_snippet,
     case_allowed,
     load_manual_reference_case_names,
+    load_memory_case_hints,
     render_reading_pack,
 )
 from similar_case_terms import (
@@ -225,6 +226,7 @@ def main() -> int:
     )
     case_index = build_case_index(cases)
     manual_reference_case_names = load_manual_reference_case_names(repo_root)
+    memory_case_hints = load_memory_case_hints(repo_root)
     ranked = []
     need_snippet = args.show_snippet or args.assert_only or args.emit_reading_pack
     for case in cases:
@@ -246,7 +248,7 @@ def main() -> int:
             "quality_bonus": score_card["quality_bonus"],
             "matched_terms": score_card["matched_terms"],
             "significant_matched_terms": score_card["significant_matched_terms"],
-            "match_notes": build_match_notes(case, score_card, manual_reference_case_names),
+            "match_notes": build_match_notes(case, score_card, manual_reference_case_names, memory_case_hints),
             "learning_focus": build_learning_focus(case),
             "similarity_tokens": build_similarity_tokens(case),
             "name_tokens": build_name_tokens(case),
@@ -284,7 +286,7 @@ def main() -> int:
                     "file": related_helper["file"],
                     "line": related_helper["line"],
                     "symbol_kind": related_helper["symbol_kind"],
-                    "match_notes": build_match_notes(related_helper, helper_score_card, manual_reference_case_names),
+                    "match_notes": build_match_notes(related_helper, helper_score_card, manual_reference_case_names, memory_case_hints),
                     "snippet": snippet_builder(
                         related_helper["body"],
                         args.snippet_lines,

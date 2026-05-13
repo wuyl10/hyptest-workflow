@@ -48,12 +48,52 @@ python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME
     --note "<为什么废弃>"
   ```
 
-常用 CLI：
+### Status 分档（读写优先级）
+
+| status | 含义 | 典型来源 | 读取优先级 |
+|---|---|---|---|
+| `info` | agent 自动沉淀的事实观察，未经人工确认 | `workflow_memory.py append`（3 门槛过，step 15 触发）| 次级参考 |
+| `open` | 可疑问题，待进一步调查 | agent 主动标记 | 次级参考 |
+| `fixed` | **人工确认过的经验**（从 Manual_Reference 迁入） | `promote-from-manual-reference` 流程（见下文）| **首选** |
+| `obsolete` | 不再成立（audit 过时） | `append --status obsolete` | 过滤掉，不再读取 |
+
+读端（`query` / 相似检索的 commented 判据 / bug hunt 历史复盘）默认过滤 `obsolete`；优先用 `fixed`，`info`/`open` 作辅助。
+
+### Manual_Reference → memory 迁入流程
+
+当人工 audit `test_point/Manual_Reference.md` 的一条 auto-append 条目时，结果分三档：
+
+1. **"规则真值"**：把内容迁进 `references/spec_profiles/<profile>.md`（例如新的 Nanhu 实现约束、新的 Spike gap 类别，同步 `hyptest-nongate-keywords` JSON 块）；Manual_Reference 该条标 `> 已解决（<日期>）：已进 profile §X`，**不进 memory**（规则真值在 profile）。
+2. **"复用线索"**：结论简化后 append memory `status=fixed`；Manual_Reference 该条标 `> 已解决（<日期>）：已进 memory`。
+3. **"作废 / 误报"**：Manual_Reference 该条标 `> 已解决（<日期>）：作废，<原因>`；不进 profile 也不进 memory。
+
+对应 CLI（当前靠手工，未来可加 `workflow_memory.py promote-from-manual-reference` 自动化）：
 
 ```bash
-# 追加一条经验
+# 规则真值：编辑 profile 后在 Manual_Reference 条目末尾手工加 `> 已解决` 行
+
+# 复用线索：从 Manual_Reference #C7 迁经验到 memory
 python3 scripts/workflow_memory.py append \
   --repo-root $HYPTEST_HOME \
+  --module <m> --platform <plat> --spec-profile <profile> \
+  --phase case_design --status fixed \
+  --case <case_name> \
+  --symptom "<一句话症状>" \
+  --reason-code <reason_code_from_catalog> \
+  --fix "<一句话结论>" \
+  --source "test_point/Manual_Reference.md#C7" \
+  --note "promoted from Manual_Reference after human confirmation <YYYY-MM-DD>"
+```
+
+`--status fixed` + `--source test_point/Manual_Reference.md#<id>` 的组合让后续 query 能区分"人工确认的"与"agent 沉淀的"。
+
+### 常用 CLI
+
+```bash
+# 追加一条经验（3 门槛过才跑；默认 status=info 时需显式指定）
+python3 scripts/workflow_memory.py append \
+  --repo-root $HYPTEST_HOME \
+  --status info \
   --topic <topic> \
   --note "<结论 / 现象 / 关键命令>"
 

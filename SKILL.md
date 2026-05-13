@@ -18,16 +18,57 @@ Agent 执行入口。触发后按以下优先级执行：
 
 冲突时按以下顺序裁决：
 
-1. `test_point/Manual_Reference.md`
-2. `references/quality_gate.md` + `references/tiering_decision.md` + `references/reason_code_catalog.md` + `references/submission_card.md`
-3. `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md` + `references/writing_cases.md` + `references/framework_usage_pitfalls.md` + `references/build_run_debug.md`
-4. `references/repo_layout.md`
-5. `test_point/CRITICAL_ISSUES_LOG.md`
+1. `test_point/Manual_Reference.md`（人工确认的规则真值 + 待人工确认条目；已确认条目会迁进 profile 或 memory）
+2. `references/spec_profiles/<spec_profile>.md` + `references/spec_and_model_limits.md`（**当前项目规格实现 + Spike 建模边界 + Nanhu 实现约束**——项目真值，通用规则下方应让位于本层）
+3. `references/quality_gate.md` + `references/tiering_decision.md` + `references/reason_code_catalog.md` + `references/submission_card.md`（分层/Gate/reason_code/交付口径）
+4. `references/writing_cases.md` + `references/framework_usage_pitfalls.md` + `references/build_run_debug.md`（写 case / 环境细节）
+5. `references/repo_layout.md`
+6. `test_point/CRITICAL_ISSUES_LOG.md`
 
 补充：
 
 - 顺序问题一律以日志和最小复现实验为准，不以视觉顺序经验做硬判断。
 - 存量 case 是学习样本，不高于项目规则。
+- `$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是**经验线索**，**不参与规则冲突裁决**；仅作为 agent 的查询辅助（见下文 `Data Sources and Roles`）。
+
+## Data Sources and Roles
+
+三个可读写文件，各司其职、各有生命周期——**不要混用**：
+
+| 文件 | 定位 | 谁写 | 谁读 | 生命周期 |
+|---|---|---|---|---|
+| `references/spec_profiles/<profile>.md` | **项目真值**：当前架构 Nanhu 实现了 spec 什么、Spike 建模了 spec 什么、Nanhu 未实现 spec 什么；PMA/PBMT/MMIO 表 | 人工长期维护；从 Manual_Reference 人工迁入 | agent 分层/选点必读 | 随项目 + Spike 版本演化 |
+| `test_point/Manual_Reference.md` | **待人工确认的收件箱**：agent 跑出来的新 manual/blocked 观察、待人工判决的问题 | skill step 16 auto-append；人工 audit 后 `> 已解决` | agent 分层决策时查 | 短暂——人工审完就流出去（进 profile 或 memory）|
+| `.hyptest_workflow_skill/memory/events.jsonl` | **agent 可复用的经验线索**：人工确认过的结论 + agent 低风险自动沉淀 | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case query | 长期累积，带 status（info / open / fixed / obsolete）|
+
+### 三文件之间的流转
+
+```
+agent 写 case 遇到新 manual/blocked
+  → step 16 auto-append Manual_Reference `#### <id>.（待人工确认）`
+  → 同时 step 15 按 3 门槛 append memory（status=info）
+
+  [人工 audit Manual_Reference 条目]
+  ├─ 判为"规则真值" → 内容迁进 spec_profiles/<profile>.md，MR 该条标 `> 已解决：已进 profile §X`
+  ├─ 判为"复用线索" → append memory（status=fixed），MR 标 `> 已解决：已进 memory`
+  └─ 判为"作废"   → MR 标 `> 已解决：作废，<原因>`（不进其它地方）
+
+agent 后续执行:
+  profile 做分层决策时读
+  memory 做相似检索 commented 判据 / bug hunt query 时读（优先 fixed，info 作辅助）
+  Manual_Reference 检查是否有本 case 的待确认条目（强信号）
+```
+
+### memory status 分档
+
+| status | 含义 | 读取优先级 |
+|---|---|---|
+| `info` | agent 自动沉淀的**事实观察**，未经人工确认 | 次级参考 |
+| `open` | 可疑问题，待进一步调查 | 次级参考 |
+| `fixed` | **人工确认过的经验**（从 Manual_Reference 迁入） | **首选** |
+| `obsolete` | 不再成立（audit 过时） | 过滤掉 |
+
+详细维护 CLI、audit 流程和 MR→memory 迁入操作见 `references/workflow_state.md`。
 
 ## Non-Negotiables
 
@@ -86,14 +127,14 @@ Agent 执行入口。触发后按以下优先级执行：
    - **相似检索前先做 query 提炼**（无 tool call）：把"想找什么"拆成 3-5 条具体 term（目标指令/结构、硬件单元、特殊 condition、profile 类别、预期断言类型），用提炼后的 term 作 `--query` 参数。
    - `--limit` 按任务分档：补已有 `### PnX` 且只加 assert / 小改 `--limit 2-3`；补已有 `### PnX` 新增 case `--limit 3-4`；新增 `### PnX` 或跨模块 `--limit 5`；bug hunt / 跨模块扩点 `--limit 5-8`。
    - **读 top 结果时先看 `note` 字段再决定 Read**：`matched terms` 判真命中还是 term alias 溢出；`observability density` / `contains explicit cause/tval checking` 判质量；`calls related helpers` 判 helper 复用。
-   - **`register_status=commented` 按来源分档处理**：commented 有多种原因（正式流程标 manual / 用户手动调试禁用 / WIP 暂停等），不能一刀切当硬信号。**判据是 Manual_Reference.md 是否有对应条目**——相似检索 render 会在 note 里标出分档：
-     - `commented` 且 Manual_Reference.md 有对应条目：**建议深入**——这是正式流程判过的 Spike 边界，有人工记录，**必须**先 Read 该 case 源文件 + 对应 Manual_Reference 条目再选同类角度
+   - **`register_status=commented` 按来源分档处理**：commented 有多种原因（正式流程标 manual / 用户手动调试禁用 / WIP 暂停等），不能一刀切当硬信号。**判据是 Manual_Reference.md 有对应条目 _或_ memory/events.jsonl 有对应历史**——相似检索 render 会在 note 里标出分档：
+     - `commented` 且 **Manual_Reference.md 或 memory/events.jsonl 命中**：**建议深入**——这是正式流程判过 / agent 已沉淀经验的 Spike 边界，**必须**先 Read 该 case 源文件 + 命中来源的条目再选同类角度
      - `commented` 但 Manual_Reference.md 无对应条目：**当噪音处理**——大概率是手动调试 / WIP 注释，不作为硬信号，但写怀疑点时仍应 Read 那个 case 看场景（作为相似检索的普通参考）
 4. **profile 标记**（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 才需要；`run-only` / `writeback-only` / `preflight-only` / `triage-only` 跳过本步）：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`（bug hunt 可用 `python3 scripts/query_spec_profile.py --spec-profile <p> --nongate-summary --json` 拿压缩版 §5 nongate keyword 列表，避免每次重读全文 profile）。标记 `spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位）。
 5. **写前三问**（无 tool call，纯文本，所有写 case 类任务必跑）：在动笔前用文字回答——
    1. 本 corner 是否落在 **Nanhu 未实现** 范围内（data trigger / 3+ 层 chain / `classification=nanhu_not_impl` 等）？若 **是** → **停下回退**到 Nanhu 已实现的等价角度或请用户确认，**不要动笔**（Non-Negotiable §3 第 4 条）。若 **否** → 继续第 2 问。
    2. 本 case 的 `spike_gate_applicable` 是 true 还是 false？依据是 profile §5 / `query_spec_profile --nongate-summary` 的哪条？
-   3. 步骤 3 相似检索 top 中有 `register_status=commented` **且 Manual_Reference.md 有对应条目**的同主题 case 吗？若有，已读了那 case + 对应 Manual_Reference 条目吗？本次为什么仍要选这个角度？（只有 Manual_Reference 有对应条目才触发本问；没对应条目的 commented 视作普通 case）
+   3. 步骤 3 相似检索 top 中有 `register_status=commented` **且（Manual_Reference.md 有对应条目 _或_ memory/events.jsonl 有对应历史）**的同主题 case 吗？若有，已读了那 case + 命中来源的条目吗？本次为什么仍要选这个角度？（两处都没命中的 commented 视作普通 case，无需触发本问）
 
    三问答完走**分路**：
    - 第 1 问 "否" + 第 2 问 "**true**"（Spike 可 gate）→ **default-first 路径**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**开启** `TEST_REGISTER(...);` → 步骤 9 compile → 步骤 10 跑 Spike → 步骤 11 失败分类（如需）→ 步骤 12-14 正常回填
@@ -195,6 +236,23 @@ Bug hunt 场景最终交付摘要额外包含：
 
 - 选点所用的证据来源：profile §5 哪条 / 源码哪个 anti-pattern（`<file>.scala:<line>` + 一句话说明）/ 现有 test_point 的覆盖空隙
 - 诚实说明怀疑程度：推测就是推测，别包装成已验证 bug
+
+## Why we still write cases when `spike_gate_applicable=false`
+
+profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spike 为 gate。三类用途：
+
+1. **为 LinkNan / RTL 环境准备回归素材**：Spike 不建模但 LinkNan difftest / 真实 RTL 仿真可以 gate。case 写好并 `// TEST_REGISTER(...)` 注释；需要时 `compile_elf.py --include-commented` + LinkNan run 手动跑回归。
+2. **覆盖完成度**：test_point 要求的场景必须有 case——即使 Spike 不能 gate，case 本身是"场景已构造、待跑 LinkNan"的证据。未来 Spike 补了 gap，去掉注释即可翻 default。
+3. **验证 profile §5 的描述**：manual-first 路径允许"可选跑 Spike 看行为但不翻 default"，实际跑一次能**实证** profile §5 的说法——例如发现"chain mismatch 抑制路径 Spike 可观测，但 chain closed BP 确实不抛"，这类观察可以通过 step 15/16 append memory 或写进 Manual_Reference 扩 profile §5。
+
+与 **Nanhu 未实现**（Non-Negotiable §3 第 4 条）的区别：
+
+| | Spike 不适合 gate | Nanhu 未实现 |
+|---|---|---|
+| Nanhu 行为 | 按 spec 实现 | 根本没实现 |
+| case 能 RTL 验证吗 | 能 | 不能（硬件没做）|
+| 写 case 有用吗 | **有**（走 manual-first）| **无**（僵尸 case）|
+| workflow 处理 | manual-first 捷径 + `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` | **禁止编写**（Non-Negotiable §3 第 4 条）|
 
 ## Output Defaults
 

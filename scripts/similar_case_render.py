@@ -40,6 +40,41 @@ def load_manual_reference_case_names(repo_root: Path) -> Set[str]:
     return {m.group(1) for m in MANUAL_REFERENCE_CASE_RE.finditer(text)}
 
 
+def load_memory_case_hints(repo_root: Path) -> Set[str]:
+    """Scan .hyptest_workflow_skill/memory/events.jsonl and return case names
+    that appear in `case` fields with status in {info, open, fixed} (not
+    obsolete). Used alongside Manual_Reference.md so that agent-sunk
+    experience also counts as a strong signal on commented cases.
+
+    Returns an empty set if the file is missing. Malformed lines are skipped.
+    """
+    path = repo_root / ".hyptest_workflow_skill" / "memory" / "events.jsonl"
+    if not path.is_file():
+        return set()
+    hints: Set[str] = set()
+    try:
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                import json as _json
+                entry = _json.loads(stripped)
+            except Exception:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            status = str(entry.get("status", "")).lower()
+            if status == "obsolete":
+                continue
+            case = entry.get("case")
+            if isinstance(case, str) and case:
+                hints.add(case)
+    except OSError:
+        return set()
+    return hints
+
+
 def build_snippet(body: str, max_lines: int) -> str:
     lines = LINE_RE.split(body.strip())
     if not lines:
@@ -144,6 +179,7 @@ def build_match_notes(
     case: Dict[str, str],
     score_card: Dict[str, object],
     manual_reference_case_names: set | None = None,
+    memory_case_hints: set | None = None,
 ) -> List[str]:
     body = case["body"]
     notes: List[str] = []
@@ -184,31 +220,46 @@ def build_match_notes(
     register_status = case.get("register_status")
     case_name = case.get("case_name") or ""
     if register_status == "commented":
-        # Two-tier judgment: Manual_Reference.md presence decides signal strength.
-        # - Has Manual_Reference entry → formally-reviewed Spike boundary (strong signal)
-        # - No Manual_Reference entry → likely WIP/manual debug (weak signal, do not gate)
+        # Two-tier judgment: Manual_Reference.md OR memory/events.jsonl presence
+        # decides signal strength.
+        #   - Has MR entry OR memory hint → formally-reviewed / experience-backed
+        #     Spike boundary (strong signal)
+        #   - Neither → likely WIP/manual debug (weak signal, do not gate)
         has_manual_ref = False
+        has_memory_hint = False
         if manual_reference_case_names is not None and case_name:
             has_manual_ref = case_name in manual_reference_case_names
-        if has_manual_ref:
+        if memory_case_hints is not None and case_name:
+            has_memory_hint = case_name in memory_case_hints
+        lookup_performed = (
+            manual_reference_case_names is not None
+            or memory_case_hints is not None
+        )
+        if has_manual_ref or has_memory_hint:
+            sources = []
+            if has_manual_ref:
+                sources.append("Manual_Reference.md")
+            if has_memory_hint:
+                sources.append("memory/events.jsonl")
             notes.append(
-                "register_status=commented + Manual_Reference entry EXISTS — this is a "
-                "formally-reviewed Spike model boundary; MUST read the case source + the "
-                "corresponding Manual_Reference.md entry before choosing a similar angle"
+                f"register_status=commented + evidence in {' + '.join(sources)} — "
+                "this is a formally-reviewed or experience-backed Spike model boundary; "
+                "MUST read the case source + the referenced entry before choosing a "
+                "similar angle"
             )
-        elif manual_reference_case_names is not None:
-            # Explicit Manual_Reference lookup was performed but found no entry.
+        elif lookup_performed:
+            # Explicit lookup was performed but found no entry in either source.
             notes.append(
-                "register_status=commented but no Manual_Reference.md entry — likely a "
-                "manual/WIP comment-out (not a Spike boundary signal); still a useful "
-                "reference for similar case structure, but not a hard gate"
+                "register_status=commented but no Manual_Reference.md or memory entry — "
+                "likely a manual/WIP comment-out (not a Spike boundary signal); still "
+                "a useful reference for similar case structure, but not a hard gate"
             )
         else:
             # No lookup performed (older call path); emit generic signal.
             notes.append(
                 "register_status=commented — the case was intentionally disabled; check "
-                "Manual_Reference.md to see if it is a formal Spike boundary entry "
-                "(strong signal) or a manual/WIP comment (weak signal)"
+                "Manual_Reference.md / memory/events.jsonl to see if it is a formal "
+                "Spike boundary entry (strong signal) or a manual/WIP comment (weak signal)"
             )
     elif register_status == "unregistered":
         notes.append(
