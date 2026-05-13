@@ -382,6 +382,21 @@ def validate_entry_reason_code(
                             "请在交付摘要里醒目标注 ⚠️ 待 catalog 扩展并 @ skill 维护者"
                         ),
                     })
+                elif normalized == "D-MANUAL-NANHU-NOT-IMPL":
+                    # Non-Negotiable §3 第 4 条：Nanhu 未实现的 corner 直接不应编 case。
+                    # 遇到这个 code 意味着 agent 要么写了僵尸 case（违反规则），要么是合理的占位
+                    # （极罕见）。用显眼 warning 提示 reviewer 人工确认，不硬 fail。
+                    warnings.append({
+                        "entry": title,
+                        "warning_code": "reason_code_nanhu_not_impl",
+                        "message": (
+                            f"{title}: ⚠️ 使用 `D-MANUAL-NANHU-NOT-IMPL` —— 按 Non-Negotiable §3 "
+                            "第 4 条，Nanhu 未实现的 corner 不应直接编 case。请确认："
+                            "(a) 是否能回退到 Nanhu 已实现的等价角度？"
+                            "(b) 这个 case 是否只是占位（未来 Nanhu 支持后再回归）？"
+                            "若两者都否，考虑删除本 case。"
+                        ),
+                    })
                 elif valid_reason_codes and normalized not in valid_reason_codes:
                     issues.append(
                         f"{title}: `reason_code: {code_text}` 不在 assets/reason_codes.json 里；"
@@ -544,7 +559,7 @@ def validate_file(
             )
             issues.extend(entry_issues)
             # reason_code / classifier warnings always surface, regardless of profile_text.
-            rc_warning_codes = {"reason_code_other_propose"}
+            rc_warning_codes = {"reason_code_other_propose", "reason_code_nanhu_not_impl"}
             for warning in entry_warnings:
                 if profile_text or warning.get("warning_code") in rc_warning_codes:
                     warnings.append(warning)

@@ -236,6 +236,34 @@ def run_reason_code_eval(script_path: Path) -> List[str]:
                 + (completed.stdout or completed.stderr)
             )
 
+        # Case F: D-MANUAL-NANHU-NOT-IMPL → legal code but emits a dedicated warning
+        # (Non-Negotiable §3 第 4 条: Nanhu 未实现的 corner 不应直接编 case).
+        md_nanhu_not_impl = md_no_rc + "\nreason_code: D-MANUAL-NANHU-NOT-IMPL\n"
+        nanhu_file = test_point_dir / "nanhu_not_impl.md"
+        write_text(nanhu_file, md_nanhu_not_impl)
+        completed = subprocess.run(
+            [
+                sys.executable, str(script_path),
+                "--repo-root", str(repo_root),
+                "--file", str(nanhu_file),
+                "--check-register", "--check-reason-code",
+                "--json",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if completed.returncode != 0:
+            failures.append(
+                "D-MANUAL-NANHU-NOT-IMPL should be a legal code (pass), got failure: "
+                + (completed.stdout or completed.stderr)
+            )
+        else:
+            payload = json.loads(completed.stdout)
+            warnings = payload.get("results", [{}])[0].get("warnings", [])
+            if not any(w.get("warning_code") == "reason_code_nanhu_not_impl" for w in warnings):
+                failures.append(
+                    "D-MANUAL-NANHU-NOT-IMPL should emit reason_code_nanhu_not_impl warning"
+                )
+
     return failures
 
 

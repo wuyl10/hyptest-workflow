@@ -55,6 +55,7 @@ Agent 执行入口。触发后按以下优先级执行：
   - **新增测试点模式**（`task_mode=new-case-only` 或未指定条目）：默认 `coverage_scope=repo` 做全仓 `test_point/**/*.md` 覆盖检查，必须新增新的 `### PnX` 条目和新的 `ai_*` case。新条目编号沿当前文件前缀继续递增（如 `*_points_7.md` 继续补 `P7D/P7E`）。
   - **补已有测试点模式**（`task_mode=supplement-existing-point` 或用户明确指定 `### PnX`）：默认 `coverage_scope=file` 围绕该条目/文件做局部测试点检查，优先在旧条目下补 case，不强行新增新条目。
 - **写新 case 或判断 Spike 结果前必须先确定规格/平台口径 `spec_profile`**（未指定则用 profile registry 中的 `default_profile`），再看 `references/spec_and_model_limits.md` 与 `references/spec_profiles/<spec_profile>.md`，**标记**规格来源、平台模型边界、`spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位，见 `Source Priority`）。Why: 同一个断言在不同 profile 下的结论可能相反（例如 PMA=IO 非对齐在某些 profile 下走 AF，通用 RISC-V 走 AM）。不定口径就判 Spike 结果会把"profile 限制"误认为"RTL bug"。
+- **Nanhu 未实现的 corner 直接不编 case**：若目标 corner 落在当前 profile 的 Nanhu 实现约束之外（例如 `spec_profiles/<profile>.md` §5 "Nanhu NHV5.1AP Debug trigger 实现约束"段、或 `query_spec_profile.py --nongate-summary --match-module <m> --json` 里 `classification=nanhu_not_impl` 的类别——data trigger、3+ 层 chain、本版本未实现的 debug 特性等），**禁止直接编写 case**——应先回退到 Nanhu 已实现的等价角度，或停下来请用户确认。写这类 case 即使标 `D-MANUAL-NANHU-NOT-IMPL` 也违反本规则——跑不动、review 验不了，属工程浪费。Why: 两类 Spike 边界语义截然不同——(a) Nanhu **实现**了 spec、Spike 有 gap（`D-MANUAL-SPIKE-GAP`/`D-MANUAL-NONGATE`）→ **照常编 case 但不以 Spike 为 gate**；(b) Nanhu **未实现**该 spec 场景 → **根本不该写对应 case**，必须回退到 Nanhu 已实现的等价角度。混淆两者会让 workflow 产出永远跑不动的僵尸 case，也污染后续覆盖统计。
 - **写新 case 前先检索 2~5 个相似存量 case**；模板只作骨架提醒，不替代存量 case 学习。Why: 模板只给形状，存量 case 含本 repo 的**特权态切换顺序、页表/PMP 处理习惯、断言文案风格**。跳过学习容易写出和仓库风格脱节的 case，review 阶段被打回。
 - **写新 case 前必须同时做 repo 级 case 相似检索 + 精确唯一性检索**；"相似检索未命中"和"函数名唯一"不是同一件事，两者都要留证据。命名确定后优先用 `scripts/check_case_uniqueness.py --expect absent` 走缓存索引快路径；缓存由 `scripts/repo_evidence_index.py` 预热（见 Workflow 步骤 1），**没预热时脚本会 fallback 到全仓 rg，等于违反此条**。写完后的 postcheck 只作复核，不能替代写前唯一性拦截。`case` 去重始终是 repo 级；`find_similar_cases.py` 始终搜索全仓 `ai_test_cases/*.c` 与 `manual_test_cases/**/*.c`。详见 `references/coverage_and_dedupe.md`。
 - **新增测试点前必须先做测试点覆盖检查**；默认按全仓 `test_point/**/*.md` 扫描，不能只看当前文件就声称"全仓未覆盖"。Why: test_point 按模块分文件但**同一怀疑点可能散落在多个文件**。只看当前文件就声称"新点"会造成跨文件重复。
@@ -89,26 +90,28 @@ Agent 执行入口。触发后按以下优先级执行：
      - `commented` 且 Manual_Reference.md 有对应条目：**建议深入**——这是正式流程判过的 Spike 边界，有人工记录，**必须**先 Read 该 case 源文件 + 对应 Manual_Reference 条目再选同类角度
      - `commented` 但 Manual_Reference.md 无对应条目：**当噪音处理**——大概率是手动调试 / WIP 注释，不作为硬信号，但写怀疑点时仍应 Read 那个 case 看场景（作为相似检索的普通参考）
 4. **profile 标记**（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 才需要；`run-only` / `writeback-only` / `preflight-only` / `triage-only` 跳过本步）：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`（bug hunt 可用 `python3 scripts/query_spec_profile.py --spec-profile <p> --nongate-summary --json` 拿压缩版 §5 nongate keyword 列表，避免每次重读全文 profile）。标记 `spike_gate_applicable` 作为初始分层候选（最终分层按 Gate 证据落位）。
-5. **写前两问**（无 tool call，纯文本，所有写 case 类任务必跑）：在动笔前用文字回答两个问题——
-   1. 本 case 的 `spike_gate_applicable` 是 true 还是 false？依据是 profile §5 / `query_spec_profile --nongate-summary` 的哪条？
-   2. 步骤 3 相似检索 top 中有 `register_status=commented` **且 Manual_Reference.md 有对应条目**的同主题 case 吗？若有，已读了那 case + 对应 Manual_Reference 条目吗？本次为什么仍要选这个角度？（只有 Manual_Reference 有对应条目才触发本问；没对应条目的 commented 视作普通 case）
+5. **写前三问**（无 tool call，纯文本，所有写 case 类任务必跑）：在动笔前用文字回答——
+   1. 本 corner 是否落在 **Nanhu 未实现** 范围内（data trigger / 3+ 层 chain / `classification=nanhu_not_impl` 等）？若 **是** → **停下回退**到 Nanhu 已实现的等价角度或请用户确认，**不要动笔**（Non-Negotiable §3 第 4 条）。若 **否** → 继续第 2 问。
+   2. 本 case 的 `spike_gate_applicable` 是 true 还是 false？依据是 profile §5 / `query_spec_profile --nongate-summary` 的哪条？
+   3. 步骤 3 相似检索 top 中有 `register_status=commented` **且 Manual_Reference.md 有对应条目**的同主题 case 吗？若有，已读了那 case + 对应 Manual_Reference 条目吗？本次为什么仍要选这个角度？（只有 Manual_Reference 有对应条目才触发本问；没对应条目的 commented 视作普通 case）
 
-   两问都答得出 + 答案对得上证据 → 进入步骤 6 写 case；任一答不出 → 回去补步骤 3-4 证据，**不要直接下笔**。这一步成本是几行文字，省的是写错一次 case 的 ~3-5 分钟返工。
+   三问答完走**分路**：
+   - 第 1 问 "否" + 第 2 问 "**true**"（Spike 可 gate）→ **default-first 路径**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**开启** `TEST_REGISTER(...);` → 步骤 9 compile → 步骤 10 跑 Spike → 步骤 11 失败分类（如需）→ 步骤 12-14 正常回填
+   - 第 1 问 "否" + 第 2 问 "**false**"（Spike 不可 gate，但 case 照编）→ **manual-first 捷径**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**直接注释** `// TEST_REGISTER(...);` → 步骤 9 compile 用 `--include-commented` → 步骤 10 **可选跑 Spike 看行为但不以结果翻 default**（Spike PASS 也保持 manual；跑出 FAILED 才进步骤 11 归因）→ 步骤 14 `reason_code:` 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY` → 步骤 16 写 Manual_Reference
+
+   三问答不出 + 答案对不上证据 → 回补步骤 3-4 证据，**不要直接下笔**。这一步成本是几行文字，省的是错走 default-first 后再回退的 ~60-90s compile/run。
 6. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
 7. **预编译 lint**（`new-case-only` / `supplement-existing-point` / `fix-case` 改 case 体后必跑；`run-only` / `writeback-only` 跳过）：
    ```bash
    python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --file <new_case_file> --strict-case-end
    ```
    pre-compile lint 拦截 `TEST_END` 多写 / `TEST_SETUP_EXCEPT()` 漏调 / 多余 register 等结构错；命中 error 立即修，**不要先 compile**——一次 compile 在 NFS 上 ~30-60s，预编译 lint 只 1-2s。
-8. **调整 `test_register.c`** 注册状态，使其与目标分层一致。
-9. **单 case 编译**：
-   ```bash
-   python3 compile_elf.py --plat spike --name <case_name>
-   ```
-10. **单 case 运行**（非 `compile-only`）：
-   ```bash
-   python3 get_result.py --platform spike --case <case_name>
-   ```
+8. **调整 `test_register.c`** 注册状态，**按步骤 5 分路**：default-first 路径**开启**注册 `TEST_REGISTER(...);`；manual-first 捷径**直接注释** `// TEST_REGISTER(...);`。
+9. **单 case 编译**：default-first 用 `python3 compile_elf.py --plat spike --name <case_name>`；manual-first 用 `python3 compile_elf.py --plat spike --name <case_name> --include-commented`（扫注释注册行）。
+10. **单 case 运行**：
+   - default-first：**必须**跑 `python3 get_result.py --platform spike --case <case_name>`；结果决定分层（PASSED → `default`；FAILED / untested → 步骤 11 归因）
+   - manual-first：**可选**跑 Spike——想拿观察证据就跑，但结果**不翻 default**（Spike PASSED 仍保持 manual，因为 profile §5 已判 `spike_gate_applicable=false`）
+   - `compile-only` 分层：Gate D = `N/A`，明确写不运行原因
    运行前确认平台环境变量在当前进程可见。`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
 11. **失败分类（强制）**：运行结果出现 `FAILED` / `untested exception` / `timeout` 时**必须**跑：
    ```bash
