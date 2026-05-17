@@ -117,7 +117,7 @@ skill 能从 prompt 里自动推断大部分字段。下表按"什么时候写"�
 spec_profile: nhv5_1_ap
 ```
 
-**环境变量字段**（`HYPTEST_HOME` / `HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` / `HYPTEST_TMPDIR`）只在当前进程看不到时补写；shell 已 export 就不用写。详细口径见 `references/task_input_schema.md`。
+**环境变量字段**（`HYPTEST_HOME` / `HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` / `HYPTEST_TMPDIR`）只在当前进程看不到时补写；shell 已 export 就不用写。`HYPTEST_SKILL_HOME` 仅在手动运行本 skill 自带 `scripts/*.py` 时需要。详细口径见 `references/task_input_schema.md`。
 
 ### 两种执行档：快速版 vs 完整 pack
 
@@ -169,11 +169,11 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 | 场景 | 先查什么 | 初始处理 |
 | --- | --- | --- |
 | 新增普通架构 case | `references/spec_profiles/<spec_profile>.md` + 相似 case | 按 Gate 跑完后落位；Spike 跑通即 `default` |
-| PMA/PBMT/MMIO/cache/TLB/CBO 等 profile-sensitive case | `scripts/query_spec_profile.py` + profile 的 Spike gate | `spike_gate_applicable=false` 属于**提醒**：Gate 先跑；若 RTL/difftest 暴露差异再转 `hyptest-failure-triage` 反向降级 |
+| PMA/PBMT/MMIO/cache/TLB/CBO 等 profile-sensitive case | `$HYPTEST_SKILL_HOME/scripts/query_spec_profile.py` + profile 的 Spike gate | `spike_gate_applicable=false` 属于**提醒**：Gate 先跑；若 RTL/difftest 暴露差异再转 `hyptest-failure-triage` 反向降级 |
 | 访问 MMIO/Device 区间 | profile 的 MMIO responder 表 | 同上；若 Spike 无 responder 导致 `FAILED`/`untested`，按运行结果归因 `manual` / `blocked` |
-| 只改回填或注册状态 | `test_register.c` + `scripts/check_writeback_format.py --check-register` | 保证 `已实现 case` 状态与注册一致 |
+| 只改回填或注册状态 | `test_register.c` + `$HYPTEST_SKILL_HOME/scripts/check_writeback_format.py --check-register` | 保证 `已实现 case` 状态与注册一致 |
 | Spike/LinkNan 运行失败 | `references/build_run_debug.md` + `references/tiering_decision.md` | 先定位用例/assert/环境/model gap，再给 `reason_code` |
-| 不确定 `reason_code` | `scripts/suggest_reason_code.py --symptom "<现象>"` | 把建议当候选，最终仍以日志和 profile 证据为准 |
+| 不确定 `reason_code` | `$HYPTEST_SKILL_HOME/scripts/suggest_reason_code.py --symptom "<现象>"` | 把建议当候选，最终仍以日志和 profile 证据为准 |
 
 ## 分层口径
 
@@ -186,7 +186,7 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 
 `default-first` 的意思是优先争取 default，不是无条件放 default。PMA/PBMT/MMIO/cache/TLB/CBO 等场景必须先看 profile；如果 `spike_gate_applicable=false`，不能只凭 official Spike 结果作为 default gate。
 
-**`manual` / `blocked` 会按 4 档 verdict 路由到 Manual_Reference**：如果分层落到 `manual` 或 `blocked`，skill 先跑 `scripts/check_manual_reference_topic.py` 判 verdict：`profile_covered`（profile §5 已收录 → 引用不新增）/ `memory_confirmed`（memory `confirmed` 已覆盖 → 复用不新增）/ `manual_reference_open`（已有未解决 MR 条目 → 在其下补"本轮也碰到"一行）/ `new_entry_needed`（auto-append 新 `#### <id>.（**自动生成，待人工确认**）`，含涉及文件、涉及用例、怀疑点源码引用、本轮 Spike 观察和 3 条待人工确认问题）。人工 audit 结论会同步回 memory（`--status confirmed`，从 Manual_Reference 迁入）和 Manual_Reference 条目（加 `> 已解决` 行）；判"作废 / 过时"则直接删 MR 整条 + 删同 case memory 行。
+**`manual` / `blocked` 会按 4 档 verdict 路由到 Manual_Reference**：如果分层落到 `manual` 或 `blocked`，skill 先跑 `$HYPTEST_SKILL_HOME/scripts/check_manual_reference_topic.py` 判 verdict：`profile_covered`（profile §5 已收录 → 引用不新增）/ `memory_confirmed`（memory `confirmed` 已覆盖 → 复用不新增）/ `manual_reference_open`（已有未解决 MR 条目 → 在其下补"本轮也碰到"一行）/ `new_entry_needed`（auto-append 新 `#### <id>.（**自动生成，待人工确认**）`，含涉及文件、涉及用例、怀疑点源码引用、本轮 Spike 观察和 3 条待人工确认问题）。人工 audit 结论会同步回 memory（`--status confirmed`，从 Manual_Reference 迁入）和 Manual_Reference 条目（加 `> 已解决` 行）；判"作废 / 过时"则直接删 MR 整条 + 删同 case memory 行。
 
 ## 目标仓库和环境
 
@@ -198,12 +198,23 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 - LinkNan / difftest gate：`HYPTEST_HOME` + `HYPTEST_LINKNAN_HOME` + `HYPTEST_DIFFTEST_REF_SO`
 - Nanhu 源码：从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导，无独立环境变量
 
+常见变量含义：
+
+| 变量 | 含义 | 什么时候需要 |
+| --- | --- | --- |
+| `HYPTEST_HOME` | hyptest 主仓库路径 | 编译、运行、回填、注册核对 |
+| `HYPTEST_SPIKE_BIN` | official/community Spike 的 `spike` bin 路径 | Spike gate |
+| `HYPTEST_LINKNAN_HOME` | LinkNan 仓库路径 | LinkNan/difftest gate、读取 Nanhu RTL 源码 |
+| `HYPTEST_DIFFTEST_REF_SO` | 项目维护的 difftest Spike `.so` 路径 | LinkNan/difftest gate |
+| `HYPTEST_TMPDIR` | 临时目录 | 需要控制临时产物位置时 |
+| `HYPTEST_SKILL_HOME` | hyptest-workflow skill 目录 | 手动运行本 skill 自带 `scripts/*.py` 时 |
+
 完整字段说明和默认值策略见 `references/task_input_schema.md`。平台名只使用 `spike` 或 `linknan`。
 
 需要检查当前环境时：
 
 ```bash
-python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain
+python3 $HYPTEST_SKILL_HOME/scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain
 ```
 
 ## 入口文件
@@ -231,15 +242,15 @@ python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain
 修改本 skill 后运行：
 
 ```bash
-python3 scripts/check_readme_commands.py
-python3 scripts/check_docs_links.py
-python3 scripts/check_skill_consistency.py
-python3 scripts/check_resource_index.py
-python3 scripts/update_resource_index.py --check
+python3 $HYPTEST_SKILL_HOME/scripts/check_readme_commands.py
+python3 $HYPTEST_SKILL_HOME/scripts/check_docs_links.py
+python3 $HYPTEST_SKILL_HOME/scripts/check_skill_consistency.py
+python3 $HYPTEST_SKILL_HOME/scripts/check_resource_index.py
+python3 $HYPTEST_SKILL_HOME/scripts/update_resource_index.py --check
 ```
 
 完整快速自检：
 
 ```bash
-python3 scripts/self_check.py --quick --spec-profile <spec_profile>
+python3 $HYPTEST_SKILL_HOME/scripts/self_check.py --quick --spec-profile <spec_profile>
 ```
