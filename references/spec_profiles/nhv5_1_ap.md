@@ -69,6 +69,9 @@ linknan_mmio_requires_responder: true
 - legal PMA/peripheral PA 不等于 testbench 有响应路径；没有 responder 时应标 `blocked` / `manual`，不要伪造 pass。
 - MMIO/Device 访问除了满足下表允许组合外，还必须确认当前 LinkNan testbench 对目标 PA 有模拟 IO responder；部分允许区间当前没有模拟 IO 返回路径，访问会无响应并导致卡死。
 - UART/IntrGen 这类 register-like responder 不能替代 memory-like MMIO scratch；若 case 需要 byte/half/word lane merge、整行 readback 或任意地址可读写，必须确认 responder 语义足够。
+- 当前 PMA `Atomic` 位不作为 AMO/LR/SC 是否允许的直接生效判据；本项目实现中实际生效的是 cacheability：PMA cache 位开启代表 atomic 能力开启，PMA cache 位关闭代表 atomic 能力关闭。只清 PMA `Atomic` 位但保持 cache 位开启，不应期望 AMO/LR/SC 立即变成访问异常；`amo_access_fault_21` 这类仅切换 `Atomic` 位的失败应按用例期望错误处理。
+- `MENVCFG.CBIE=Flush` 时，当前实现会把 `CBO.INVAL` 走成 flush 语义而不是普通“只失效不回写”的清线语义；具体是否触发该特殊路径还取决于当前特权级和 `CBIE` 生效层级。写 `cbo_inval` 相关 selfcheck 时，不能默认它一定只是清掉 cacheline，更不能默认它会把另一个 alias 的 NC 写入立即传播成 cacheable/backing 视图的一致值。
+- M-mode direct physical read/write 或 cacheable alias 访问没有 PBMT=NC 属性；PBMT=NC store/load 的自校验不要用后续 `read64(paddr)`、普通 M-mode direct 访问、或 cacheable alias convergence 作为唯一 oracle。若测试意图是验证 NC 路径本身，应优先通过同一个 PBMT=NC alias seed/readback；若测试意图确实是跨 cacheable/NC 视图一致性，必须额外建立 flush/ordering/responder 条件并把该语义写清楚。
 
 允许组合表：
 
@@ -373,7 +376,8 @@ Spike 结果使用口径：
 - 标量 Device 区域非对齐按 AF 口径处理。Device 区域包括：
   - `PBMT=IO`
   - `PBMT=None` 且物理地址通过 PMA 限制为 IO 区域
-- 标量 `PBMT=NC` 且 PMA 为 memory 区域时，非对齐按地址非对齐异常处理。
+- 标量 `PBMT=NC` 会覆盖 PMA 的 memory/IO 区域分类；无论 PMA 命中 memory 还是 IO/MMIO 区域，标量非对齐都按地址非对齐异常处理。
+- 普通标量访问 cacheable 区域时，非对齐 load/store 不触发异常；实现按 cacheable 数据通路处理非对齐访问，不应期望 LAM/SAM。
 - 向量 `PBMT=NC` 或 `PBMT=IO` 非对齐按 AF 口径处理。
 - 原子非对齐按 AF 口径处理。
 - 显式访存与 Device/MMIO 非对齐、PF/TLB AF 等组合叠加时，不要机械按单一关键词改写预期；先确认 first encountered fault，再按上述访问类型和属性组合判定。
