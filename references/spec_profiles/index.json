@@ -9,6 +9,12 @@
       "status": "active"
     },
     {
+      "name": "nhv5_2_AIA",
+      "path": "references/spec_profiles/nhv5_2_AIA.md",
+      "description": "NHV5.2 AIA/APLIC/IMSIC profile using QEMU virt,aia=aplic-imsic as the current AIA golden.",
+      "status": "active"
+    },
+    {
       "name": "template",
       "path": "references/spec_profiles/template.md",
       "description": "Blank template for adding a new project profile.",
