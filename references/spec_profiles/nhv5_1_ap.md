@@ -382,6 +382,7 @@ Spike 结果使用口径：
 - 原子非对齐按 AF 口径处理。
 - 显式访存与 Device/MMIO 非对齐、PF/TLB AF 等组合叠加时，不要机械按单一关键词改写预期；先确认 first encountered fault，再按上述访问类型和属性组合判定。
 - cross-page low-half 正常、high-half fault 时，`tval` 应取 second-half 起始地址。
+- `sd` 跨页或跨 16B split 时，若后半部分发生 PF/AF 等异常，`tval` 应取 split 后的错误地址；整条 store 不产生部分写入，前半部分即使权限/属性检查本身无异常也不能写入 backing memory。相关 case 不应断言 legal first fragment 可见，故障修复前应检查前后 split fragment 均保持原值。
 
 若同一 case 包含多种访问形态，断言文案必须标明“本条断言对应哪一类访问”。
 
