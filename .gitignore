@@ -3,4 +3,3 @@ __pycache__/
 *.py[cod]
 .hyptest_workflow_skill/
 **/.hyptest_workflow_skill/
-.tmp/
