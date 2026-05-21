@@ -228,6 +228,18 @@ MMIO responder matrix：
 | `3T~4T` Device/MMIO 区域 | 依 testbench 连接而定 | 未确认前否 | 只按规格允许不够；无返回路径会卡死 |
 | UART/IntrGen 等寄存器型外设 | register-like | 否 | 只适合对应寄存器语义，不替代任意地址 MMIO memory |
 
+LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
+
+- 显式 SimMMIO responder 在 `LinkNan/src/test/scala/lntest/top/SimMMIO.scala`：
+  - flash: `AddressSet(0x10000000, 0x0fffffff)` → `0x10000000..0x1fffffff`，flash/ROM 语义，不作为通用 scratch。
+  - UART: `AddressSet(0x40600000, 0x0000000f)` → `0x40600000..0x4060000f`，register-like。
+  - IntrGen: `AddressSet(0x40070000, 0x0000ffff)` → `0x40070000..0x4007ffff`，register-like。
+- IntrGen 语义在 `LinkNan/src/test/scala/lntest/peripheral/AXI4IntrGenerator.scala`：AXI slave 声明 `supportsRead/Write = TransferSizes(1, 8)`，但实现对 AW/AR assert `cache == 0`、`size == log2Ceil(regBits / 8)`、`len == 0`；当前 regBits=64 时等价于单 beat 8B register access。它可用于 8B register-style load/store，不可替代 byte/half/word lane merge、任意地址 scratch 或整行 readback。
+- 普通 DRAM/cacheable memory 在 `LinkNan/src/main/scala/linknan/generator/Config.scala` 的 `pmemRange = 0x80000000..0x2000000000`，并由 `LinkNan/src/test/scala/lntest/top/DummyDramMoudle.scala` 普通 mem slave 提供 memory-like response。
+- 高地址 NC window 在 `Config.scala` 的 `AddrConfig.mem_nc = (0x300_0000_0000, 0xF00_0000_0000)`；`LinkNan/src/main/scala/linknan/soc/MstAxiFabric.scala` 用 `ucMatcher` 将命中该 window 的地址走 UC 路由。是否有 memory-like response 还取决于当前 config 是否启用 `LinkNanParamsKey.extraNcMem`，以及 `DummyDramMoudle.scala` 是否创建并连接 `pciNode` / `AXI4RAMWrapper`。
+- `extraNcMem` 默认值在 `LinkNan/src/main/scala/linknan/soc/LinkNanParams.scala` 为 `true`。`xmake simv` 的默认生成路径会调用 `task.run("soc", sim=true, ...)`，不传 `pldm_verilog`，因此若它重新生成 RTL，默认保持 `extraNcMem=true`；`xmake soc --sim --pldm_verilog` / `xmake soc -s -p` 会在 `xmake.lua` 里追加 `--no-extra-nc-mem`，经 `SimArgParser.scala` 改成 `extraNcMem=false`。若 `xmake simv --no_build_chisel` 或复用已有 build，则不改变已有 RTL 的该配置，只能按当前生成产物确认。
+- Zhujiang AXI/TL xbar matcher 是按 slave matcher gate ready/valid；当前 `BaseAxiXbar.scala` / `BaseTLULXbar.scala` 未匹配地址没有 profile 保证的默认 error response。若目标 PA 不落在当前连接的 responder/memory window，可能表现为请求不被接受或无返回，需用 waveform 定位具体卡点。
+
 机器可读 responder 表：
 
 ```hyptest-mmio-responder-matrix
@@ -263,6 +275,42 @@ MMIO responder matrix：
     "memory_like_scratch": false,
     "default_decision": "manual_for_device_specific_semantics_only",
     "notes": "does not replace arbitrary-address memory-like MMIO scratch"
+  },
+  {
+    "id": "linknan_simmmio_flash",
+    "target": "0x10000000-0x20000000_flash",
+    "responder_type": "testbench_dependent",
+    "memory_like_scratch": false,
+    "default_decision": "manual_for_flash_semantics_only",
+    "source": "LinkNan/src/test/scala/lntest/top/SimMMIO.scala",
+    "notes": "AXI4Flash responder; not arbitrary writable MMIO scratch"
+  },
+  {
+    "id": "linknan_simmmio_uart",
+    "target": "0x40600000-0x40600010_uart",
+    "responder_type": "register-like",
+    "memory_like_scratch": false,
+    "default_decision": "manual_for_uart_semantics_only",
+    "source": "LinkNan/src/test/scala/lntest/top/SimMMIO.scala",
+    "notes": "small UART register window"
+  },
+  {
+    "id": "linknan_simmmio_intrgen",
+    "target": "0x40070000-0x40080000_intrgen",
+    "responder_type": "register-like",
+    "memory_like_scratch": false,
+    "default_decision": "manual_for_register_8b_semantics_only",
+    "source": "LinkNan/src/test/scala/lntest/top/SimMMIO.scala; LinkNan/src/test/scala/lntest/peripheral/AXI4IntrGenerator.scala",
+    "notes": "supports register-like single-beat 8B access in current implementation; not arbitrary byte/half/word or whole-line scratch"
+  },
+  {
+    "id": "linknan_extra_nc_mem",
+    "target": "0x30000000000-0x40000000000_extra_nc_mem",
+    "responder_type": "testbench_dependent",
+    "memory_like_scratch": true,
+    "default_decision": "manual_or_blocked_until_current_config_confirms_extraNcMem",
+    "source": "LinkNan/src/main/scala/linknan/generator/Config.scala; LinkNan/src/test/scala/lntest/top/DummyDramMoudle.scala; LinkNan/src/main/scala/linknan/soc/MstAxiFabric.scala",
+    "notes": "spec/window is allowed for multiple PMA/PBMT rows, but current simv must prove extraNcMem/AXI4RAMWrapper is present and response path closes"
   }
 ]
 ```
