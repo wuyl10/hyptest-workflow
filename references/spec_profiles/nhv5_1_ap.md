@@ -44,6 +44,8 @@ linknan_mmio_requires_responder: true
 - NMI、double trap 不属于本轮 NHV5.1AP 常规验证项目范围；相关 case 不进入常规 default gate。
 - project/custom CSR 或 custom instruction 若 official Spike 不支持，按 official Spike model gap 处理；是否属于项目验证范围由测试点/项目需求决定，不自动等同于范围外。
 - WFI 可能导致模拟器卡死；优先测试权限与控制位语义，不强制执行真实等待路径。
+- 当前 NHV5.1AP / LinkNan simv 不支持运行时动态更新 `misa` 扩展位；写 `misa` 后不要假设 `C` 等扩展位可以被临时清除/打开并立即改变执行语义。
+- 依赖动态清 `misa.C` 将当前核从 IALIGN=16 切到 IALIGN=32 的 case，不进入默认 selfcheck/default gate。若要测 JAL/JALR/branch 半字对齐目标 IAM，必须使用已确认支持 IALIGN=32 的构建配置，或把当前配置下的失败归为平台约束/用例假设不成立，而不是直接判 RTL 控制转移异常实现错误。
 
 ## 3. PMP 粒度约定
 
@@ -332,6 +334,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 - CBO 的内部 line 状态、cache side effect、refill image、以及无 A/D 权限时的实现分类差异，不作为 official Spike default gate。
 - replay queue、sbuffer、uncache buffer、MSHR、ROB head、response-context binding。
 - PMA/PBMT/MMIO/cacheability routing 和平台 responder 行为。
+- 运行时动态更新 `misa` 扩展位，以及依赖动态清 `misa.C` 切换 IALIGN=32 的场景。当前 NHV5.1AP / LinkNan simv 不支持这类动态切换；相关 case 不能按普通 default gate 判断。
 - LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
 - project/custom CSR、custom instruction、NMI/double trap 等非本轮 NHV5.1AP 验证范围或 official Spike 不支持的路径。
 - Debug trigger: `mcontrol6` chain 闭合后 AMO 的 breakpoint 语义在 Spike 不建模——chain mismatch 抑制路径在 Spike 上可观测（符合 spec），但 chain 闭合后 spec 要求的 BP 在 Spike 不抛（详见 `test_point/Manual_Reference.md#C7`）。
@@ -383,6 +386,13 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
     "category": "Custom CSR / instruction",
     "keywords": ["custom_csr", "custom_instruction", "nmi", "double_trap"],
     "module_hints": ["csr", "rob", "trap"]
+  },
+  {
+    "category": "Runtime misa update / IALIGN32 dynamic switch",
+    "keywords": ["misa_dynamic", "misa_update", "misa_c_clear", "misa_c_toggle", "ialign32_dynamic", "ialign32", "clear_misa_c"],
+    "module_hints": ["csr", "trap", "frontend", "branch", "exception_priority"],
+    "classification": "nanhu_not_impl",
+    "note": "Current NHV5.1AP / LinkNan simv does not support runtime dynamic misa extension-bit updates. Cases that clear misa.C to force IALIGN=32 should not be default-gated unless a dedicated IALIGN=32 build/config is confirmed. Reason code: D-MANUAL-NANHU-NOT-IMPL or blocked/manual platform-constraint handling."
   },
   {
     "category": "Debug trigger chain AMO (Spike gap)",
