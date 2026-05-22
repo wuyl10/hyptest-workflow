@@ -15,6 +15,12 @@
       "status": "active"
     },
     {
+      "name": "nhv5_h",
+      "path": "references/spec_profiles/nhv5_h.md",
+      "description": "NHV5.1AP + H-extension + AIA profile: G-stage / 2-stage translation, HLV/HSV, hfence, VS-mode CSR, IMSIC + APLIC. Overlaps with nhv5_2_AIA by design.",
+      "status": "active"
+    },
+    {
       "name": "template",
       "path": "references/spec_profiles/template.md",
       "description": "Blank template for adding a new project profile.",
