@@ -16,6 +16,9 @@ default_spike_gate: ordinary_cacheable_dram_arch_only
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: true
 smrnmi: supported
+vmodule_interrupt_injection: rtl_testbench_only
+vmodule_requires_compile_flag: VMODULE=1
+vmodule_spike_gate_applicable: false
 ```
 
 ## 1. 口径优先级
@@ -49,6 +52,42 @@ smrnmi: supported
 - WFI 可能导致模拟器卡死；优先测试权限与控制位语义，不强制执行真实等待路径。
 - 当前 NHV5.1AP / LinkNan simv 不支持运行时动态更新 `misa` 扩展位；写 `misa` 后不要假设 `C` 等扩展位可以被临时清除/打开并立即改变执行语义。
 - 依赖动态清 `misa.C` 将当前核从 IALIGN=16 切到 IALIGN=32 的 case，不进入默认 selfcheck/default gate。若要测 JAL/JALR/branch 半字对齐目标 IAM，必须使用已确认支持 IALIGN=32 的构建配置，或把当前配置下的失败归为平台约束/用例假设不成立，而不是直接判 RTL 控制转移异常实现错误。
+
+### 2.1 VModule / AP-IT 中断注入口径
+
+VModule 是 NHV5.1AP / LinkNan AP-IT 环境中的 RTL/testbench 注入模块，可用于定向注入普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等信号；它不是 official Spike 可建模的普通 ISA 行为。
+
+当用户明确要求“用 VModule”“VMODULE=1”“通过 `vm_reg` 注入中断/NMI/debug interrupt/error inject”，或测试点依赖 VModule 寄存器时，写 case 前必须先阅读并遵守仓库内文档：
+
+- `docs/interrupt-vmodule-support/VModule模块说明.md`
+- `docs/interrupt-vmodule-support/Nanhuv5.1-AP-IT环境中断产生方法说明.md`
+
+VModule 相关 case 的默认口径：
+
+- `spike_gate_applicable=false`；不要求、也不应以 official Spike run pass 作为通过门槛。
+- Spike 只可作为编译或普通 ISA smoke，不能作为 VModule 注入链路有效的证据。
+- 需要 `VMODULE=1` 编译/运行环境；有效 gate 应来自 LinkNan/RTL/special-run。
+- 若当前 runner 没有 VModule 或没有可控注入源，case 应保持 `manual` / `compile-only` / `blocked`，不要伪装成 default。
+- VModule case 默认不进入普通 Spike default 回归；除非当前 CI/runner 明确支持 `VMODULE=1` special-run。
+
+VModule 写 case 时的硬要求：
+
+- 优先复用仓库已有 VModule helper；没有 helper 时再封装 `vm_reg` 写接口，不要在每个 case 中散落裸 magic。
+- VModule 命令序列需要按文档使用 address command / data command；中断注入相关序列保留 `fence.i`，避免后续触发不稳定。
+- `vm_reg_8` 只控制 VModule 注入到 core 顶层前的额外 delay；core 顶层到后端/ROB/trap handler 的延迟不可预测。selfcheck 不得断言固定第 N 条指令、固定 cycle 或固定单拍先后。
+- level-sensitive / force 类普通 interrupt 源需要通过 VModule 对应寄存器写 0 清源；不要依赖 `CSRC(mip/sip)` 清掉所有中断 pending，因为很多外部/定时/force 源不是 CSR 写清。
+- case 开始和结束都要显式清 VModule source，并恢复 `vm_reg_8=0` 或 testcase 约定值，避免污染后续 case。
+- 若涉及 RNMI/NMI，检查 `mnepc/mncause/mnstatus` 和 `mnret` 路径，不用普通 `mip/mie/mstatus.MIE` oracle 判断 NMI 是否进入。
+- 旧 `manual_test_cases/interrupt` 中未经审计的历史写法不作为 VModule interrupt case 的语义模板；以 profile、VModule docs、当前 harness helper 为准。
+
+常用 VModule 寄存器摘要（以仓库 docs 为准）：
+
+- `vm_reg_0 @ 0x1000`：普通主中断 `SEI/MEI/MTI/MSI` 注入与关闭；写 1 拉高对应源，写 0 拉低。
+- `vm_reg_8 @ 0x1028`：VModule 到 core 顶层前的 delay count，不代表 handler 零延迟。
+- `vm_reg_9 @ 0x1030`：直接 force NMI；`bit0=nmi_31`，`bit1=nmi_43`。
+- `vm_reg_12 @ 0x1048`：force debug interrupt。
+- `vm_reg_13 @ 0x1050`：CHI error inject，通过正常 error path 触发 NMI。
+- `vm_reg_14 @ 0x1060`：AXI error inject。
 
 ## 3. PMP 粒度约定
 
@@ -341,6 +380,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 - LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
 - project/custom CSR、custom instruction 等 selected runner 不支持的路径。
 - Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、以及 double-trap 交叉场景只有在 runner/testbench oracle 明确时才可作为 default gate；否则走 manual/LinkNan/RTL 或 compile-only。
+- VModule / AP-IT 注入的普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等场景不走 official Spike default gate。Spike 不会通过 VModule 寄存器真实拉高 RTL/testbench 注入信号；即使指令流在 Spike 上执行，也只能作为编译或普通 ISA smoke，不能作为注入链路证据。
 - Debug trigger: `mcontrol6` chain 闭合后 AMO 的 breakpoint 语义在 Spike 不建模——chain mismatch 抑制路径在 Spike 上可观测（符合 spec），但 chain 闭合后 spec 要求的 BP 在 Spike 不抛（详见 `test_point/Manual_Reference.md#C7`）。
 
 **Nanhu NHV5.1AP Debug trigger 实现约束**（Nanhu 侧的裁剪，超出部分 **测试点本身不应设计**）：
@@ -397,6 +437,13 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
     "module_hints": ["csr", "rob", "trap", "interrupt"],
     "classification": "platform_guarded",
     "note": "NHV5.1AP supports Smrnmi/RNMI. Basic CSR/mnret semantics can be tested when the runner enables Smrnmi; external RNMI source/vector/timing and double-trap cross scenarios need runner/testbench/RTL evidence before default gate."
+  },
+  {
+    "category": "VModule / AP-IT interrupt injection",
+    "keywords": ["vmodule", "vm_reg", "VMODULE=1", "HYPTEST_VMODULE", "vmodule_interrupt", "vm_reg_0", "vm_reg_8", "vm_reg_9", "vm_reg_12", "vm_reg_13", "vm_reg_14", "force_nmi", "debug_interrupt", "chi_error_inject", "axi_error_inject"],
+    "module_hints": ["interrupt", "csr", "trap", "vmodule", "linknan"],
+    "classification": "rtl_testbench_only",
+    "note": "VModule/AP-IT injection is RTL/testbench controlled. Must read docs/interrupt-vmodule-support before writing cases. official Spike is not a valid gate; use VMODULE=1 LinkNan/RTL/special-run or manual/compile-only/blocked."
   },
   {
     "category": "Runtime misa update / IALIGN32 dynamic switch",
@@ -470,6 +517,7 @@ Spike 结果使用口径：
 - LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件。
 - custom CSR/instruction 等 selected runner 不支持的路径。
 - Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、double-trap 交叉等缺少 runner/testbench oracle 的路径。
+- VModule / AP-IT 注入普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等 RTL/testbench-only 场景。
 
 ## 8. Spike 不一致时的 NHV5.1AP 处理流程
 
@@ -492,4 +540,5 @@ Spike 结果使用口径：
 - PMA/PBMT/MMIO/cacheability routing、Device responder 行为：优先 `D-MANUAL-NONGATE`；若当前 testbench 没有 responder 或访问会无返回，则 `blocked`。
 - LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件、或其它实现特定 reservation 策略：优先 `D-MANUAL-NONGATE`。
 - Smrnmi/RNMI：NHV5.1AP 支持。CSR/`mnret` 基础语义在 runner 明确启用 Smrnmi 时可走 default candidate；RNMI 外部源/vector/timing、unexpected trap 以及 double-trap 交叉优先 `D-MANUAL-NONGATE` 或 special-run，缺少注入/观测路径时转 `compile-only` / `blocked`。
+- VModule / AP-IT 注入：优先 `D-MANUAL-NONGATE`，因为注入源来自 LinkNan/AP-IT RTL testbench，不是 official Spike 可建模行为。若只有编译环境、没有 `VMODULE=1` run 环境，则 `compile-only`；若当前 testbench 不支持对应 `vm_reg` 或注入源无响应，则 `blocked`。
 - project/custom CSR 或 custom instruction 且 official Spike 不支持：先按 official Spike model gap 归因；是否保留为 manual/compile-only 取决于测试点/项目需求。
