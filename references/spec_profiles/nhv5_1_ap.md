@@ -15,6 +15,7 @@ official_spike_has_pma_csr: false
 default_spike_gate: ordinary_cacheable_dram_arch_only
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: true
+smrnmi: supported
 ```
 
 ## 1. 口径优先级
@@ -41,7 +42,9 @@ linknan_mmio_requires_responder: true
 
 - 当前默认 no-H：不依赖 H 特有指令/CSR。
 - 仓库里的 HS helper 按项目约定可作为 S 语义路径别名使用，不表示要求启用 H 扩展验证。
-- NMI、double trap 不属于本轮 NHV5.1AP 常规验证项目范围；相关 case 不进入常规 default gate。
+- 当前 NHV5.1AP 支持 Smrnmi/RNMI；`mnstatus/mnepc/mncause/mnscratch` 与 `mnret` 相关 case 属于项目验证范围。
+- Smrnmi/RNMI case 需要按平台能力分层：CSR/`mnret` 基础语义在 runner 明确启用 Smrnmi 时可作为 default candidate；外部 RNMI 源、RNMI vector 注入、unexpected-trap timing、与 breakpoint/interrupt 同窗交叉通常需要 LinkNan/RTL 或 special-run 证据。
+- double trap 不再和 NMI 混为“范围外”判断；只有在 Smdbltrp/Ssdbltrp、RNMI 入口和 runner oracle 都确认后才进入对应分层，否则保持 manual/compile-only/blocked。
 - project/custom CSR 或 custom instruction 若 official Spike 不支持，按 official Spike model gap 处理；是否属于项目验证范围由测试点/项目需求决定，不自动等同于范围外。
 - WFI 可能导致模拟器卡死；优先测试权限与控制位语义，不强制执行真实等待路径。
 - 当前 NHV5.1AP / LinkNan simv 不支持运行时动态更新 `misa` 扩展位；写 `misa` 后不要假设 `C` 等扩展位可以被临时清除/打开并立即改变执行语义。
@@ -336,7 +339,8 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 - PMA/PBMT/MMIO/cacheability routing 和平台 responder 行为。
 - 运行时动态更新 `misa` 扩展位，以及依赖动态清 `misa.C` 切换 IALIGN=32 的场景。当前 NHV5.1AP / LinkNan simv 不支持这类动态切换；相关 case 不能按普通 default gate 判断。
 - LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
-- project/custom CSR、custom instruction、NMI/double trap 等非本轮 NHV5.1AP 验证范围或 official Spike 不支持的路径。
+- project/custom CSR、custom instruction 等 selected runner 不支持的路径。
+- Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、以及 double-trap 交叉场景只有在 runner/testbench oracle 明确时才可作为 default gate；否则走 manual/LinkNan/RTL 或 compile-only。
 - Debug trigger: `mcontrol6` chain 闭合后 AMO 的 breakpoint 语义在 Spike 不建模——chain mismatch 抑制路径在 Spike 上可观测（符合 spec），但 chain 闭合后 spec 要求的 BP 在 Spike 不抛（详见 `test_point/Manual_Reference.md#C7`）。
 
 **Nanhu NHV5.1AP Debug trigger 实现约束**（Nanhu 侧的裁剪，超出部分 **测试点本身不应设计**）：
@@ -384,8 +388,15 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
   },
   {
     "category": "Custom CSR / instruction",
-    "keywords": ["custom_csr", "custom_instruction", "nmi", "double_trap"],
+    "keywords": ["custom_csr", "custom_instruction"],
     "module_hints": ["csr", "rob", "trap"]
+  },
+  {
+    "category": "Smrnmi/RNMI source and timing",
+    "keywords": ["smrnmi", "rnmi", "nmi_source", "rnmi_vector", "rnmi_injection", "unexpected_trap", "mnstatus_nmie", "mnepc", "mncause", "mnret", "double_trap"],
+    "module_hints": ["csr", "rob", "trap", "interrupt"],
+    "classification": "platform_guarded",
+    "note": "NHV5.1AP supports Smrnmi/RNMI. Basic CSR/mnret semantics can be tested when the runner enables Smrnmi; external RNMI source/vector/timing and double-trap cross scenarios need runner/testbench/RTL evidence before default gate."
   },
   {
     "category": "Runtime misa update / IALIGN32 dynamic switch",
@@ -457,7 +468,8 @@ Spike 结果使用口径：
 - TLB/cache 一致性、访问 PMA CSR、CBO/refill/replay/sbuffer/MSHR。
 - PMP sub-4KB 精度假设。
 - LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件。
-- custom CSR/instruction、NMI/double trap 等 official Spike 或本轮项目范围不支持的路径。
+- custom CSR/instruction 等 selected runner 不支持的路径。
+- Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、double-trap 交叉等缺少 runner/testbench oracle 的路径。
 
 ## 8. Spike 不一致时的 NHV5.1AP 处理流程
 
@@ -479,5 +491,5 @@ Spike 结果使用口径：
 - 访问 `PMAADDR*` / `PMACFG*` 等 PMA CSR：优先 `D-MANUAL-NONGATE` 或 `compile-only`，因为本版本 official Spike 没有 PMA CSR 模型。
 - PMA/PBMT/MMIO/cacheability routing、Device responder 行为：优先 `D-MANUAL-NONGATE`；若当前 testbench 没有 responder 或访问会无返回，则 `blocked`。
 - LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件、或其它实现特定 reservation 策略：优先 `D-MANUAL-NONGATE`。
-- NMI / double trap：本轮 NHV5.1AP 常规验证范围外，默认不进入常规 default gate。
+- Smrnmi/RNMI：NHV5.1AP 支持。CSR/`mnret` 基础语义在 runner 明确启用 Smrnmi 时可走 default candidate；RNMI 外部源/vector/timing、unexpected trap 以及 double-trap 交叉优先 `D-MANUAL-NONGATE` 或 special-run，缺少注入/观测路径时转 `compile-only` / `blocked`。
 - project/custom CSR 或 custom instruction 且 official Spike 不支持：先按 official Spike model gap 归因；是否保留为 manual/compile-only 取决于测试点/项目需求。
