@@ -384,9 +384,11 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 
 **Nanhu NHV5.1AP Debug trigger 实现约束**（Nanhu 侧的裁剪，超出部分 **测试点本身不应设计**）：
 
-- chain 最多支持 **2 层**（即只支持两个 trigger 的级联；3 层及以上 chain 不支持，case 不应覆盖）。
+- 当前源码口径：debug trigger 总 slot 数为 **4**，`TriggerNum = 4`；合法 `tselect` 编号为 `0..3`。写 `tselect >= 4` 不会选中新 slot，而是保持原 `tselect`。
+- chain 最大合法长度为 **2 层**，`TriggerChainMaxLength = 2`；这只限制一次 chain 的级联深度，不等于“总共只有 2 个 slot”。case 可以使用 `slot0/slot1` 或 `slot2/slot3` 组成 2 层 chain，但不能设计 3 层及以上 chain。
 - 仅支持 **address trigger（访存地址）** 和 **execute-PC trigger（取指地址）**。
 - **不支持 data trigger**（trigger 匹配数据值）；相关 case 不应设计。
+- 源码证据：`LinkNan/dependencies/nanhu/src/main/scala/xiangshan/Parameters.scala` 定义 `TriggerNum = 4`、`TriggerChainMaxLength = 2`；CSR/DebugLevel 中 `tdata1/tdata2` 用 `Seq.fill(TriggerNum)` / `Range(0, TriggerNum)` 生成，`tselect` 写入以 `wdata < TriggerNum.U` 为合法条件。
 
 机器可读 nongate keyword 速查（供 `scripts/query_spec_profile.py --nongate-summary` 使用；与上文 prose 保持一致，prose 仍为真值）：
 
@@ -460,10 +462,10 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
   },
   {
     "category": "Debug trigger Nanhu implementation limits",
-    "keywords": ["chain_depth_limit", "data_trigger", "more_than_two_triggers"],
+    "keywords": ["chain_depth_limit", "data_trigger", "more_than_two_triggers", "trigger_num", "trigger_slot", "tselect_range", "TriggerNum", "TriggerChainMaxLength"],
     "module_hints": ["trigger", "atomicsunit"],
     "classification": "nanhu_not_impl",
-    "note": "Nanhu only supports 2-level chain, address-trigger and execute-PC trigger; data trigger NOT implemented. Case designs targeting 3+ level chain or data trigger are out of scope. Reason code: D-MANUAL-NANHU-NOT-IMPL."
+    "note": "Nanhu NHV5.1AP has 4 debug trigger slots (TriggerNum=4, legal tselect 0..3) but only supports 2-level chain (TriggerChainMaxLength=2), address-trigger and execute-PC trigger; data trigger is NOT implemented. Case designs targeting 3+ level chain or data trigger are out of scope. Reason code: D-MANUAL-NANHU-NOT-IMPL."
   }
 ]
 ```
