@@ -169,8 +169,8 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 | 场景 | 先查什么 | 初始处理 |
 | --- | --- | --- |
 | 新增普通架构 case | `references/spec_profiles/<spec_profile>.md` + 相似 case | 按 Gate 跑完后落位；Spike 跑通即 `default` |
-| PMA/PBMT/MMIO/cache/TLB/CBO 等 profile-sensitive case | `$HYPTEST_SKILL_HOME/scripts/query_spec_profile.py` + profile 的 Spike gate | `spike_gate_applicable=false` 属于**提醒**：Gate 先跑；若 RTL/difftest 暴露差异再转 `hyptest-failure-triage` 反向降级 |
-| 访问 MMIO/Device 区间 | profile 的 MMIO responder 表 | 同上；若 Spike 无 responder 导致 `FAILED`/`untested`，按运行结果归因 `manual` / `blocked` |
+| PMA/PBMT/MMIO/cache/TLB/CBO 等 profile-sensitive case | `$HYPTEST_SKILL_HOME/scripts/query_spec_profile.py` + profile 的 Spike gate | 若 `spike_gate_applicable=false`，走 nongate 路由并按环境落 `manual` / `compile-only` / `blocked`；不要先用 Spike/default gate 或改成 Spike-friendly baseline |
+| 访问 MMIO/Device 区间 | profile 的 MMIO responder 表 | 先确认 responder；无 responder 或 Spike 不建模时走 manual/compile-only/blocked，不用普通 DRAM/cacheable 近似替代 |
 | 只改回填或注册状态 | `test_register.c` + `$HYPTEST_SKILL_HOME/scripts/check_writeback_format.py --check-register` | 保证 `已实现 case` 状态与注册一致 |
 | Spike/LinkNan 运行失败 | `references/build_run_debug.md` + `references/tiering_decision.md` | 先定位用例/assert/环境/model gap，再给 `reason_code` |
 | 不确定 `reason_code` | `$HYPTEST_SKILL_HOME/scripts/suggest_reason_code.py --symptom "<现象>"` | 把建议当候选，最终仍以日志和 profile 证据为准 |
@@ -184,7 +184,9 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 | `compile-only` | 当前只保证可编译，运行 gate 不成立或阶段性不运行 | 通常注释注册 |
 | `blocked` | 编译、运行、规则、证据或注册一致性存在阻塞 | 不作为完成落位 |
 
-`default-first` 的意思是优先争取 default，不是无条件放 default。PMA/PBMT/MMIO/cache/TLB/CBO 等场景必须先看 profile；如果 `spike_gate_applicable=false`，不能只凭 official Spike 结果作为 default gate。
+`default-first` 的意思是普通架构场景优先争取 default，不是无条件放 default。`spike_gate_applicable=false` 是 gate/runner 路由属性，不是测试价值降级信号；manual/nongate 场景不能只凭 official Spike 结果作为 default gate，也不能被更容易跑 Spike 的近似场景替代。若 nongate 场景当前只有编译条件、缺少对应 LinkNan/RTL/special-run runner，则先落 `compile-only`；这仍表示场景应保留，只是本轮运行证据还没闭环。
+
+**非 default 都会生成 submission card**：`manual` / `compile-only` / `blocked` 都需要机器可读交付卡，记录 reason_code、注册状态和证据摘要；`compile-only` 默认只说明 Gate D=`N/A` 与不运行原因，不写 Manual_Reference。
 
 **`manual` / `blocked` 会按 4 档 verdict 路由到 Manual_Reference**：如果分层落到 `manual` 或 `blocked`，skill 先跑 `$HYPTEST_SKILL_HOME/scripts/check_manual_reference_topic.py` 判 verdict：`profile_covered`（profile §5 已收录 → 引用不新增）/ `memory_confirmed`（memory `confirmed` 已覆盖 → 复用不新增）/ `manual_reference_open`（已有未解决 MR 条目 → 在其下补"本轮也碰到"一行）/ `new_entry_needed`（auto-append 新 `#### <id>.（**自动生成，待人工确认**）`，含涉及文件、涉及用例、怀疑点源码引用、本轮 Spike 观察和 3 条待人工确认问题）。人工 audit 结论会同步回 memory（`--status confirmed`，从 Manual_Reference 迁入）和 Manual_Reference 条目（加 `> 已解决` 行）；判"作废 / 过时"则直接删 MR 整条 + 删同 case memory 行。
 

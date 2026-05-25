@@ -132,7 +132,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
 
 ## Workflow
 
-默认走"**预热 + 轻量直通**"：`repo_evidence_index` 预热 → `find_similar_cases` → `check_case_uniqueness` → 写 case → `compile_elf` → `get_result` → `check_case_lint` →（失败时）`classify_failure_log` → 回填 → `check_writeback_format --check-register`。**不默认跑 pack 聚合工具**（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `case_workflow_ledger`）；只有用户明确要求"跑完整 pack"、"复盘耗时"时才走完整 pipeline。质量工具（lint / 失败分类 / 注册一致性）在轻量路径仍必须保留。**例外**：`$HYPTEST_SKILL_HOME/scripts/make_case_submission_card.py` 在 **非 default 分层**（manual / compile-only / blocked）时**必须跑**（由 step 16 触发），作为 reason_code 与 Manual_Reference 的机器可读统一证据来源；default 分层不跑。
+默认走"**预热 + 轻量直通**"：`repo_evidence_index` 预热 → `find_similar_cases` → `check_case_uniqueness` → 写 case → `check_case_lint` → 调整注册 → `compile_elf` → `get_result` →（失败时）`classify_failure_log` → 回填 → `check_writeback_format --check-register`。**不默认跑 pack 聚合工具**（`case_preflight_pack` / `case_gate_pack` / `case_postcheck_pack` / `case_workflow_ledger`）；只有用户明确要求"跑完整 pack"、"复盘耗时"时才走完整 pipeline。质量工具（lint / 失败分类 / 注册一致性）在轻量路径仍必须保留。**例外**：`$HYPTEST_SKILL_HOME/scripts/make_case_submission_card.py` 在 **非 default 分层**（manual / compile-only / blocked）时**必须跑**，作为 reason_code 和交付摘要的机器可读证据；default 分层不跑。`Manual_Reference` 只承载需要人工判决/复核的 `manual` / `blocked` 观察，不承载普通 `compile-only` 阶段性结论。
 
 1. **锁定输入 + 按需预热**：确认 `HYPTEST_HOME`、`test_point_file`、平台、case 名、目标分层和 `spec_profile`（未指定则用 profile registry 中的 `default_profile`）。**`check_env.py` 与 repo evidence 预热都按任务分档**——必须 / 跳过条件相同：
    - 需要运行平台 / 查覆盖 / 唯一性 / 相似 case 的任务（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 遇到非平凡失败）：**必须**跑 `check_env.py` + 预热 evidence index
@@ -151,28 +151,28 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
      - `commented` 且 **Manual_Reference.md 或 memory/events.jsonl 命中**：**建议深入**——这是正式流程判过 / agent 已沉淀经验的 Spike 边界，**必须**先 Read 该 case 源文件 + 命中来源的条目再选同类角度
      - `commented` 但 Manual_Reference.md 无对应条目：**当噪音处理**——大概率是手动调试 / WIP 注释，不作为硬信号，但写怀疑点时仍应 Read 那个 case 看场景（作为相似检索的普通参考）
 4. **profile 标记**（`new-case-only` / `supplement-existing-point` / bug hunt / `fix-case` 才需要；`run-only` / `writeback-only` / `preflight-only` 跳过；`triage-only` 只有在 PMA/PBMT/MMIO/no-response 判断会影响修改或分层时执行）：读 `references/spec_and_model_limits.md` + `references/spec_profiles/<spec_profile>.md`。标记 `spike_gate_applicable`；PMA/PBMT/MMIO guard 还要写出 `spec_allowed`、`responder_required`、`testbench_responder_confirmed` 和证据路径。
-5. **写前三问**（无 tool call，纯文本，所有写 case 类任务必跑）：在动笔前用文字回答——
+5. **写前检查**（无 tool call，纯文本，所有写 case 类任务必跑）：在动笔前用文字回答——
    1. 本 corner 是否落在 **Nanhu 未实现** 范围内（data trigger / 3+ 层 chain / `classification=nanhu_not_impl` 等）？若 **是** → **停下回退**到 Nanhu 已实现的等价角度或请用户确认，**不要动笔**（Non-Negotiable §3 第 4 条）。若 **否** → 继续第 2 问。
    2. 本 case 的 `spike_gate_applicable` 是 true 还是 false？依据是 profile §5 / `$HYPTEST_SKILL_HOME/scripts/query_spec_profile.py --nongate-summary` 的哪条？
    3. 若涉及 PMA/PBMT/MMIO/no-response：`spec_allowed` 与 `testbench_responder_confirmed` 分别是什么，证据路径是什么？
    4. 步骤 3 相似检索 top 中有 `register_status=commented` **且（Manual_Reference.md 有对应条目 _或_ memory/events.jsonl 有对应历史）**的同主题 case 吗？若有，已读了那 case + 命中来源的条目吗？本次为什么仍要选这个角度？（两处都没命中的 commented 视作普通 case，无需触发本问）
 
-   三问答完走**分路**：
+   写前检查答完走**分路**：
    - 第 1 问 "否" + 第 2 问 "**true**"（Spike 可 gate）→ **default-first 路径**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**开启** `TEST_REGISTER(...);` → 步骤 9 compile → 步骤 10 跑 Spike → 步骤 11 失败分类（如需）→ 步骤 12-14 正常回填
-   - 第 1 问 "否" + 第 2 问 "**false**"（Spike 不可 gate，但 case 照编）→ **manual-first 捷径**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**直接注释** `// TEST_REGISTER(...);` → 步骤 9 compile 用 `--include-commented` → 步骤 10 **可选跑 Spike 看行为但不以结果翻 default**（Spike PASS 也保持 manual；跑出 FAILED 才进步骤 11 归因）→ 步骤 14 `reason_code:` 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY` → 步骤 16 写 Manual_Reference
+   - 第 1 问 "否" + 第 2 问 "**false**"（Spike 不可 gate，但 case 照编）→ **nongate 路由**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**直接注释** `// TEST_REGISTER(...);` → 步骤 9 compile 用 `--include-commented` → 步骤 10 **可选跑 Spike 看行为但不以结果翻 default**（Spike PASS 也不翻 default；跑出 FAILED 才进步骤 11 归因）→ 步骤 14 按证据落 `manual` / `compile-only` / `blocked` 并填写对应 `reason_code:` → 步骤 16 跑 submission card；若最终分层是 `manual` / `blocked`，再按 4 档 verdict 处理 Manual_Reference。
 
-   三问答不出 + 答案对不上证据 → 回补步骤 3-4 证据，**不要直接下笔**。这一步成本是几行文字，省的是错走 default-first 后再回退的 ~60-90s compile/run。
+   写前检查答不出 + 答案对不上证据 → 回补步骤 3-4 证据，**不要直接下笔**。这一步成本是几行文字，省的是错走 default-first 后再回退的 ~60-90s compile/run。
 6. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
 7. **预编译 lint**（`new-case-only` / `supplement-existing-point` / `fix-case` 改 case 体后必跑；`run-only` / `writeback-only` 跳过）：
    ```bash
    python3 $HYPTEST_SKILL_HOME/scripts/check_case_lint.py --repo-root $HYPTEST_HOME --file <new_case_file> --strict-case-end
    ```
    pre-compile lint 拦截 `TEST_END` 多写 / `TEST_SETUP_EXCEPT()` 漏调 / 多余 register 等结构错；命中 error 立即修，**不要先 compile**——一次 compile 在 NFS 上 ~30-60s，预编译 lint 只 1-2s。
-8. **调整 `test_register.c`** 注册状态，**按步骤 5 分路**：default-first 路径**开启**注册 `TEST_REGISTER(...);`；manual-first 捷径**直接注释** `// TEST_REGISTER(...);`。
-9. **单 case 编译**：default-first 用 `python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name>`；manual-first 用 `python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name> --include-commented`（扫注释注册行）。
+8. **调整 `test_register.c`** 注册状态，**按步骤 5 分路**：default-first 路径**开启**注册 `TEST_REGISTER(...);`；nongate 路由**直接注释** `// TEST_REGISTER(...);`。
+9. **单 case 编译**：default-first 用 `python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name>`；nongate 路由用 `python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name> --include-commented`（扫注释注册行）。
 10. **单 case 运行**：
    - default-first：**必须**跑 `python3 $HYPTEST_HOME/get_result.py --platform spike --case <case_name>`；结果决定分层（PASSED → `default`；FAILED / untested → 步骤 11 归因）
-   - manual-first：**可选**跑 Spike——想拿观察证据就跑，但结果**不翻 default**（Spike PASSED 仍保持 manual，因为 profile §5 已判 `spike_gate_applicable=false`）
+   - nongate 路由：**可选**跑 Spike——想拿观察证据就跑，但结果**不翻 default**；最终仍按当前 runner/oracle 条件落 `manual` / `compile-only` / `blocked`
    - `compile-only` 分层：Gate D = `N/A`，明确写不运行原因
    运行前确认平台环境变量在当前进程可见。`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
 11. **失败分类（强制）**：运行结果出现 `FAILED` / `untested exception` / `timeout` 时**必须**跑：
@@ -192,13 +192,13 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
    ```
    `--check-reason-code` 校验非 default 状态的 `已实现 case` 行**必须**带 `reason_code:` 注释，且 code 必须在 `assets/reason_codes.json` 枚举里（当前 15 个——1 个 default + 5 个 manual + 2 个 compile-only + 7 个 blocked；见 §reason_code Catalog 或 `references/reason_code_catalog.md`）。**禁止编造** `manual.<...>` / 自由式 `D-MANUAL-<自造名>` 这类 code；catalog 不够用 → 用 `OTHER-PROPOSE:<一句话>` 占位（提示 skill 维护者扩 catalog），同时摘要里醒目标"⚠️ 待 catalog 扩展"。
 15. **memory append 自问**（仅 bug hunt / 新增测试点 / `fix-case` 发现工具坑 / 非预期运行结果等场景）：按 `Workflow Memory` 段的 3 门槛处理。其它任务类型跳过。
-16. **Manual_Reference 写回**：分层落到 `manual` / `blocked` 时**先跑 `$HYPTEST_SKILL_HOME/scripts/check_manual_reference_topic.py`** 判 4 档 verdict：
+16. **非 default 交付卡 + Manual_Reference 写回**：分层落到 `manual` / `compile-only` / `blocked` 时，必须跑 `$HYPTEST_SKILL_HOME/scripts/make_case_submission_card.py` 生成机器可读交付卡，作为 reason_code 和最终摘要的统一证据来源。分层落到 `manual` / `blocked` 时，再跑 `$HYPTEST_SKILL_HOME/scripts/check_manual_reference_topic.py` 判 4 档 verdict：
     - `profile_covered` → profile §5 / reason_code_catalog 已明确收录，**不新增 MR 条目**，交付摘要里引用 profile 对应条目
     - `memory_confirmed` → memory 已有 `confirmed` 条目覆盖本主题，**不新增 MR 条目**，复用 memory 条目的 fix/reason_code 结论
     - `manual_reference_open` → Manual_Reference 已有**未解决**条目，**不新开**，在已有条目末尾补一行 `- 本轮也碰到：<case_name>，<关键现象>`，摘要注明"已叠加到 MR #<id>"
     - `new_entry_needed` → 才 auto-append 新的 `#### <id>. <title>（**自动生成，待人工确认**）`，含涉及文件 / 涉及用例 / 怀疑点源码引用 / 本轮 Spike 观察 / 三条待人工确认问题（是否补入 profile、是否 LinkNan 复核、`reason_code` 确认）
 
-    **非 default 分层必须同时跑 `$HYPTEST_SKILL_HOME/scripts/make_case_submission_card.py` 生成机器可读交付卡**作为 reason_code / Manual_Reference 的统一证据来源。`default` / `compile-only` 不触发本步。
+    `compile-only` 只需要交付卡和摘要里说明 Gate D=`N/A` / 不运行原因；除非同时存在待人工判决的问题，否则不写 Manual_Reference。`default` 不触发本步。
 
     **人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status confirmed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。若人工判决"作废/过时"，**直接从 Manual_Reference 删除该条目**；memory 如有对应记录也一并删除对应 JSON 行。
 
@@ -268,11 +268,15 @@ Bug hunt 场景最终交付摘要额外包含：
 
 ## Why we still write cases when `spike_gate_applicable=false`
 
-profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spike 为 gate。三类用途：
+profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spike 为 gate。`spike_gate_applicable=false` 是 **gate/runner 路由属性**，不是覆盖价值、风险优先级或测试点重要性的降级信号。选点先由测试点目标、项目 profile、RTL 风险和覆盖空缺决定；分层只决定 case 怎么注册、怎么运行、用什么证据闭环。
+
+因此不要因为某场景不走 official Spike gate，就把它替换成更容易跑 Spike 的近似 baseline，也不要把 `manual` / `D-MANUAL-NONGATE` 解读为"低价值"、"可不写"、"先跳过"。只有当前 profile 明确写成 Nanhu 未实现、环境缺失且无法表达、或测试点本身无新增覆盖时，才停止或降为 blocked/compile-only。
+
+三类用途：
 
 1. **为 LinkNan / RTL 环境准备回归素材**：Spike 不建模但 LinkNan difftest / 真实 RTL 仿真可以 gate。case 写好并 `// TEST_REGISTER(...)` 注释；需要时 `$HYPTEST_HOME/compile_elf.py --include-commented` + LinkNan run 手动跑回归。
 2. **覆盖完成度**：test_point 要求的场景必须有 case——即使 Spike 不能 gate，case 本身是"场景已构造、待跑 LinkNan"的证据。未来 Spike 补了 gap，去掉注释即可翻 default。
-3. **验证 profile §5 的描述**：manual-first 路径允许"可选跑 Spike 看行为但不翻 default"，实际跑一次能**实证** profile §5 的说法——例如发现"chain mismatch 抑制路径 Spike 可观测，但 chain closed BP 确实不抛"，这类观察可以通过 step 15/16 append memory 或写进 Manual_Reference 扩 profile §5。
+3. **验证 profile §5 的描述**：nongate 路由允许"可选跑 Spike 看行为但不翻 default"，实际跑一次能**实证** profile §5 的说法——例如发现"chain mismatch 抑制路径 Spike 可观测，但 chain closed BP 确实不抛"，这类观察可以通过 step 15/16 append memory，或在 `manual` / `blocked` 需要人工复核时写进 Manual_Reference 扩 profile §5。
 
 与 **Nanhu 未实现**（Non-Negotiable §3 第 4 条）的区别：
 
@@ -280,8 +284,8 @@ profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spi
 |---|---|---|
 | Nanhu 行为 | 按 spec 实现 | 根本没实现 |
 | case 能 RTL 验证吗 | 能 | 不能（硬件没做）|
-| 写 case 有用吗 | **有**（走 manual-first）| **无**（僵尸 case）|
-| workflow 处理 | manual-first 捷径 + `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` | **禁止编写**（Non-Negotiable §3 第 4 条）|
+| 写 case 有用吗 | **有**（走 nongate 路由）| **无**（僵尸 case）|
+| workflow 处理 | nongate 路由；按环境和 oracle 落 `manual` / `compile-only` / `blocked` | **禁止编写**（Non-Negotiable §3 第 4 条）|
 
 ## Output Defaults
 
@@ -294,7 +298,7 @@ profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spi
 - `compile-only` 时显式写 Gate D=`N/A` 与不运行原因。
 - 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须明确说明原因，不能把旧条目或旧 case 当成"新增结果"。
 - **memory 动作**（仅在 Workflow 步骤 15 触发的任务类型输出）：列本轮 query 了哪些 topic（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 15 的任务不用列。
-- **Manual_Reference 动作**（仅在 Workflow 步骤 16 触发时输出）：说明 `check_manual_reference_topic.py` 的 `verdict`（`profile_covered` / `memory_confirmed` / `manual_reference_open` / `new_entry_needed`）以及对应动作：是否引用了 profile 条目 / 复用了 memory confirmed 条目 / 在已有 MR 条目下补"本轮也碰到"行 / 新 append 了 `#### <id>.（**自动生成，待人工确认**）`；或本轮收到人工 / LinkNan 复核结论，给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status confirmed`，或者人工判决"作废/过时"**直接删除了 MR 条目 + 对应 memory 行**。`default` / `compile-only` 不触发本步，摘要里明确"未触发"。
+- **非 default 交付卡 / Manual_Reference 动作**：`manual` / `compile-only` / `blocked` 必须说明 submission card 路径。只有 `manual` / `blocked` 触发 Manual_Reference 四档 verdict：说明 `check_manual_reference_topic.py` 的 `verdict`（`profile_covered` / `memory_confirmed` / `manual_reference_open` / `new_entry_needed`）以及对应动作：是否引用了 profile 条目 / 复用了 memory confirmed 条目 / 在已有 MR 条目下补"本轮也碰到"行 / 新 append 了 `#### <id>.（**自动生成，待人工确认**）`；或本轮收到人工 / LinkNan 复核结论，给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status confirmed`，或者人工判决"作废/过时"**直接删除了 MR 条目 + 对应 memory 行**。`compile-only` 默认不写 Manual_Reference；`default` 不触发本项。
 
 ## What To Read
 

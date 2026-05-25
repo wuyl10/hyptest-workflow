@@ -64,17 +64,16 @@ VModule 是 NHV5.1AP / LinkNan AP-IT 环境中的 RTL/testbench 注入模块，�
 
 VModule 相关 case 的默认口径：
 
-- `spike_gate_applicable=false`；不要求、也不应以 official Spike run pass 作为通过门槛。
-- Spike 只可作为编译或普通 ISA smoke，不能作为 VModule 注入链路有效的证据。
-- 需要 `VMODULE=1` 编译/运行环境；有效 gate 应来自 LinkNan/RTL/special-run。
-- 若当前 runner 没有 VModule 或没有可控注入源，case 应保持 `manual` / `compile-only` / `blocked`，不要伪装成 default。
-- VModule case 默认不进入普通 Spike default 回归；除非当前 CI/runner 明确支持 `VMODULE=1` special-run。
+- **选点**：当测试点/用户任务目标是“当前平台可控 interrupt 注入”“interrupt 与 breakpoint/debug trigger 交叉”“interrupt delay/到达窗口”“外部/force/timer/software 注入源”时，优先落 VModule/AP-IT 路径。CSR `mip/sip` pending 版本只可作为 architecture/default-friendly baseline 或对照组；除非测试点明确写“纯 CSR pending / official Spike default gate”，否则不能替代 VModule 注入覆盖。若已写 CSR baseline，还应继续补 VModule `vm_reg_0/vm_reg_8` 版本，或在交付摘要中明确说明 VModule 覆盖未完成。
+- **分层/运行**：VModule case 的 `spike_gate_applicable=false`，遵守全局“nongate 不等于低价值”原则；不要求、也不应以 official Spike run pass 作为通过门槛。Spike 只可作为编译或普通 ISA smoke，不能作为 VModule 注入链路有效证据。
+- **环境**：需要 `VMODULE=1` 编译/运行环境；有效 gate 应来自 LinkNan/RTL/special-run。若当前 runner 没有 VModule 或没有可控注入源，case 应保持 `manual` / `compile-only` / `blocked`，不要伪装成 default。VModule case 默认不进入普通 Spike default 回归，除非当前 CI/runner 明确支持 `VMODULE=1` special-run。
 
 VModule 写 case 时的硬要求：
 
 - 优先复用仓库已有 VModule helper；没有 helper 时再封装 `vm_reg` 写接口，不要在每个 case 中散落裸 magic。
 - VModule 命令序列需要按文档使用 address command / data command；中断注入相关序列保留 `fence.i`，避免后续触发不稳定。
 - `vm_reg_8` 只控制 VModule 注入到 core 顶层前的额外 delay；core 顶层到后端/ROB/trap handler 的延迟不可预测。selfcheck 不得断言固定第 N 条指令、固定 cycle 或固定单拍先后。
+- VModule interrupt selfcheck 的稳定 oracle 应放在事件集合和状态合同：是否至少观察到目标 interrupt cause、pending/source 是否按 handler 清理、breakpoint/exception side effect 是否被抑制或保留、handler 返回后 marker 是否 exactly-once。不要把“官方 Spike 可跑”或“CSR pending 可设置”当作 VModule 注入链路的替代 oracle。
 - level-sensitive / force 类普通 interrupt 源需要通过 VModule 对应寄存器写 0 清源；不要依赖 `CSRC(mip/sip)` 清掉所有中断 pending，因为很多外部/定时/force 源不是 CSR 写清。
 - case 开始和结束都要显式清 VModule source，并恢复 `vm_reg_8=0` 或 testcase 约定值，避免污染后续 case。
 - 若涉及 RNMI/NMI，检查 `mnepc/mncause/mnstatus` 和 `mnret` 路径，不用普通 `mip/mie/mstatus.MIE` oracle 判断 NMI 是否进入。
@@ -380,7 +379,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 - LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
 - project/custom CSR、custom instruction 等 selected runner 不支持的路径。
 - Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、以及 double-trap 交叉场景只有在 runner/testbench oracle 明确时才可作为 default gate；否则走 manual/LinkNan/RTL 或 compile-only。
-- VModule / AP-IT 注入的普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等场景不走 official Spike default gate。Spike 不会通过 VModule 寄存器真实拉高 RTL/testbench 注入信号；即使指令流在 Spike 上执行，也只能作为编译或普通 ISA smoke，不能作为注入链路证据。
+- VModule / AP-IT 注入的普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等场景不走 official Spike default gate。Spike 不会通过 VModule 寄存器真实拉高 RTL/testbench 注入信号；即使指令流在 Spike 上执行，也只能作为编译或普通 ISA smoke。VModule 选点优先级与自检 oracle 见 §2.1。
 - Debug trigger: `mcontrol6` chain 闭合后 AMO 的 breakpoint 语义在 Spike 不建模——chain mismatch 抑制路径在 Spike 上可观测（符合 spec），但 chain 闭合后 spec 要求的 BP 在 Spike 不抛（详见 `test_point/Manual_Reference.md#C7`）。
 
 **Nanhu NHV5.1AP Debug trigger 实现约束**（Nanhu 侧的裁剪，超出部分 **测试点本身不应设计**）：
@@ -540,5 +539,5 @@ Spike 结果使用口径：
 - PMA/PBMT/MMIO/cacheability routing、Device responder 行为：优先 `D-MANUAL-NONGATE`；若当前 testbench 没有 responder 或访问会无返回，则 `blocked`。
 - LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件、或其它实现特定 reservation 策略：优先 `D-MANUAL-NONGATE`。
 - Smrnmi/RNMI：NHV5.1AP 支持。CSR/`mnret` 基础语义在 runner 明确启用 Smrnmi 时可走 default candidate；RNMI 外部源/vector/timing、unexpected trap 以及 double-trap 交叉优先 `D-MANUAL-NONGATE` 或 special-run，缺少注入/观测路径时转 `compile-only` / `blocked`。
-- VModule / AP-IT 注入：优先 `D-MANUAL-NONGATE`，因为注入源来自 LinkNan/AP-IT RTL testbench，不是 official Spike 可建模行为。若只有编译环境、没有 `VMODULE=1` run 环境，则 `compile-only`；若当前 testbench 不支持对应 `vm_reg` 或注入源无响应，则 `blocked`。
+- VModule / AP-IT 注入：通常用 `D-MANUAL-NONGATE`，因为注入源来自 LinkNan/AP-IT RTL testbench，不是 official Spike 可建模行为；若 case 的主要 oracle 必须依赖 RTL 内部信号/波形才能观察，可用 `D-MANUAL-RTL-ONLY`。若只有编译环境、没有 `VMODULE=1` run 环境，则 `compile-only`；若当前 testbench 不支持对应 `vm_reg` 或注入源无响应，则 `blocked`。不要因该分层把 VModule 场景替换成 CSR pending default baseline。
 - project/custom CSR 或 custom instruction 且 official Spike 不支持：先按 official Spike model gap 归因；是否保留为 manual/compile-only 取决于测试点/项目需求。

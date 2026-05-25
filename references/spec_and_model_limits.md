@@ -37,6 +37,7 @@ profile 参数：
 - 若测试点要求 specific fault order / producer order / template switch / address layout / guard-preserved 检查，case 中必须保留这些关键维度。
 - 若文本要求与现实可构造性冲突，先标 `blocked` 或降级分层，不要偷换成更容易通过 Spike 的相邻场景。
 - Spike 是重要参考，但不是所有场景的最终真值；先按当前 profile 判断 `spike_gate_applicable`，再决定是否运行/准入。
+- `spike_gate_applicable=false` 只表示 official Spike 不适合作为该场景的 default gate；它不是测试价值低、覆盖优先级低、可以不写 case 的信号。不要为了得到 default/Spike pass，把测试点目标替换成更容易建模的近似 baseline。
 - 不要因为单次 Spike 结果反向改写长期规则口径；先判断是否属于 profile 中的模型边界。
 
 ## 4. 新增或切换 profile

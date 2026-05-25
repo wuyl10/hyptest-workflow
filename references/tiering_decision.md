@@ -2,6 +2,8 @@
 
 本文给出 default/manual/compile-only 的可重复判定流程，用于减少主观波动并保留完整质量证据。
 
+分层只描述 **当前 gate/runner 怎么闭环证据**，不描述测试点价值高低。尤其是 `spike_gate_applicable=false`、`manual`、`D-MANUAL-NONGATE` 这类结论，不表示场景低价值、可跳过或可用 Spike-friendly baseline 替代；它们通常表示该场景需要 LinkNan/RTL/special-run/人工证据，而不是 official Spike default gate。
+
 ## 1. 输入信号（来自门禁与日志）
 
 - `compile_pass`: 单 case 编译是否通过
@@ -39,9 +41,9 @@
      - **前置要求**：`run_explainable=true` 必须以 `classify_failure_log.py` 的机器输出为依据（SKILL.md step 11 强制）——没跑 classifier 即 `run_explainable=false`，直接落 `blocked (D-BLOCK-EVIDENCE)`。
    - 且 `run_attempted = true` 且 `run_explainable = false`：结论 `blocked`
    - 其他：结论 `blocked`
-3. 若 `spike_gate_applicable = false`（manual-first 路径）：
-   - 且 `target_policy = manual-ok` 或 `spike_gate_applicable=false` 由 step 5 Q2 显式判出：结论 `manual`（**不需要 `run_attempted`**；case 注册注释 + `--include-commented` 编译即可；step 10 可选跑 Spike 看行为但 Spike PASS 不翻 default）
-   - 且 `target_policy = compile-only-ok` 或 `run_attempted = false` 且用户未明确要求 manual：结论 `compile-only`
+3. 若 `spike_gate_applicable = false`（nongate 路由）：
+   - 且 `target_policy = compile-only-ok`，或当前只有编译条件、缺少该场景所需 LinkNan/RTL/special-run runner：结论 `compile-only`
+   - 且 `target_policy = manual-ok`，或 `spike_gate_applicable=false` 由 step 5 Q2 显式判出且场景有可预期的 LinkNan/RTL/special-run 闭环：结论 `manual`（**不要求 official Spike `run_attempted`**；case 注册注释 + `--include-commented` 编译即可；step 10 可选跑 Spike 看行为但 Spike PASS 不翻 default）
    - 且 `run_attempted = true` 但结果不可归因：结论 `blocked`
 4. 其他情况：
    - 结论：`manual`
