@@ -15,6 +15,7 @@ official_spike_has_pma_csr: false
 default_spike_gate: ordinary_h_extension_with_aia_arch_only
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: true
+primary_aia_gate: LinkNan RTL regression
 ```
 
 ## 1. 口径优先级
@@ -62,6 +63,7 @@ linknan_mmio_requires_responder: true
 - 默认 G-stage / VS-stage MODE：`Bare` / `Sv39x4` / `Sv48x4`（Nanhu 未启用 Sv57，相关 case 不构造）。
 - ASID 16 bit，VMID 14 bit。
 - Sdtrig 在本 profile 沿用 `nhv5_1_ap` 的 Nanhu 裁剪：仅 2 层 chain、仅 address / execute-PC trigger、无 data trigger；超出部分测试点本身不应设计。
+- 当前 NHV5.1AP / LinkNan simv 不支持运行时动态更新 `misa` 扩展位（与 H 无关的平台级约束，沿用 `nhv5_1_ap`）；写 `misa` 后不要假设 `C` 等扩展位可以被临时清除/打开并立即改变执行语义。依赖动态清 `misa.C` 将当前核从 IALIGN=16 切到 IALIGN=32 的 case 不进入默认 selfcheck/default gate；若要测 JAL/JALR/branch 半字对齐目标 IAM，必须使用已确认支持 IALIGN=32 的构建配置，或把当前配置下的失败归为平台约束/用例假设不成立。
 
 ### 范围外项目（碰到归 `compile-only` 或转其它 profile）
 
@@ -247,6 +249,42 @@ AIA（IMSIC + APLIC）在本 profile 范围内；CSR 架构面（`mtopi` / `stop
     "responder_status": "memory_if_testbench_maps_it",
     "spike_gate_applicable": false,
     "default_decision": "manual_unless_arch_only_and_model_supported"
+  },
+  {
+    "id": "linknan_aplic_mmio",
+    "window": "0x38050000-0x38057fff",
+    "pma": "IO",
+    "pbmt": "None",
+    "memattr_device": true,
+    "allowed": true,
+    "responder_required": true,
+    "responder_status": "confirmed_in_linknan_rtl",
+    "spike_gate_applicable": false,
+    "default_decision": "linknan_rtl_gate_candidate"
+  },
+  {
+    "id": "linknan_intr_gen_mmio",
+    "window": "0x40070000-0x4007ffff",
+    "pma": "IO",
+    "pbmt": "None",
+    "memattr_device": true,
+    "allowed": true,
+    "responder_required": true,
+    "responder_status": "confirmed_in_linknan_sim",
+    "spike_gate_applicable": false,
+    "default_decision": "linknan_rtl_gate_candidate"
+  },
+  {
+    "id": "linknan_imsic_global_window",
+    "window": "0xE000000000-0xE00000ffff per hart by current default",
+    "pma": "IO",
+    "pbmt": "None",
+    "memattr_device": true,
+    "allowed": true,
+    "responder_required": true,
+    "responder_status": "confirmed_in_linknan_rtl",
+    "spike_gate_applicable": false,
+    "default_decision": "capability_gated_manual_by_default"
   }
 ]
 ```
@@ -267,6 +305,18 @@ MMIO responder matrix：
 | `0x0~2G` Device/MMIO 区域 | 依 testbench 连接而定 | 未确认前否 | 先确认 responder；否则 `blocked` / `manual` |
 | `3T~4T` Device/MMIO 区域 | 依 testbench 连接而定 | 未确认前否 | 只按规格允许不够；无返回路径会卡死 |
 | UART/IntrGen 等寄存器型外设 | register-like | 否 | 只适合对应寄存器语义，不替代任意地址 MMIO memory |
+
+LinkNan responder/source evidence（LinkNan testbench 共享，与 `nhv5_1_ap` 一致）：
+
+- 显式 SimMMIO responder 在 `LinkNan/src/test/scala/lntest/top/SimMMIO.scala`：
+  - flash: `AddressSet(0x10000000, 0x0fffffff)` → `0x10000000..0x1fffffff`，flash/ROM 语义，不作为通用 scratch。
+  - UART: `AddressSet(0x40600000, 0x0000000f)` → `0x40600000..0x4060000f`，register-like。
+  - IntrGen: `AddressSet(0x40070000, 0x0000ffff)` → `0x40070000..0x4007ffff`，register-like。
+- IntrGen 语义在 `LinkNan/src/test/scala/lntest/peripheral/AXI4IntrGenerator.scala`：AXI slave 声明 `supportsRead/Write = TransferSizes(1, 8)`，但实现对 AW/AR assert `cache == 0`、`size == log2Ceil(regBits / 8)`、`len == 0`；当前 regBits=64 时等价于单 beat 8B register access。它可用于 8B register-style load/store，不可替代 byte/half/word lane merge、任意地址 scratch 或整行 readback。
+- 普通 DRAM/cacheable memory 在 `LinkNan/src/main/scala/linknan/generator/Config.scala` 的 `pmemRange = 0x80000000..0x2000000000`，并由 `LinkNan/src/test/scala/lntest/top/DummyDramMoudle.scala` 普通 mem slave 提供 memory-like response。
+- 高地址 NC window 在 `Config.scala` 的 `AddrConfig.mem_nc = (0x300_0000_0000, 0xF00_0000_0000)`；`LinkNan/src/main/scala/linknan/soc/MstAxiFabric.scala` 用 `ucMatcher` 将命中该 window 的地址走 UC 路由。是否有 memory-like response 还取决于当前 config 是否启用 `LinkNanParamsKey.extraNcMem`，以及 `DummyDramMoudle.scala` 是否创建并连接 `pciNode` / `AXI4RAMWrapper`。
+- `extraNcMem` 默认值在 `LinkNan/src/main/scala/linknan/soc/LinkNanParams.scala` 为 `true`。`xmake simv` 的默认生成路径会调用 `task.run("soc", sim=true, ...)`，不传 `pldm_verilog`，因此若它重新生成 RTL，默认保持 `extraNcMem=true`；`xmake soc --sim --pldm_verilog` / `xmake soc -s -p` 会在 `xmake.lua` 里追加 `--no-extra-nc-mem`，经 `SimArgParser.scala` 改成 `extraNcMem=false`。若 `xmake simv --no_build_chisel` 或复用已有 build，则不改变已有 RTL 的该配置，只能按当前生成产物确认。
+- Zhujiang AXI/TL xbar matcher 是按 slave matcher gate ready/valid；当前 `BaseAxiXbar.scala` / `BaseTLULXbar.scala` 未匹配地址没有 profile 保证的默认 error response。若目标 PA 不落在当前连接的 responder/memory window，可能表现为请求不被接受或无返回，需用 waveform 定位具体卡点。
 
 机器可读 responder 表：
 
@@ -303,6 +353,78 @@ MMIO responder matrix：
     "memory_like_scratch": false,
     "default_decision": "manual_for_device_specific_semantics_only",
     "notes": "does not replace arbitrary-address memory-like MMIO scratch"
+  },
+  {
+    "id": "linknan_simmmio_flash",
+    "target": "0x10000000-0x20000000_flash",
+    "responder_type": "testbench_dependent",
+    "memory_like_scratch": false,
+    "default_decision": "manual_for_flash_semantics_only",
+    "source": "LinkNan/src/test/scala/lntest/top/SimMMIO.scala",
+    "notes": "AXI4Flash responder; not arbitrary writable MMIO scratch"
+  },
+  {
+    "id": "linknan_simmmio_uart",
+    "target": "0x40600000-0x40600010_uart",
+    "responder_type": "register-like",
+    "memory_like_scratch": false,
+    "default_decision": "manual_for_uart_semantics_only",
+    "source": "LinkNan/src/test/scala/lntest/top/SimMMIO.scala",
+    "notes": "small UART register window"
+  },
+  {
+    "id": "linknan_simmmio_intrgen",
+    "target": "0x40070000-0x40080000_intrgen",
+    "responder_type": "register-like",
+    "memory_like_scratch": false,
+    "default_decision": "manual_for_register_8b_semantics_only",
+    "source": "LinkNan/src/test/scala/lntest/top/SimMMIO.scala; LinkNan/src/test/scala/lntest/peripheral/AXI4IntrGenerator.scala",
+    "notes": "supports register-like single-beat 8B access in current implementation; not arbitrary byte/half/word or whole-line scratch"
+  },
+  {
+    "id": "linknan_extra_nc_mem",
+    "target": "0x30000000000-0x40000000000_extra_nc_mem",
+    "responder_type": "testbench_dependent",
+    "memory_like_scratch": true,
+    "default_decision": "manual_or_blocked_until_current_config_confirms_extraNcMem",
+    "source": "LinkNan/src/main/scala/linknan/generator/Config.scala; LinkNan/src/test/scala/lntest/top/DummyDramMoudle.scala; LinkNan/src/main/scala/linknan/soc/MstAxiFabric.scala",
+    "notes": "spec/window is allowed for multiple PMA/PBMT rows, but current simv must prove extraNcMem/AXI4RAMWrapper is present and response path closes"
+  },
+  {
+    "id": "linknan_intr_gen",
+    "target": "LinkNan AXI4IntrGenerator / INTR_GEN_ADDR 0x40070000",
+    "responder_type": "register-like",
+    "memory_like_scratch": false,
+    "spike_gate_applicable": false,
+    "default_decision": "linknan_rtl_gate_candidate",
+    "notes": "平台私有外设；QEMU/official Spike 无对应模型。"
+  },
+  {
+    "id": "linknan_aplic",
+    "target": "LinkNan APLIC 0x38050000 M-domain, 0x38054000 S-domain",
+    "responder_type": "register-like",
+    "memory_like_scratch": false,
+    "spike_gate_applicable": false,
+    "default_decision": "linknan_rtl_gate_candidate",
+    "notes": "当前设计仅 MSI delivery，source 0 保留。"
+  },
+  {
+    "id": "linknan_imsic",
+    "target": "LinkNan IMSIC global base 0xE000000000, M file offset 0x8000, S/VS offset 0x0",
+    "responder_type": "msi-window-plus-csr",
+    "memory_like_scratch": false,
+    "spike_gate_applicable": false,
+    "default_decision": "capability_gated_manual_by_default",
+    "notes": "RTL 已集成，hyptest LinkNan 平台头记录 LINKNAN_IMSIC_M_BASE_ADDR=0xE000008000、LINKNAN_IMSIC_S_BASE_ADDR=0xE000000000；只有定义 LINKNAN_ENABLE_IMSIC_MMIO_TESTS 时才暴露 IMSIC_M_BASE_ADDR/S_BASE_ADDR。"
+  },
+  {
+    "id": "qemu_virt_aia",
+    "target": "QEMU virt,aia=aplic-imsic APLIC/IMSIC",
+    "responder_type": "reference-model",
+    "memory_like_scratch": false,
+    "spike_gate_applicable": false,
+    "default_decision": "optional_reference",
+    "notes": "可用于通用 AIA 行为观察，但不是 LinkNan gate。"
   }
 ]
 ```
@@ -321,9 +443,43 @@ MMIO responder matrix：
 - **HLVX**：`HLVX.HU/WU` 以执行权限读，PMA / PBMT 检查仍按最终 host PA 的属性，不会因为是"以执行权限"就变成 cacheable。
 - **HLV / HSV 异常归属**：HLV/HSV 跨页失败时，第二半页的 PMA / PBMT 检查独立判断，guest-page-fault 与 access-fault 优先级见 §6。
 
+### LinkNan AIA 平台事实
+
+LinkNan 集成下的 AIA 硬件参数来自 `LinkNan/src/main/scala/linknan/soc/LinkNanParams.scala`、`devicetree/Predefined.scala` 与 hyptest `platform/linknan/inc/platform.h`。本子节作为本 profile 下 AIA 平台路径 case 的硬地址参考；与 `nhv5_2_AIA` profile 的事实表重叠，但保留以避免 H × AIA case 跨 profile 查阅。
+
+| 项 | 当前值 |
+| --- | --- |
+| 外部中断输入 | `nrExtIntr = 256`，`ext_intr` 宽度 256 |
+| 有效 APLIC source | `1..255`，source 0 保留 |
+| APLIC base | `0x3805_0000` |
+| APLIC M/S domain size | `0x4000`，总 window `0x3805_0000..0x3805_7fff` |
+| APLIC delivery | 当前设计只支持 MSI delivery，`domaincfg.DM` 固定为 1 |
+| APLIC EIID width | `log2Ceil(nrExtIntr) + 1 = 9` |
+| APLIC guest files | `geilen = 1` |
+| IMSIC global base | `finalImsicBase = 0xE0_0000_0000` |
+| IMSIC S/VS global base | `finalSgBase = 0xE0_0000_0000` |
+| IMSIC M global base | `finalMBase = 0xE0_0000_8000` |
+| IMSIC local S/VS base | `0x0000` |
+| IMSIC local M base | `0x8000` |
+| IMSIC hart stride | `0x1_0000` |
+| IMSIC EIID count | `512` |
+| hyptest guest hint | `IMSIC_S_GUEST_COUNT = 1U` |
+| LinkNan intr_gen | `0x4007_0000..0x4007_ffff` |
+
+intr_gen 编号规则：
+
+```text
+raise_ext_intr(1) -> ext_intr(0) -> APLIC source 0, reserved
+raise_ext_intr(source + 1) -> ext_intr(source) -> APLIC source N
+```
+
+因此有效 APLIC 外部线 case 必须使用 `raise_ext_intr(source + 1)`，且 source 从 1 开始。
+
+`IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR` 默认**不**作为 hyptest 平台头公开宏；需要泛化 IMSIC MMIO case 时显式定义 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 才暴露这两个宏作为 hyptest 可执行能力。LinkNan 专用 `intr_gen → APLIC → IMSIC → core trap` 闭环探针（如 P6I/P6J/P6K 类）可直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 硬件地址作为 LinkNan RTL-only / manual 闭环 oracle，不依赖该 capability flag。
+
 ## 5. Official Spike 模型边界
 
-**继承 `nhv5_1_ap` §5 全部 gap**（无 TLB 模型、无 cache 模型、无 PMA CSR、CBO 内部 line 状态不建模、replay queue / sbuffer / uncache buffer / MSHR / ROB head / response-context 不建模、PMA / PBMT / MMIO routing 不建模、LR/SC reservation timeout / alias DCache hit 不建模、custom CSR / instruction / NMI / double trap 不在范围、Debug trigger chain 闭合 AMO BP 不建模），下面只补 H + AIA 的增量。
+**继承 `nhv5_1_ap` §5 全部 gap**（无 TLB 模型、无 cache 模型、无 PMA CSR、CBO 内部 line 状态不建模、replay queue / sbuffer / uncache buffer / MSHR / ROB head / response-context 不建模、PMA / PBMT / MMIO routing 不建模、LR/SC reservation timeout / alias DCache hit 不建模、custom CSR / instruction / NMI / double trap 不在范围、运行时动态更新 misa / IALIGN=32 动态切换不支持、Debug trigger chain 闭合 AMO BP 不建模、Nanhu Debug trigger 实现约束 chain ≤2 层 + 仅 address/execute-PC trigger + 无 data trigger），下面只补 H + AIA 的增量。
 
 前提：official Spike 必须在编译时启用 H、Smaia、Ssaia、Sstc、Svpbmt；任一开关缺失时不构成 model gap，按 `D-BLOCK-COMPILE` 或 `D-BLOCK-EVIDENCE` 处理（参见 §9）。
 
@@ -371,12 +527,77 @@ MMIO responder matrix：
 | `hstatus.VGEIN` 选 guest IF + `hgeip` set bit 实际驱动路径 | false | 平台 + IMSIC guest IF 强耦合 |
 | IOMMU + MSI 转换（address mask / pattern、`extract` 公式）+ MSI 页表（基本转换 M=3、MRIF 模式 M=1）+ MRIF 结构 / 通知 MSI / 虚拟 hart 迁移 4 步 / 6 步 | false | Spike 无 IOMMU 模型；全部 RTL-only / LinkNan |
 
+LinkNan AIA capability gate 补充：
+
+- 泛化 IMSIC M-file / S-file MMIO case（依赖 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR`）默认保持 **capability-gated / manual**；只有显式定义 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 且 LinkNan difftest 参考模型对 IMSIC 间接 CSR/MMIO 状态完成对齐后，才作为 LinkNan RTL gate candidate 收紧。
+- LinkNan 专用 `intr_gen → APLIC → IMSIC → core trap/claim` 闭环探针（如 M / HS / VS 三档 guest file 验证）可直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 硬件地址，保持 manual / RTL-only。当前若该类闭环出现 APLIC pending / enable / target 已成立但 IMSIC `topei` / `pending` 为 0、对应 MEIP / SEIP / VSEIP 未进入的现象，应聚焦 APLIC MSI output → outbound / remap → IMSIC write front-end / `msiio` → IMSIC file pending 链路定位，按 LinkNan RTL bug 候选处理，不直接归 official Spike model gap。
+- `mstateen0.IMSIC` 与 IMSIC 访问门禁相关 case 在 LinkNan difftest Spike 上若出现 REF 报 illegal 但 DUT 未陷入的差异，属于独立的 difftest 对齐问题，不与 IMSIC MSI 投递链路问题混为同一根因；按 `D-MANUAL-SPIKE-GAP` 或 `D-MANUAL-RTL-ONLY` 分别归因。
+
 ### 5.5 H + AIA 不可 gate keyword 速查
 
-继承 nhv5_1_ap §5 全部 keyword 块，附加本 profile 增量：
+继承 nhv5_1_ap §5 全部 keyword 块（脚本 `query_spec_profile.py --nongate-summary` 不做跨 profile 合并，因此本 profile 把 nhv5_1_ap 的相关 keyword 也内嵌一份），附加本 profile 增量：
 
 ```hyptest-nongate-keywords
 [
+  {
+    "category": "TLB/cache consistency",
+    "keywords": ["tlb", "cache", "stale_translation", "cache_residency", "dirty_line", "refill", "cacheline"],
+    "module_hints": ["dcache", "icache", "mmu", "tlb", "ptw", "load_queue", "store_queue", "memblock"],
+    "note": "Spike has no TLB/cache model; route to RTL/LinkNan."
+  },
+  {
+    "category": "PMA CSR",
+    "keywords": ["pmaaddr", "pmacfg", "pma_csr"],
+    "module_hints": ["csr", "pma", "mmu"],
+    "note": "PMA CSR not implemented in this Spike."
+  },
+  {
+    "category": "CBO internal line state",
+    "keywords": ["cbo_line_state", "cbo_refill", "cbo_side_effect"],
+    "module_hints": ["dcache", "cbo", "memblock"],
+    "note": "Architectural CBO exceptions are fine; internal state is not."
+  },
+  {
+    "category": "Ordering / queues",
+    "keywords": ["replay_queue", "sbuffer", "uncache_buffer", "mshr", "rob_head", "response_context"],
+    "module_hints": ["memblock", "load_queue", "store_queue", "sbuffer", "mshr", "rob"]
+  },
+  {
+    "category": "PMA/PBMT/MMIO routing",
+    "keywords": ["pma_routing", "pbmt_routing", "mmio_responder", "cacheability_routing"],
+    "module_hints": ["memblock", "dcache", "pbmt", "pma"]
+  },
+  {
+    "category": "LR/SC timeout / alias",
+    "keywords": ["lr_timeout", "sc_timeout", "same_pa_diff_va", "reservation_timeout", "reservation_policy"],
+    "module_hints": ["memblock", "load_queue", "atomicsunit", "reservation"]
+  },
+  {
+    "category": "Custom CSR / instruction",
+    "keywords": ["custom_csr", "custom_instruction", "nmi", "double_trap"],
+    "module_hints": ["csr", "rob", "trap"]
+  },
+  {
+    "category": "Runtime misa update / IALIGN32 dynamic switch",
+    "keywords": ["misa_dynamic", "misa_update", "misa_c_clear", "misa_c_toggle", "ialign32_dynamic", "ialign32", "clear_misa_c"],
+    "module_hints": ["csr", "trap", "frontend", "branch", "exception_priority"],
+    "classification": "nanhu_not_impl",
+    "note": "Current NHV5.1AP / LinkNan simv does not support runtime dynamic misa extension-bit updates. Cases that clear misa.C to force IALIGN=32 should not be default-gated unless a dedicated IALIGN=32 build/config is confirmed. Reason code: D-MANUAL-NANHU-NOT-IMPL or blocked/manual platform-constraint handling."
+  },
+  {
+    "category": "Debug trigger chain AMO (Spike gap)",
+    "keywords": ["mcontrol6_chain", "trigger_chain_amo", "chain_breakpoint_amo", "chain_closed_bp"],
+    "module_hints": ["atomicsunit", "trigger", "memblock"],
+    "classification": "spike_gap",
+    "note": "Nanhu implements spec correctly (chain mismatch suppression + chain closed BP); Spike only models the suppression path, not the chain-closed BP. Reason code: D-MANUAL-SPIKE-GAP."
+  },
+  {
+    "category": "Debug trigger Nanhu implementation limits",
+    "keywords": ["chain_depth_limit", "data_trigger", "more_than_two_triggers"],
+    "module_hints": ["trigger", "atomicsunit"],
+    "classification": "nanhu_not_impl",
+    "note": "Nanhu only supports 2-level chain, address-trigger and execute-PC trigger; data trigger NOT implemented. Case designs targeting 3+ level chain or data trigger are out of scope. Reason code: D-MANUAL-NANHU-NOT-IMPL."
+  },
   {
     "category": "H two-stage routing on platform",
     "keywords": ["g_stage_routing", "two_stage_routing", "hlv_cross_page_device", "hsv_cross_page_device", "page_walk_to_device"],
@@ -507,6 +728,13 @@ AIA 增量：
 - `hstatus.VGEIN` + IMSIC guest IF 实际 MSI 投递：`D-MANUAL-RTL-ONLY`。
 - AIA CSR 架构面 case 但 Spike 未启用 Smaia / Ssaia：`D-BLOCK-COMPILE` 或 `D-BLOCK-EVIDENCE`。
 - AIA CSR 候选规则 / 触发条件 sanity check 通过但 Spike 与 spec 不一致（实测 spec gap）：`D-MANUAL-SPIKE-GAP`。
+
+LinkNan AIA 平台增量：
+
+- LinkNan `intr_gen` 注入 / APLIC source 路由 / APLIC → IMSIC MSI 投递链路 / IMSIC `topei` / guest-file HGEIP 等 RTL-only 闭环：`D-MANUAL-RTL-ONLY` 或 `D-MANUAL-NONGATE`。
+- 依赖 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 才暴露 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR` 的泛化 IMSIC MMIO case（capability-gated）：默认 `D-MANUAL-NONGATE`；capability flag + difftest 参考模型对齐后再收紧为 LinkNan RTL gate candidate。
+- `mstateen0.IMSIC` 等 stateen 与 AIA CSR 交互的 LinkNan difftest 独立 mismatch（REF 报 illegal、DUT 未陷入）：`D-MANUAL-SPIKE-GAP`，与 MSI 投递链路问题分别归因。
+- 注：当前 reason_code catalog **没有**专门的 `LINKNAN_RTL_GOLDEN` 类型；不要自造 reason_code。需要表达 LinkNan 证据时，在最终摘要和测试点短状态里写明 LinkNan RTL PASS / FAIL，分层 reason_code 仍按通用 catalog 选项（`D-MANUAL-RTL-ONLY` / `D-MANUAL-NONGATE` / `D-BLOCK-EVIDENCE`）选择。
 
 环境与 Spike 配置：
 
