@@ -3,6 +3,12 @@
   "default_profile": "nhv5_1_ap",
   "profiles": [
     {
+      "name": "nhv5",
+      "path": "references/spec_profiles/nhv5.md",
+      "description": "NHV5 no-V/no-H hyptest profile for scalar NHV5 verification.",
+      "status": "active"
+    },
+    {
       "name": "nhv5_1_ap",
       "path": "references/spec_profiles/nhv5_1_ap.md",
       "description": "NHV5.1AP hyptest profile for LinkNan/AP-core verification.",
