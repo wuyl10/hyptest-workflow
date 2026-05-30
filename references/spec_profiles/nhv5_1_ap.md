@@ -390,6 +390,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 - chain 最大合法长度为 **2 层**，`TriggerChainMaxLength = 2`；这只限制一次 chain 的级联深度，不等于“总共只有 2 个 slot”。case 可以使用 `slot0/slot1` 或 `slot2/slot3` 组成 2 层 chain，但不能设计 3 层及以上 chain。
 - 仅支持 **address trigger（访存地址）** 和 **execute-PC trigger（取指地址）**。
 - **不支持 data trigger**（trigger 匹配数据值）；相关 case 不应设计。
+- FOF / fault-only-first vector load（`vle*ff.v`、`vlseg*e*ff.v`）的非 0 元素后续异常上报只适用于 Data trigger 语义；NHV5.1AP 不支持 Data trigger，因此非 0 元素的 address trigger 命中不应上报 breakpoint/debug exception，不应设置 `excpt.triggered` / `CAUSE_BKP` / `tval` / `vstart`，也不应仅因此截断 `vl` 或屏蔽元素写回。期望 FOF 非 0 元素 address trigger 报异常的 case 属于 profile-invalid/selfcheck bug；若 Spike/ref model 将其当成 breakpoint 或 `vl` 截断，则按 Spike/model gap 处理。
 - 源码证据：`LinkNan/dependencies/nanhu/src/main/scala/xiangshan/Parameters.scala` 定义 `TriggerNum = 4`、`TriggerChainMaxLength = 2`；CSR/DebugLevel 中 `tdata1/tdata2` 用 `Seq.fill(TriggerNum)` / `Range(0, TriggerNum)` 生成，`tselect` 写入以 `wdata < TriggerNum.U` 为合法条件。
 
 机器可读 nongate keyword 速查（供 `scripts/query_spec_profile.py --nongate-summary` 使用；与上文 prose 保持一致，prose 仍为真值）：
@@ -461,6 +462,13 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
     "module_hints": ["atomicsunit", "trigger", "memblock"],
     "classification": "spike_gap",
     "note": "Nanhu implements spec correctly (chain mismatch suppression + chain closed BP); Spike only models the suppression path, not the chain-closed BP. Reason code: D-MANUAL-SPIKE-GAP."
+  },
+  {
+    "category": "Vector FOF nonzero address trigger",
+    "keywords": ["fof_address_trigger", "fof_nonzero_trigger", "vleff_address_trigger", "vlsegff_address_trigger"],
+    "module_hints": ["memblock", "load_queue", "trigger", "vector"],
+    "classification": "spike_gap",
+    "note": "NHV5.1AP does not support Data trigger. For FOF loads, nonzero-element address-trigger matches must not raise breakpoint/debug exception or truncate vl; Spike/ref behavior that does so is a model gap."
   },
   {
     "category": "Debug trigger Nanhu implementation limits",
