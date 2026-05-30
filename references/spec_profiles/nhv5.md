@@ -15,7 +15,7 @@ official_spike_has_pma_csr: false
 default_spike_gate: ordinary_cacheable_dram_arch_only
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: true
-smrnmi: not_default_or_unconfirmed
+smrnmi: unsupported_in_current_plain_nhv5
 vmodule_interrupt_injection: not_default_plain_nhv5
 vmodule_requires_compile_flag: unsupported_in_plain_nhv5
 vmodule_spike_gate_applicable: false
@@ -48,7 +48,7 @@ vmodule_current_linknan_gate_applicable: false
 - 仓库里的 `hs`/`hu` 命名和 helper 是历史路径命名，按项目约定可分别当作 S/U 语义路径别名使用；它们不表示启用 H 扩展，也不表示进入 HS/VS 两级虚拟化语义。
 - `compile_elf.py` 默认应保持 `ENABLE_V_EXT=0`、`ENABLE_H_EXT=0` 口径。带 `vector`、`rvv`、`vset*`、`vle/vse`、`vcsr/vtype/vl/vstart`、`hgatp/vsatp/hstatus/vsstatus`、`hfence/hlv/hsv` 等硬依赖的 case 不进入本 profile 默认回归。
 - 当前 profile 目标是最大化保留 NHV5 可运行的普通 M/S/U、PMP/PTE/Svpbmt、异常、trigger、interrupt、memblock 标量路径用例。来自 NHV5.1AP 的 case 迁入时，应只做最小语义改动：删除 V/H 专属片段、保留可映射到 M/S/U 标量路径的断言。
-- Smrnmi/RNMI 在本 profile 不作为默认已启用能力。若目标 runner 明确支持 Smrnmi/RNMI，可以按专门任务补充 profile override 或新增 profile；缺少 runner/oracle 前，RNMI 外部源、vector 注入、unexpected-trap timing、double-trap 交叉不进 default。
+- 当前 plain NHV5 不支持 Smrnmi 扩展；Smrnmi/RNMI 不作为本 profile 可运行能力。任何依赖 RNMI CSR/指令、外部源、vector 注入、unexpected-trap timing 或 double-trap 交叉的 case 不进入 default，也不要求 Spike pass。若后续有明确支持 Smrnmi 的 runner，应另建 profile 或 profile override。
 - VModule/AP-IT 注入模块不属于普通 NHV5 默认运行口径。任何依赖 `vm_reg`、`VMODULE=1`、force NMI/debug interrupt/error inject 的 case，默认视为 plain NHV5 范围外或 special-run 占位，不应混进普通 NHV5 default 回归。
 - project/custom CSR 或 custom instruction 若 official Spike 不支持，按 official Spike model gap 处理；是否属于项目验证范围由测试点/项目需求决定，不自动等同于范围外。
 - WFI 可能导致模拟器卡死；优先测试权限与控制位语义，不强制执行真实等待路径。
@@ -307,7 +307,7 @@ LinkNan responder/source evidence（当前 NHV5 项目口径）：
 
 以下场景不宜把 official Spike 当 default gate：
 
-- 本版本 official Spike 没有 TLB/cache 模型；凡涉及 TLB 一致性、cache 一致性、stale translation、cache residency、dirty line preservation、refill image、cacheline side effect 的 case，都只能走 RTL-only/LinkNan 仿真，不走 official Spike gate。
+- 本版本 official Spike 没有 TLB/cache 模型；凡涉及 TLB 一致性、cache 一致性、stale translation、cache residency、dirty line preservation、refill image、cacheline side effect 的 case，都只能走 RTL-only/LinkNan 仿真，不走 official Spike gate。这类 case 不要求 Spike PASS；Spike pass/fail 都不能作为 TLB/cache 一致性闭环证据。
 - 本版本 official Spike 没有实现 PMA CSR；凡涉及访问 `PMAADDR*`、`PMACFG*` 等 PMA CSR 的 case，都只能走 RTL-only/LinkNan 仿真，不走 official Spike gate。
 - CBO 的架构可见异常、权限、编码语义可以作为测试目标；是否可作为 Spike gate 取决于是否只依赖 Spike 可建模的普通架构行为。
 - CBO 的内部 line 状态、cache side effect、refill image、以及无 A/D 权限时的实现分类差异，不作为 official Spike default gate。
@@ -316,7 +316,7 @@ LinkNan responder/source evidence（当前 NHV5 项目口径）：
 - 运行时动态更新 `misa` 扩展位，以及依赖动态清 `misa.C` 切换 IALIGN=32 的场景。当前 NHV5/LinkNan simv 不支持这类动态切换；相关 case 不能按普通 default gate 判断。
 - LR/SC reservation timeout、同 PA 不同 VA 的 cache hit / set index 条件、或其它实现特定 reservation 策略。
 - project/custom CSR、custom instruction 等 selected runner 不支持的路径。
-- Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、double-trap 交叉等不属于本 profile 默认 gate；除非 runner/profile 另行确认支持。
+- 当前 plain NHV5 不支持 Smrnmi/RNMI；RNMI 外部源、RNMI vector 注入、unexpected-trap timing、double-trap 交叉等不属于本 profile 默认 gate；除非使用单独 confirmed runner/profile override。
 - VModule/AP-IT 注入普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等不属于 plain NHV5 default gate。它们既不是 official Spike 可建模行为，也不是普通 NHV5 runner 默认覆盖范围。
 - V 扩展/RVV/vector 指令、vector CSR、vector misalignment 等场景属于本 profile 范围外；不要把 vector case 注释注册保留为 NHV5 default 候选。
 - H 扩展/VS/G-stage/HLV/HSV/HFENCE 等场景属于本 profile 范围外；`hs` 名称只能按 S 语义别名处理。
@@ -397,7 +397,7 @@ LinkNan responder/source evidence（当前 NHV5 项目口径）：
     "keywords": ["smrnmi", "rnmi", "nmi_source", "rnmi_vector", "rnmi_injection", "unexpected_trap", "mnstatus_nmie", "mnepc", "mncause", "mnret", "double_trap"],
     "module_hints": ["csr", "rob", "trap", "interrupt"],
     "classification": "platform_guarded",
-    "note": "Plain NHV5 profile does not assume Smrnmi/RNMI by default. Use a confirmed runner/profile override before default gate."
+    "note": "Current plain NHV5 profile treats Smrnmi/RNMI as unsupported. Use a separate confirmed runner/profile override before any default gate."
   },
   {
     "category": "VModule / AP-IT interrupt injection",
@@ -466,7 +466,7 @@ Spike 结果使用口径：
 本 profile 下 `spike_gate_applicable` 的判定原则：
 
 - 普通 M/S/U、普通 cacheable DRAM、自然对齐标量 load/store/AMO/LRSC、普通异常/CSR/PTE/PMP 行为，若 selected runner 支持且不依赖平台私有路径，可以作为 default 候选。
-- 任何 V 扩展、H 扩展、VModule/AP-IT 注入、未确认 Smrnmi/RNMI、TLB/cache 内部一致性、PMA CSR、PBMT/MMIO/cacheability routing、Device responder、同 PA 不同 VA reservation 策略、runtime `misa` 动态切换，都先视为 `spike_gate_applicable=false`。
+- 任何 V 扩展、H 扩展、VModule/AP-IT 注入、当前 plain NHV5 不支持的 Smrnmi/RNMI、TLB/cache 内部一致性、PMA CSR、PBMT/MMIO/cacheability routing、Device responder、同 PA 不同 VA reservation 策略、runtime `misa` 动态切换，都先视为 `spike_gate_applicable=false`。
 - 非对齐 case 只有在断言改成 NHV5 当前异常口径后才可进入对应分层；普通标量 MEM/NC 非对齐可以作为架构/实现口径 default 候选，Device/PBMT IO/原子/LRSC/PMA routing 相关通常需要 manual 或 LinkNan 证据。
 
 常见 `manual` / `compile-only` / `blocked` 候选：
@@ -505,6 +505,6 @@ Spike 结果使用口径：
 - LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件、或其它实现特定 reservation 策略：优先 `D-MANUAL-NONGATE`。
 - V 扩展/RVV/vector-only case：plain NHV5 不保留；能改成标量等价路径就改，不能改则删除或移出本 profile。
 - H 扩展/VS/G-stage-only case：plain NHV5 不保留；`hs` 命名可改按 S 语义，但 H 专属 CSR/指令/两级翻译路径应删除或移出本 profile。
-- Smrnmi/RNMI：本 profile 不默认支持。基础 CSR/`mnret` 只有在 runner 明确启用后才可走 default candidate；RNMI 外部源/vector/timing、unexpected trap 以及 double-trap 交叉优先 `D-MANUAL-NONGATE` 或 special-run，缺少注入/观测路径时转 `compile-only` / `blocked`。
+- Smrnmi/RNMI：当前 plain NHV5 不支持，默认不编入普通 NHV5 default gate。只有在单独 confirmed runner/profile override 明确启用后，基础 CSR/`mnret` 才可作为 default candidate；RNMI 外部源/vector/timing、unexpected trap 以及 double-trap 交叉优先 `D-MANUAL-NONGATE` 或 special-run，缺少注入/观测路径时转 `compile-only` / `blocked`。
 - VModule/AP-IT 注入：plain NHV5 默认不保留。若未来确实需要，应建 dedicated special-run profile；不要放在 `nhv5` default 回归里。
 - project/custom CSR 或 custom instruction 且 official Spike 不支持：先按 official Spike model gap 归因；是否保留为 manual/compile-only 取决于测试点/项目需求。
