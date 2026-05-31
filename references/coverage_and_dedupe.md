@@ -81,7 +81,7 @@ rg -n "memblock|retry|refault|upper-tail|boundary\\+15|BYTE7|mask" test_point/
 推荐命令：
 
 ```bash
-python3 scripts/find_similar_cases.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/find_similar_cases.py \
   --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query <axis> --query <axis> \
@@ -92,7 +92,7 @@ python3 scripts/find_similar_cases.py \
 复杂场景可用：
 
 ```bash
-python3 scripts/find_similar_cases.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/find_similar_cases.py \
   --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query <axis> --query <axis> \
@@ -113,7 +113,7 @@ python3 scripts/find_similar_cases.py \
 推荐快路径：
 
 ```bash
-python3 scripts/check_case_uniqueness.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_uniqueness.py \
   --repo-root $HYPTEST_HOME \
   --case <case_name> \
   --expect absent \

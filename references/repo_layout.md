@@ -62,7 +62,7 @@ rebuild. Treat `memory/` differently: it is local evidence for repeated failure
 patterns and fixes, so mark stale records `obsolete` instead of casually
 dropping them.
 
-Use `python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME` to remove
+Use `python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/clean_generated.py --repo-root $HYPTEST_HOME` to remove
 workflow cache/report/tmp directories after confirming no useful logs need to
 be kept.
 
@@ -90,6 +90,7 @@ HYPTEST_SPIKE_BIN        community/upstream Spike executable for get_result.py -
 HYPTEST_LINKNAN_HOME     LinkNan workspace root for compile/run on platform linknan
 HYPTEST_DIFFTEST_REF_SO  difftest reference shared object for LinkNan runs, often from custom Spike
 HYPTEST_TMPDIR           temporary directory when /tmp is too small
+HYPTEST_WORKFLOW_SKILL_HOME  hyptest-workflow skill directory for bundled scripts
 ```
 
 If a required env var is missing, prefer a clear error over silently falling
@@ -105,3 +106,7 @@ The skill-facing environment uses only `HYPTEST_*` names to avoid collisions
 with other projects. When invoking hyptest repo scripts, the skill maps
 `HYPTEST_SPIKE_BIN` to the runtime `SPIKE_BIN` that `get_result.py` already
 expects.
+
+Use `$HYPTEST_WORKFLOW_SKILL_HOME/scripts/<tool>.py` for workflow bundled
+tools. Use `$HYPTEST_HOME/<tool>.py` only for hyptest repo runners such as
+`compile_elf.py` and `get_result.py`.

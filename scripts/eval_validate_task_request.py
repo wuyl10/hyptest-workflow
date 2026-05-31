@@ -222,6 +222,30 @@ def main() -> int:
             f"HYPTEST_DIFFTEST_REF_SO: {difftest}\n",
             encoding="utf-8",
         )
+        failure_log = tmp / "run.log"
+        write(failure_log, "ai_smoke FAILED\n50000 cycles no commit\n")
+        waveform = tmp / "wave.fsdb"
+        write(waveform, "placeholder fsdb bytes")
+        waveform_report = tmp / "waveform" / "report.md"
+        write(waveform_report, "# waveform report\n")
+        triage_waveform_md = tmp / "request_triage_waveform.md"
+        triage_waveform_md.write_text(
+            f"HYPTEST_HOME: {repo}\n"
+            "platform: linknan\n"
+            "task_mode: triage-only\n"
+            "case_name: ai_smoke\n"
+            f"failure_log: {failure_log}\n"
+            f"HYPTEST_LINKNAN_HOME: {linknan}\n"
+            f"HYPTEST_DIFFTEST_REF_SO: {difftest}\n"
+            f"waveform_path: {waveform}\n"
+            "top_module: SimTop\n"
+            "debug_target: confirm exception request/response first-bad-cycle\n"
+            "time_window: cycles 1000-1200\n"
+            "expected_behavior: commit should keep advancing\n"
+            "observed_behavior: no commit for 50000 cycles\n"
+            f"waveform_report: {waveform_report}\n",
+            encoding="utf-8",
+        )
         linknan_missing_spike_marker_md = tmp / "request_linknan_missing_spike_marker.md"
         linknan_missing_spike_marker_md.write_text(
             f"HYPTEST_HOME: {repo}\n"
@@ -421,6 +445,33 @@ def main() -> int:
                 failures.append("linknan fixture should capture DIFFTEST_REF_SO")
             if any("SPIKE_BIN" in warning for warning in linknan_payload.get("warnings", [])):
                 failures.append("linknan fixture should not warn about omitted HYPTEST_SPIKE_BIN")
+        triage_waveform = run("--request-md", str(triage_waveform_md), "--json")
+        if triage_waveform.returncode != 0:
+            failures.append("triage-only fixture with waveform handoff context should pass")
+        else:
+            triage_payload = json.loads(triage_waveform.stdout)
+            waveform_context = triage_payload.get("normalized", {}).get("waveform_context", {})
+            if waveform_context.get("waveform_path") != str(waveform.resolve()):
+                failures.append("waveform_path should resolve into normalized waveform_context")
+            if waveform_context.get("rtl_root") != str(nanhu.resolve()):
+                failures.append("rtl_root should derive from HYPTEST_LINKNAN_HOME when waveform context is present")
+            if waveform_context.get("debug_target") != "confirm exception request/response first-bad-cycle":
+                failures.append("debug_target should be preserved in normalized waveform_context")
+            if waveform_context.get("suggested_waveform_report") != str(waveform_report.resolve()):
+                failures.append("waveform_report should resolve into normalized waveform_context")
+            next_commands = "\n".join(triage_payload.get("next_commands", []))
+            for expected in (
+                "--waveform-path",
+                str(waveform.resolve()),
+                "--rtl-root",
+                str(nanhu.resolve()),
+                "--top-module SimTop",
+                "--debug-target 'confirm exception request/response first-bad-cycle'",
+                "--waveform-report",
+                str(waveform_report.resolve()),
+            ):
+                if expected not in next_commands:
+                    failures.append(f"triage handoff command should include waveform arg: {expected}")
         broken_linknan_request = tmp / "request_broken_linknan_nanhu.md"
         broken_linknan = tmp / "BrokenLinkNan"
         broken_linknan.mkdir()

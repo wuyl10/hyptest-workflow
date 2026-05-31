@@ -186,8 +186,8 @@ def main() -> int:
         "would_update_registry": bool(args.update_registry and not args.dry_run and not issues),
         "issues": issues,
         "next_checks": [
-            f"python3 scripts/check_spec_profile.py --spec-profile {args.name} --strict",
-            "python3 scripts/check_spec_profile_registry.py --policy all",
+            f"python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile.py --spec-profile {args.name} --strict",
+            "python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile_registry.py --policy all",
         ],
     }
     if args.dry_run or issues:
@@ -216,8 +216,8 @@ def main() -> int:
         "path": str(target),
         "registry_updated": registry_updated,
         "next_checks": [
-            f"python3 scripts/check_spec_profile.py --spec-profile {args.name} --strict",
-            "python3 scripts/check_spec_profile_registry.py --policy all",
+            f"python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile.py --spec-profile {args.name} --strict",
+            "python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile_registry.py --policy all",
         ],
     }
     if args.json:

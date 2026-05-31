@@ -42,7 +42,10 @@ def main() -> int:
     current, _after = rest.split(END, 1)
     current = current.lstrip("\n").rstrip() + "\n"
     if current != generated:
-        print("FAIL command_index generated command block is stale; run scripts/update_readme_commands.py")
+        print(
+            "FAIL command_index generated command block is stale; run "
+            "$HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_readme_commands.py"
+        )
         return 1
     print("PASS command index")
     return 0

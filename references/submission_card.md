@@ -7,8 +7,8 @@
 若本次修改的是 skill 自身，先运行：
 
 ```bash
-python3 scripts/self_check.py --quick
-python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --quick
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --full --repo-root $HYPTEST_HOME
 ```
 
 ## A. 输入锁定

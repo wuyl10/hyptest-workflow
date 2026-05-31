@@ -33,6 +33,7 @@
     "reason_code_details": ["array"],
     "next_single_run": ["string", "null"],
     "waveform_needed": ["boolean"],
+    "waveform_context": ["object", "null"],
     "log_paths": ["array"]
   }
 }

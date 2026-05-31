@@ -66,8 +66,7 @@ git branch --show-current
 更快的聚合入口：
 
 ```bash
-cd $HYPTEST_SKILL_HOME
-python3 scripts/case_preflight_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_preflight_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --platform spike \
@@ -106,13 +105,13 @@ python3 scripts/case_preflight_pack.py \
    - **Q4**：相似检索 top 中有 `register_status=commented` **且（Manual_Reference.md 有对应条目 _或_ memory/events.jsonl 有对应历史）**的同主题 case 吗？若有，Read case 源 + 命中来源条目后再决定。
 5. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。
 6. 在合适的 case 目录写或改 case：AI/批量生成 case 默认放 `ai_test_cases/`，人工维护 case 放 `manual_test_cases/<module>/`。
-7. **预编译 lint**：`python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --file <new_case_file> --strict-case-end`——命中 error 立即修，不要先 compile（lint 1-2s，NFS 上 compile 30-60s）。
+7. **预编译 lint**：`python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_lint.py --repo-root $HYPTEST_HOME --file <new_case_file> --strict-case-end`——命中 error 立即修，不要先 compile（lint 1-2s，NFS 上 compile 30-60s）。
 8. 按 `references/framework_usage_pitfalls.md` 复核 `TEST_SETUP_EXCEPT()`、`TEST_END(...)`、注册和工具使用风险。
 
 建议命令：
 
 ```bash
-python3 scripts/find_similar_cases.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/find_similar_cases.py \
   --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query cross_16b --query retry --query access_fault \
@@ -123,7 +122,7 @@ python3 scripts/find_similar_cases.py \
 更适合大模型阅读的检索方式：
 
 ```bash
-python3 scripts/find_similar_cases.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/find_similar_cases.py \
   --repo-root $HYPTEST_HOME \
   --from-file <test_point_file> \
   --query cross_16b --query retry --query access_fault \
@@ -135,7 +134,7 @@ python3 scripts/find_similar_cases.py \
 如果只是想预热或复用全仓索引，可单独执行：
 
 ```bash
-python3 scripts/repo_evidence_index.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/repo_evidence_index.py \
   --repo-root $HYPTEST_HOME \
   --query '<scenario terms>' \
   --json
@@ -144,7 +143,7 @@ python3 scripts/repo_evidence_index.py \
 需要机械骨架时，可从 preflight 证据生成保守 skeleton：
 
 ```bash
-python3 scripts/make_case_skeleton.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/make_case_skeleton.py \
   --case <case_name> \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --test-point-id <PnX>
@@ -155,7 +154,7 @@ python3 scripts/make_case_skeleton.py \
 命名前可以先生成候选并做冲突检查：
 
 ```bash
-python3 scripts/suggest_case_name.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/suggest_case_name.py \
   --repo-root $HYPTEST_HOME \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --prefix ai_micro \
@@ -167,7 +166,7 @@ python3 scripts/suggest_case_name.py \
 命名确定后做快速唯一性检查：
 
 ```bash
-python3 scripts/check_case_uniqueness.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_uniqueness.py \
   --repo-root $HYPTEST_HOME \
   --case <case_name> \
   --expect absent \
@@ -207,8 +206,7 @@ python3 compile_elf.py --plat spike --name <case_name>
 如果希望把 Gate-2、Gate-3 和证据收口压成一个命令，可在写完 case、注册和回填后执行：
 
 ```bash
-cd $HYPTEST_SKILL_HOME
-python3 scripts/case_gate_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
@@ -305,7 +303,7 @@ python3 get_result.py --platform spike --case <case_name>
 建议命令：
 
 ```bash
-python3 scripts/check_writeback_format.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_writeback_format.py \
   --repo-root $HYPTEST_HOME \
   --file <test_point_file> \
   --check-register
@@ -340,8 +338,7 @@ python3 scripts/check_writeback_format.py \
 提交前动作：
 
 ```bash
-cd $HYPTEST_SKILL_HOME
-python3 scripts/case_gate_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
@@ -356,7 +353,7 @@ python3 scripts/case_gate_pack.py \
 - 可继续生成证据卡片，减少最终摘要整理时间：
 
 ```bash
-python3 scripts/make_case_submission_card.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/make_case_submission_card.py \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
   --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/submission_card.json \
@@ -368,7 +365,7 @@ python3 scripts/make_case_submission_card.py \
 如果本轮一次新增 2~3 个 case，可用批量 gate 保留每个 case 的独立证据：
 
 ```bash
-python3 scripts/case_batch_gate_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_batch_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case1> \
@@ -384,7 +381,7 @@ python3 scripts/case_batch_gate_pack.py \
 最终交付草稿可让 submission card 生成：
 
 ```bash
-python3 scripts/make_case_submission_card.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/make_case_submission_card.py \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
   --emit-final-draft \
@@ -397,7 +394,7 @@ python3 scripts/make_case_submission_card.py \
 如果同一 case 明确要求同时看 Spike 和 LinkNan，可用多平台 gate：
 
 ```bash
-python3 scripts/case_multi_platform_gate_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_multi_platform_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
@@ -413,7 +410,7 @@ python3 scripts/case_multi_platform_gate_pack.py \
 长期观察耗时瓶颈时，可汇总 timing：
 
 ```bash
-python3 scripts/case_timing_summary.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_timing_summary.py \
   --reports '$HYPTEST_HOME/.hyptest_workflow_skill/reports/*.json' \
   --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/timing_summary.json \
   --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/timing_summary.md
@@ -424,7 +421,7 @@ timing summary 只用于观察 compile/run/postcheck/cache hit 等耗时，不�
 如果要记录单个 case 的端到端耗时和返工信号，可生成 workflow ledger：
 
 ```bash
-python3 scripts/case_workflow_ledger.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_workflow_ledger.py \
   --case <case_name> \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \

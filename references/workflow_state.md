@@ -30,7 +30,7 @@ workflow 辅助状态默认统一放在 `$HYPTEST_HOME/.hyptest_workflow_skill/`
 清理命令：
 
 ```bash
-python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/clean_generated.py --repo-root $HYPTEST_HOME
 ```
 
 默认不会清 `memory/`。
@@ -65,7 +65,7 @@ memory 只存**可以直接参考的事实**；"可疑/待确认"一律放 `test
 对应 CLI（"复用线索" 路径）：
 
 ```bash
-python3 scripts/workflow_memory.py append \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_memory.py append \
   --repo-root $HYPTEST_HOME \
   --module <m> --platform <plat> --spec-profile <profile> \
   --phase case_design --status confirmed \
@@ -84,7 +84,7 @@ python3 scripts/workflow_memory.py append \
 写回 Manual_Reference 前先跑 `check_manual_reference_topic.py` 判 verdict，避免重复 append：
 
 ```bash
-python3 scripts/check_manual_reference_topic.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_manual_reference_topic.py \
   --repo-root $HYPTEST_HOME \
   --case <case_name> --module <m> \
   --topic <kw1> --topic <kw2> \
@@ -102,18 +102,18 @@ python3 scripts/check_manual_reference_topic.py \
 
 ```bash
 # 追加一条经验（3 门槛过才跑；status 默认 unconfirmed，可省略）
-python3 scripts/workflow_memory.py append \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_memory.py append \
   --repo-root $HYPTEST_HOME \
   --topic <topic> \
   --note "<结论 / 现象 / 关键命令>"
 
 # 按 topic 或关键词检索
-python3 scripts/workflow_memory.py query \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_memory.py query \
   --repo-root $HYPTEST_HOME \
   --topic <topic>
 
 # 汇总当前有哪些活跃经验
-python3 scripts/workflow_memory.py summarize \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_memory.py summarize \
   --repo-root $HYPTEST_HOME
 ```
 
@@ -122,7 +122,7 @@ python3 scripts/workflow_memory.py summarize \
 查看当前路径推导结果（调试路径相关问题时用）：
 
 ```bash
-python3 scripts/workflow_paths.py --repo-root $HYPTEST_HOME
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_paths.py --repo-root $HYPTEST_HOME
 ```
 
 ## 膨胀控制

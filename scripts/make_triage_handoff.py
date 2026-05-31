@@ -29,6 +29,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--next-single-run", help="Suggested single-run command.")
     parser.add_argument("--log-path", action="append", default=[], help="Related log path.")
+    parser.add_argument("--waveform-path", help="Related FSDB/VCD/FST path for downstream triage.")
+    parser.add_argument("--rtl-root", help="RTL/source root to pass to waveform triage.")
+    parser.add_argument("--top-module", help="Top module name for waveform triage.")
+    parser.add_argument("--debug-target", help="Concrete waveform debug target or signal question.")
+    parser.add_argument("--time-window", help="Known failing time window or cycle range.")
+    parser.add_argument("--expected-behavior", help="Expected behavior to check in waveform triage.")
+    parser.add_argument("--observed-behavior", help="Observed behavior to contrast with expected behavior.")
+    parser.add_argument("--waveform-report", help="Suggested or existing waveform-debug report.md path.")
     parser.add_argument("--json", action="store_true", help="Emit JSON only.")
     return parser.parse_args()
 
@@ -45,6 +53,23 @@ def find_value(pattern: str, text: str) -> str | None:
     return match.group(1).strip() if match else None
 
 
+def waveform_context(args: argparse.Namespace) -> dict[str, str | None]:
+    return {
+        "waveform_path": args.waveform_path,
+        "rtl_root": args.rtl_root,
+        "top_module": args.top_module,
+        "debug_target": args.debug_target,
+        "time_window": args.time_window,
+        "expected_behavior": args.expected_behavior,
+        "observed_behavior": args.observed_behavior,
+        "suggested_waveform_report": args.waveform_report,
+    }
+
+
+def has_waveform_context(context: dict[str, str | None]) -> bool:
+    return any(value for value in context.values())
+
+
 def main() -> int:
     args = parse_args()
     try:
@@ -54,6 +79,11 @@ def main() -> int:
         return 2
     classified = classify(text)
     excpt_dump = {match.group(1): match.group(2) for match in EXCPT_RE.finditer(text)}
+    wave_ctx = waveform_context(args)
+    classifier_wants_waveform = any(
+        token in " ".join(classified.get("next_actions", [])).lower()
+        for token in ["fsdb", "wave"]
+    )
     handoff = {
         "case_name": classified.get("case_name"),
         "platform": args.platform,
@@ -68,10 +98,8 @@ def main() -> int:
         "reason_code_candidates": classified.get("reason_code_candidates", []),
         "reason_code_details": classified.get("reason_code_details", []),
         "next_single_run": args.next_single_run,
-        "waveform_needed": any(
-            token in " ".join(classified.get("next_actions", [])).lower()
-            for token in ["fsdb", "wave"]
-        ),
+        "waveform_needed": classifier_wants_waveform or has_waveform_context(wave_ctx),
+        "waveform_context": wave_ctx,
         "log_paths": [*implicit_paths, *args.log_path],
     }
     if args.json:

@@ -310,10 +310,11 @@ def recommended_checks(*, show_resolved_profile: bool = False) -> list[str]:
     profile_arg = (
         f" --spec-profile {default_spec_profile()}" if show_resolved_profile else ""
     )
+    script_home = "$HYPTEST_WORKFLOW_SKILL_HOME/scripts"
     return [
-        f"python3 scripts/self_check.py --quick{profile_arg}",
-        f"python3 scripts/self_check.py --full --repo-root \"$HYPTEST_HOME\"{profile_arg}",
-        f"python3 scripts/doctor.py --repo-root \"$HYPTEST_HOME\" --pre-submit --strict{profile_arg}",
+        f"python3 {script_home}/self_check.py --quick{profile_arg}",
+        f"python3 {script_home}/self_check.py --full --repo-root \"$HYPTEST_HOME\"{profile_arg}",
+        f"python3 {script_home}/doctor.py --repo-root \"$HYPTEST_HOME\" --pre-submit --strict{profile_arg}",
     ]
 
 

@@ -10,7 +10,7 @@ profile 参数：
 - 若用户给 profile 文件路径，直接读取该路径。
 - 显式 `spec_profile` 优先；若未指定，默认使用 `spec_profile=<name>`。
 - 交付摘要中应记录实际使用的 `spec_profile`。
-- 可用 `python3 scripts/resolve_spec_profile.py --spec-profile <name>` 确认实际 profile 路径。
+- 可用 `python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/resolve_spec_profile.py --spec-profile <name>` 确认实际 profile 路径。
 
 ## 1. 使用顺序
 
@@ -96,14 +96,14 @@ profile 中应显式回答：
 新增或修改 profile 后，建议执行：
 
 ```bash
-python3 scripts/check_spec_profile_registry.py
-python3 scripts/check_spec_profile.py --spec-profile <name>
-python3 scripts/check_spec_profile.py --spec-profile <name> --strict
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile_registry.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile.py --spec-profile <name>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile.py --spec-profile <name> --strict
 ```
 
 若调用方传的是 profile 文件路径，建议同时确认两种入口都可解析：
 
 ```bash
-python3 scripts/resolve_spec_profile.py --spec-profile <name>
-python3 scripts/resolve_spec_profile.py --spec-profile references/spec_profiles/<name>.md
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/resolve_spec_profile.py --spec-profile <name>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/resolve_spec_profile.py --spec-profile references/spec_profiles/<name>.md
 ```

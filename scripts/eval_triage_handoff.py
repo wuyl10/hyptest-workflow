@@ -36,6 +36,14 @@ def main() -> int:
             log,
             "--platform",
             "spike",
+            "--waveform-path",
+            "/tmp/example.fsdb",
+            "--rtl-root",
+            "$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main",
+            "--top-module",
+            "SimTop",
+            "--debug-target",
+            "confirm exception request/response first-bad-cycle",
             "--json",
         ],
         capture_output=True,
@@ -62,6 +70,7 @@ def main() -> int:
         "reason_code_details",
         "next_single_run",
         "waveform_needed",
+        "waveform_context",
         "log_paths",
     ]:
         if key not in payload:
@@ -77,6 +86,13 @@ def main() -> int:
     details = payload.get("reason_code_details", [])
     if not details or details[0].get("default_decision") != "blocked":
         failures.append("reason_code details should include catalog metadata")
+    if payload.get("waveform_needed") is not True:
+        failures.append("waveform_needed should be true when waveform context is provided")
+    waveform_context = payload.get("waveform_context", {})
+    if not isinstance(waveform_context, dict):
+        failures.append("waveform_context should be an object")
+    elif waveform_context.get("debug_target") != "confirm exception request/response first-bad-cycle":
+        failures.append("waveform_context.debug_target mismatch")
     with tempfile.TemporaryDirectory(prefix="hyptest_handoff_eval_", dir=temp_parent()) as tmpdir:
         handoff_path = Path(tmpdir) / "handoff.json"
         handoff_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")

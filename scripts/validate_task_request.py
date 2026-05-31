@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -46,6 +47,31 @@ TASK_MODES = {
     "triage-only",
     "writeback-only",
 }
+WAVEFORM_HANDOFF_FIELDS = (
+    "waveform_path",
+    "rtl_root",
+    "top_module",
+    "debug_target",
+    "time_window",
+    "expected_behavior",
+    "observed_behavior",
+    "waveform_report",
+)
+WAVEFORM_HANDOFF_PATH_FIELDS = {
+    "waveform_path",
+    "rtl_root",
+    "waveform_report",
+}
+WAVEFORM_HANDOFF_CLI_FLAGS = {
+    "waveform_path": "--waveform-path",
+    "rtl_root": "--rtl-root",
+    "top_module": "--top-module",
+    "debug_target": "--debug-target",
+    "time_window": "--time-window",
+    "expected_behavior": "--expected-behavior",
+    "observed_behavior": "--observed-behavior",
+    "suggested_waveform_report": "--waveform-report",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -71,6 +97,14 @@ def parse_args() -> argparse.Namespace:
         "--failure-log",
         help="Path to failure log for triage-only or failure-driven tasks.",
     )
+    parser.add_argument("--waveform-path", help="Optional FSDB/VCD/FST path to pass through triage handoff.")
+    parser.add_argument("--rtl-root", help="Optional RTL/source root to pass through triage handoff.")
+    parser.add_argument("--top-module", help="Optional waveform top module for downstream triage.")
+    parser.add_argument("--debug-target", help="Optional first-bad-cycle/protocol/signal question.")
+    parser.add_argument("--time-window", help="Optional known failing time window or cycle range.")
+    parser.add_argument("--expected-behavior", help="Optional expected behavior for waveform-aware triage.")
+    parser.add_argument("--observed-behavior", help="Optional observed behavior for waveform-aware triage.")
+    parser.add_argument("--waveform-report", help="Optional existing or suggested waveform-debug report.md path.")
     parser.add_argument(
         "--env",
         action="append",
@@ -107,6 +141,22 @@ def parse_request_md(path: Path) -> dict[str, str]:
         "coverage-scope": "coverage_scope",
         "failure_log": "failure_log",
         "failure-log": "failure_log",
+        "waveform_path": "waveform_path",
+        "waveform-path": "waveform_path",
+        "rtl_root": "rtl_root",
+        "rtl-root": "rtl_root",
+        "top_module": "top_module",
+        "top-module": "top_module",
+        "debug_target": "debug_target",
+        "debug-target": "debug_target",
+        "time_window": "time_window",
+        "time-window": "time_window",
+        "expected_behavior": "expected_behavior",
+        "expected-behavior": "expected_behavior",
+        "observed_behavior": "observed_behavior",
+        "observed-behavior": "observed_behavior",
+        "waveform_report": "waveform_report",
+        "waveform-report": "waveform_report",
         "hyptest_spike_bin": "HYPTEST_SPIKE_BIN",
         "hyptest-spike-bin": "HYPTEST_SPIKE_BIN",
         "hyptest_linknan_home": "HYPTEST_LINKNAN_HOME",
@@ -242,6 +292,24 @@ def add_placeholder_issue(
     return True
 
 
+def add_template_placeholder_issue(
+    issues: list[dict[str, str]],
+    *,
+    field: str,
+    value: str | None,
+    hint_field: str | None = None,
+) -> bool:
+    if value is None or not re.search(r"<[^<>\n]+>", value.strip()):
+        return False
+    hint = prompt_field_hint(hint_field or field)
+    add_issue(
+        issues,
+        f"{field} still contains a template placeholder: {value}",
+        f"replace it with a real value such as `{hint}`, or omit the optional field",
+    )
+    return True
+
+
 def placeholder(raw: str | None) -> bool:
     return bool(raw is not None and is_placeholder_value(raw))
 
@@ -320,6 +388,21 @@ def resolve_request_path(
     return None
 
 
+def resolve_context_path(
+    value: str | None,
+    *,
+    repo_root: Path | None = None,
+) -> Path | None:
+    if not value or unresolved_env_vars(value):
+        return None
+    expanded = expand_path(value)
+    if expanded.is_absolute():
+        return expanded.resolve()
+    if repo_root:
+        return (repo_root / expanded).resolve()
+    return expanded.resolve()
+
+
 def infer_coverage_scope(task_mode: str | None, explicit_scope: str | None) -> str | None:
     if explicit_scope:
         return explicit_scope
@@ -331,6 +414,7 @@ def infer_coverage_scope(task_mode: str | None, explicit_scope: str | None) -> s
 
 
 def build_next_commands(normalized: dict[str, object]) -> list[str]:
+    script_home = "$HYPTEST_WORKFLOW_SKILL_HOME/scripts"
     profile = str(normalized.get("spec_profile") or default_spec_profile())
     repo_root = normalized.get("repo_root")
     test_point_file = normalized.get("test_point_file")
@@ -339,6 +423,7 @@ def build_next_commands(normalized: dict[str, object]) -> list[str]:
     case_name = normalized.get("case_name")
     failure_log = normalized.get("failure_log")
     env_overrides = normalized.get("env_overrides")
+    waveform_context = normalized.get("waveform_context")
     env_args = ""
     if isinstance(env_overrides, dict):
         rendered = env_override_args(
@@ -353,18 +438,18 @@ def build_next_commands(normalized: dict[str, object]) -> list[str]:
             for index in range(0, len(rendered), 2)
         )
     commands = [
-        f"python3 scripts/resolve_spec_profile.py --spec-profile {profile}",
+        f"python3 {script_home}/resolve_spec_profile.py --spec-profile {profile}",
     ]
     if repo_root:
-        commands.append(f"python3 scripts/check_hyptest_cli_contract.py --repo-root {repo_root}")
+        commands.append(f"python3 {script_home}/check_hyptest_cli_contract.py --repo-root {repo_root}")
     if repo_root and platform:
         task_mode_arg = f" --task-mode {task_mode}" if task_mode else ""
         commands.append(
-            f"python3 scripts/check_env.py --repo-root {repo_root} --platform {platform}{task_mode_arg}{env_args} --explain"
+            f"python3 {script_home}/check_env.py --repo-root {repo_root} --platform {platform}{task_mode_arg}{env_args} --explain"
         )
     if repo_root and task_mode == "new-case-only":
         commands.append(
-            f"python3 scripts/find_similar_cases.py --repo-root {repo_root} --query '<scenario terms>' --limit 5 --explain-score"
+            f"python3 {script_home}/find_similar_cases.py --repo-root {repo_root} --query '<scenario terms>' --limit 5 --explain-score"
         )
     if repo_root and test_point_file and task_mode in {
         "new-case-only",
@@ -372,15 +457,21 @@ def build_next_commands(normalized: dict[str, object]) -> list[str]:
         "writeback-only",
     }:
         commands.append(
-            f"python3 scripts/check_writeback_format.py --repo-root {repo_root} --file {test_point_file} --check-register --spec-profile {profile}"
+            f"python3 {script_home}/check_writeback_format.py --repo-root {repo_root} --file {test_point_file} --check-register --spec-profile {profile}"
         )
     if failure_log and platform:
+        waveform_args = ""
+        if isinstance(waveform_context, dict):
+            for field, flag in WAVEFORM_HANDOFF_CLI_FLAGS.items():
+                value = waveform_context.get(field)
+                if value:
+                    waveform_args += f" {flag} {shlex.quote(str(value))}"
         commands.append(
-            f"python3 scripts/make_triage_handoff.py --log-file {failure_log} --platform {platform} --spec-profile {profile} --json"
+            f"python3 {script_home}/make_triage_handoff.py --log-file {failure_log} --platform {platform} --spec-profile {profile}{waveform_args} --json"
         )
     elif task_mode == "triage-only" and case_name:
         commands.append(
-            f"python3 scripts/classify_failure_log.py --log-file <log-for-{case_name}> --json"
+            f"python3 {script_home}/classify_failure_log.py --log-file <log-for-{case_name}> --json"
         )
     return commands
 
@@ -407,6 +498,10 @@ def main() -> int:
     case_name = pick(args, overrides, "case_name")
     new_case_count = pick(args, overrides, "new_case_count")
     coverage_scope = pick(args, overrides, "coverage_scope")
+    waveform_raw = {
+        field: pick(args, overrides, field)
+        for field in WAVEFORM_HANDOFF_FIELDS
+    }
     normalized_platform = normalize_platform(platform_raw)
     env_overrides = prompt_env_overrides(overrides)
     for raw_field, hint_field in (
@@ -422,6 +517,20 @@ def main() -> int:
             value=raw_value,
             hint_field=hint_field,
         )
+    for field, raw_value in waveform_raw.items():
+        add_template_placeholder_issue(
+            issues,
+            field=field,
+            value=raw_value,
+            hint_field=field,
+        )
+        if field in WAVEFORM_HANDOFF_PATH_FIELDS:
+            add_unresolved_path_issue(
+                issues,
+                field=field,
+                value=raw_value,
+                prompt_field=field,
+            )
     for field_name, raw_key in (
         ("HYPTEST_SPIKE_BIN", "HYPTEST_SPIKE_BIN"),
         ("HYPTEST_LINKNAN_HOME", "HYPTEST_LINKNAN_HOME"),
@@ -482,6 +591,32 @@ def main() -> int:
         None if placeholder(failure_log_raw)
         else resolve_request_path(failure_log_raw, repo_root=repo_root)
     )
+    any_waveform_context = any(
+        value and not placeholder(value)
+        for value in waveform_raw.values()
+    )
+    if any_waveform_context and not waveform_raw.get("rtl_root"):
+        derived_source = derived_nanhu_source(env_overrides)
+        if derived_source:
+            waveform_raw["rtl_root"] = derived_source
+    waveform_paths = {
+        field: (
+            None
+            if placeholder(waveform_raw.get(field))
+            else resolve_context_path(waveform_raw.get(field), repo_root=repo_root)
+        )
+        for field in WAVEFORM_HANDOFF_PATH_FIELDS
+    }
+    waveform_context = {
+        "waveform_path": str(waveform_paths["waveform_path"]) if waveform_paths["waveform_path"] else None,
+        "rtl_root": str(waveform_paths["rtl_root"]) if waveform_paths["rtl_root"] else None,
+        "top_module": None if placeholder(waveform_raw.get("top_module")) else waveform_raw.get("top_module"),
+        "debug_target": None if placeholder(waveform_raw.get("debug_target")) else waveform_raw.get("debug_target"),
+        "time_window": None if placeholder(waveform_raw.get("time_window")) else waveform_raw.get("time_window"),
+        "expected_behavior": None if placeholder(waveform_raw.get("expected_behavior")) else waveform_raw.get("expected_behavior"),
+        "observed_behavior": None if placeholder(waveform_raw.get("observed_behavior")) else waveform_raw.get("observed_behavior"),
+        "suggested_waveform_report": str(waveform_paths["waveform_report"]) if waveform_paths["waveform_report"] else None,
+    }
 
     if spec_profile_placeholder:
         profile_ok, profile_detail = False, ""
@@ -677,6 +812,28 @@ def main() -> int:
                 "pass --failure-log <log> or --case-name <case_name>",
             )
 
+    waveform_path = waveform_paths["waveform_path"]
+    rtl_root = waveform_paths["rtl_root"]
+    waveform_report = waveform_paths["waveform_report"]
+    if waveform_path and not waveform_path.is_file():
+        add_warning(
+            warnings,
+            f"waveform_path not found: {waveform_path}",
+            "confirm the FSDB/VCD/FST path before handing this to failure-triage",
+        )
+    if rtl_root and not rtl_root.is_dir():
+        add_warning(
+            warnings,
+            f"rtl_root not found or not a directory: {rtl_root}",
+            "pass an existing RTL/source root, commonly $HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main",
+        )
+    if waveform_report and waveform_report.name != "report.md":
+        add_warning(
+            warnings,
+            "waveform_report should usually point to waveform-debug's report.md",
+            "use a path ending in report.md when referencing waveform-debug output",
+        )
+
     inferred_coverage_scope = infer_coverage_scope(task_mode, coverage_scope)
     normalized = {
         "repo_root": str(repo_root) if repo_root else None,
@@ -691,6 +848,7 @@ def main() -> int:
         "new_case_count": new_case_count,
         "coverage_scope": inferred_coverage_scope,
         "env_overrides": env_overrides,
+        "waveform_context": waveform_context,
     }
     payload = {
         "ok": not issues,
@@ -713,6 +871,7 @@ def main() -> int:
             "new_case_count": new_case_count,
             "coverage_scope": inferred_coverage_scope,
             "env_overrides": env_overrides,
+            "waveform_context": waveform_context,
         },
     }
 

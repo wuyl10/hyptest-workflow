@@ -184,7 +184,7 @@ def main() -> int:
     if not args.no_cache and not cache.get("hit"):
         print(
             "WARN check_case_uniqueness: cache miss — 建议先跑 "
-            "`python3 scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --json > /dev/null` "
+            "`python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/repo_evidence_index.py --repo-root $HYPTEST_HOME --json > /dev/null` "
             "预热，然后再跑本脚本；否则本轮属于全仓冷扫，NFS 上较慢且违反 "
             "SKILL.md Non-Negotiables §3 '走缓存索引快路径' 的硬规则。",
             file=sys.stderr,

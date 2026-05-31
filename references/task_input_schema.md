@@ -25,7 +25,7 @@
 - `platform=linknan` 且本轮会运行 `get_result.py`，但缺 `HYPTEST_LINKNAN_HOME` 或 `HYPTEST_DIFFTEST_REF_SO`：先提醒调用者补缺失字段。
 - 需要 Nanhu RTL/source 证据时，workflow 固定从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导；如果路径不存在，提醒初始化 LinkNan 的 `dependencies/nanhu` submodule 或修正 `HYPTEST_LINKNAN_HOME`。
 - 无关组件直接省略。
-- prompt 显式写的路径优先于环境变量；执行脚本时运行环境字段映射成 `--env KEY=VALUE`。
+- prompt 显式写的路径优先于环境变量；执行 hyptest runner 相关脚本时，运行环境字段映射成 `--env KEY=VALUE`。`HYPTEST_WORKFLOW_SKILL_HOME` 只用于定位 workflow skill 自带脚本，不映射成 runner `--env`。
 - prompt 写成 `$VAR` 但当前执行环境无法展开时，视为缺失，而不是有效路径。
 
 ## Optional Fields
@@ -39,6 +39,21 @@
 | `reason_code` | none | catalog code | 已有结论时可指定；否则由日志/profile 推断。 |
 | `failure_log` | none | path/text | 失败归因或分层初判时提供。 |
 
+## Optional Waveform Handoff Fields
+
+这些字段只用于 workflow 生成 workflow-to-triage handoff，不代表 workflow 直接做波形分析。若任务是 hyptest 失败闭环，即使已经有 FSDB，也先把这些字段交给 `hyptest-failure-triage`，由它决定是否调用 `waveform-debug` 并最终收口。
+
+| Field | Default | Value | Notes |
+| --- | --- | --- | --- |
+| `waveform_path` | none | path | FSDB/VCD/FST 路径；用于 `make_triage_handoff.py --waveform-path`。 |
+| `rtl_root` | none | path | RTL/source 根目录；常见值是 `$HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main`。 |
+| `top_module` | none | string | waveform-debug 需要的 top module 名。 |
+| `debug_target` | none | text | first-bad-cycle、握手、协议或具体信号问题。 |
+| `time_window` | none | text | 已知失败时间窗或 cycle 范围。 |
+| `expected_behavior` | none | text | 预期行为，用于后续波形报告对照。 |
+| `observed_behavior` | none | text | 当前日志/现象中观察到的行为。 |
+| `waveform_report` | none | path | 已有或建议产出的 waveform-debug `report.md` 路径。 |
+
 ## Conditional Runner Path Fields
 
 | Field | Required When | Value | Notes |
@@ -47,6 +62,7 @@
 | `HYPTEST_LINKNAN_HOME` | `platform=linknan` 或需要读取 LinkNan/Nanhu 源码证据，且当前环境没有 `HYPTEST_LINKNAN_HOME` 时 | path | 本轮 `platform=linknan` 指定 LinkNan workspace；脚本参数写作 `--env HYPTEST_LINKNAN_HOME=<path>`。 |
 | `HYPTEST_DIFFTEST_REF_SO` | `platform=linknan` 且当前环境没有 `HYPTEST_DIFFTEST_REF_SO` 时 | file path | 本轮 LinkNan difftest 指定参考模型 so，通常来自项目定制 Spike；脚本参数写作 `--env HYPTEST_DIFFTEST_REF_SO=<path>`。 |
 | `HYPTEST_TMPDIR` | 可省略 | path | `/tmp` 空间不足时指定临时目录；脚本参数写作 `--env HYPTEST_TMPDIR=<path>`。 |
+| `HYPTEST_WORKFLOW_SKILL_HOME` | 手动运行 workflow 自带脚本时 | path | 指向 `hyptest-workflow` skill 目录；用于 `$HYPTEST_WORKFLOW_SKILL_HOME/scripts/<tool>.py`，不传给 hyptest repo runner。 |
 
 这些字段不是长期配置要求。若 shell 环境已经正确设置，prompt 不必填写；若 shell 环境没有对应变量，prompt 必须填写。若 prompt 显式填写，workflow 执行脚本时应把它们映射成重复的 `--env KEY=VALUE` 参数。Nanhu 源码是 LinkNan submodule 检查项，不是 prompt 环境字段。
 
@@ -86,7 +102,7 @@ runner 角色不要混用：`HYPTEST_SPIKE_BIN` 用于社区版/上游 Spike 的
 开工前可用：
 
 ```bash
-python3 scripts/validate_task_request.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/validate_task_request.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --platform spike \

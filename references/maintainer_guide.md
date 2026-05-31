@@ -29,7 +29,7 @@
 1. 优先用脚手架生成新 profile：
 
 ```bash
-python3 scripts/new_spec_profile.py --name <name> --title "<project/core title>" --update-registry
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/new_spec_profile.py --name <name> --title "<project/core title>" --update-registry
 ```
 
 也可以手工从 `references/spec_profiles/template.md` 复制新 profile。
@@ -39,22 +39,22 @@ python3 scripts/new_spec_profile.py --name <name> --title "<project/core title>"
 5. 用查询脚本抽查关键窗口、PMA/PBMT 组合和 MMIO responder：
 
 ```bash
-python3 scripts/query_spec_profile.py --spec-profile <name> --address <pa> --json
-python3 scripts/query_spec_profile.py --spec-profile <name> --address <pa> --summary
-python3 scripts/query_spec_profile.py --spec-profile <name> --address <pa> --decision-only
-python3 scripts/query_spec_profile.py --spec-profile <name> --pma IO --pbmt IO
-python3 scripts/query_spec_profile.py --spec-profile <name> --responder-target <target>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/query_spec_profile.py --spec-profile <name> --address <pa> --json
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/query_spec_profile.py --spec-profile <name> --address <pa> --summary
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/query_spec_profile.py --spec-profile <name> --address <pa> --decision-only
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/query_spec_profile.py --spec-profile <name> --pma IO --pbmt IO
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/query_spec_profile.py --spec-profile <name> --responder-target <target>
 ```
 
 6. 跑：
 
 ```bash
-python3 scripts/check_spec_profile_registry.py --policy all
-python3 scripts/check_spec_profile.py --spec-profile <name> --strict
-python3 scripts/eval_spec_profile_registry.py
-python3 scripts/eval_spec_profile.py
-python3 scripts/eval_profile_decisions.py
-python3 scripts/eval_profile_portability.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile_registry.py --policy all
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_spec_profile.py --spec-profile <name> --strict
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_spec_profile_registry.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_spec_profile.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_profile_decisions.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_profile_portability.py
 ```
 
 不要把 NHV5.1AP 的 no-H、PMP 粒度、PMA/PBMT/MMIO 表直接写入通用文档。
@@ -62,19 +62,19 @@ python3 scripts/eval_profile_portability.py
 ## 新增脚本
 
 1. 新脚本放 `scripts/`。
-2. 用 `python3 scripts/update_script_manifest.py --write` 刷新 `assets/script_manifest.json`。
-3. 在 `references/resource_index.md` 加一条说明；不确定缺项时先跑 `python3 scripts/update_resource_index.py --suggest`。
+2. 用 `python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_script_manifest.py --write` 刷新 `assets/script_manifest.json`。
+3. 在 `references/resource_index.md` 加一条说明；不确定缺项时先跑 `python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_resource_index.py --suggest`。
 4. 如脚本属于维护/门禁检查，确认 `scripts/self_check.py` 会通过 manifest 覆盖它。
 5. 若脚本暴露公共行为，补一个轻量 eval 或 smoke fixture。
 6. 跑：
 
 ```bash
-python3 scripts/update_script_manifest.py --check
-python3 scripts/check_skill_consistency.py
-python3 scripts/check_resource_index.py
-python3 scripts/list_skill_commands.py
-python3 scripts/skill_summary.py
-python3 scripts/self_check.py --quick --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_script_manifest.py --check
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_skill_consistency.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_resource_index.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/list_skill_commands.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/skill_summary.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --quick --spec-profile <spec_profile>
 ```
 
 ## 修改相似检索
@@ -91,17 +91,17 @@ python3 scripts/self_check.py --quick --spec-profile <spec_profile>
 修改后至少跑：
 
 ```bash
-python3 scripts/check_hyptest_cli_contract.py --repo-root $HYPTEST_HOME
-python3 scripts/eval_hyptest_cli_contract.py
-python3 scripts/eval_find_similar_cache.py
-python3 scripts/eval_workflow_smoke.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_hyptest_cli_contract.py --repo-root $HYPTEST_HOME
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_hyptest_cli_contract.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_find_similar_cache.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_workflow_smoke.py
 ```
 
 有 hyptest 仓库时再跑：
 
 ```bash
-python3 scripts/eval_find_similar_cases.py --repo-root $HYPTEST_HOME
-python3 scripts/find_similar_cases.py --repo-root $HYPTEST_HOME --query "<scenario>" --limit 3 --explain-score
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_find_similar_cases.py --repo-root $HYPTEST_HOME
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/find_similar_cases.py --repo-root $HYPTEST_HOME --query "<scenario>" --limit 3 --explain-score
 ```
 
 ## 修改 Reason Code
@@ -112,13 +112,13 @@ python3 scripts/find_similar_cases.py --repo-root $HYPTEST_HOME --query "<scenar
 4. 抽查一个现象：
 
 ```bash
-python3 scripts/suggest_reason_code.py --symptom "PMA PBMT MMIO no responder" --json
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/suggest_reason_code.py --symptom "PMA PBMT MMIO no responder" --json
 ```
 
 5. 跑：
 
 ```bash
-python3 scripts/check_reason_codes.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_reason_codes.py
 ```
 
 ## 修改 Case Lint 或 Writeback Checker
@@ -126,22 +126,22 @@ python3 scripts/check_reason_codes.py
 改 `scripts/check_case_lint.py` 后跑：
 
 ```bash
-python3 scripts/eval_check_case_lint.py
-python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
-python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end --warnings-as-errors
-python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_check_case_lint.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end --warnings-as-errors
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_lint.py --repo-root $HYPTEST_HOME --baseline assets/baselines/case_lint_baseline.json --warnings-as-errors
 ```
 
 若历史 warning 太多，先生成 baseline，再只关注新增问题：
 
 ```bash
-python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --write-baseline assets/baselines/case_lint_baseline.json
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_lint.py --repo-root $HYPTEST_HOME --write-baseline assets/baselines/case_lint_baseline.json
 ```
 
 改 `scripts/check_writeback_format.py` 后跑：
 
 ```bash
-python3 scripts/eval_check_writeback_format.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_check_writeback_format.py
 ```
 
 `test_register.c` 注册状态解析在 `scripts/writeback_register.py`，若修改该部分也跑同一个 eval。
@@ -149,8 +149,8 @@ python3 scripts/eval_check_writeback_format.py
 对真实仓库做快速增量检查：
 
 ```bash
-python3 scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
-python3 scripts/check_writeback_format.py --repo-root $HYPTEST_HOME --file <test_point_file> --check-register --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_case_lint.py --repo-root $HYPTEST_HOME --changed-only --strict-case-end
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_writeback_format.py --repo-root $HYPTEST_HOME --file <test_point_file> --check-register --spec-profile <spec_profile>
 ```
 
 ## 修改 Preflight/Postcheck Pack
@@ -160,7 +160,7 @@ python3 scripts/check_writeback_format.py --repo-root $HYPTEST_HOME --file <test
 修改后至少跑：
 
 ```bash
-python3 scripts/case_preflight_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_preflight_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --platform spike \
@@ -171,7 +171,7 @@ python3 scripts/case_preflight_pack.py \
   --query memblock \
   --json
 
-python3 scripts/case_postcheck_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_postcheck_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
@@ -179,7 +179,7 @@ python3 scripts/case_postcheck_pack.py \
   --spec-profile <spec_profile> \
   --json
 
-python3 scripts/case_gate_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
@@ -187,7 +187,7 @@ python3 scripts/case_gate_pack.py \
   --spec-profile <spec_profile> \
   --json
 
-python3 scripts/case_batch_gate_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_batch_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
@@ -195,19 +195,19 @@ python3 scripts/case_batch_gate_pack.py \
   --spec-profile <spec_profile> \
   --json
 
-python3 scripts/make_case_submission_card.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/make_case_submission_card.py \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
   --emit-final-draft \
   --json
 
-python3 scripts/suggest_case_name.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/suggest_case_name.py \
   --repo-root $HYPTEST_HOME \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --prefix ai_micro \
   --json
 
-python3 scripts/case_multi_platform_gate_pack.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_multi_platform_gate_pack.py \
   --repo-root $HYPTEST_HOME \
   --test-point-file <test_point_file> \
   --case <case_name> \
@@ -216,11 +216,11 @@ python3 scripts/case_multi_platform_gate_pack.py \
   --spec-profile <spec_profile> \
   --json
 
-python3 scripts/case_timing_summary.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_timing_summary.py \
   --reports '$HYPTEST_HOME/.hyptest_workflow_skill/reports/*.json' \
   --json
 
-python3 scripts/case_workflow_ledger.py \
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_workflow_ledger.py \
   --case <case_name> \
   --preflight-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_preflight.json \
   --gate-json $HYPTEST_HOME/.hyptest_workflow_skill/reports/case_gate.json \
@@ -256,7 +256,7 @@ skill eval、自检和真实 hyptest 仓库的新 workflow 生成物都默认放
 验证结束后跑：
 
 ```bash
-python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/clean_generated.py --repo-root $HYPTEST_HOME
 ```
 
 ## Cross-Skill Consistency
@@ -268,8 +268,8 @@ python3 scripts/clean_generated.py --repo-root $HYPTEST_HOME
 修改任一 skill 的触发词、旧路径、平台名或失败分类时，跑：
 
 ```bash
-python3 scripts/check_cross_skill_consistency.py
-python3 scripts/eval_joint_handoff.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_cross_skill_consistency.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_joint_handoff.py
 ```
 
 若 workflow 交给 triage 的字段变化，同时更新：
@@ -286,34 +286,34 @@ references/triage_handoff_schema.md
 快速：
 
 ```bash
-python3 scripts/self_check.py --quick --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --quick --spec-profile <spec_profile>
 ```
 
 带真实 hyptest 仓库但不依赖仿真器环境：
 
 ```bash
-python3 scripts/self_check.py --repo --repo-root $HYPTEST_HOME --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --repo --repo-root $HYPTEST_HOME --spec-profile <spec_profile>
 ```
 
 检查平台环境变量：
 
 ```bash
-python3 scripts/self_check.py --platform-check --repo-root $HYPTEST_HOME --platform spike --spec-profile <spec_profile>
-python3 scripts/self_check.py --platform-check --repo-root $HYPTEST_HOME --platform linknan --spec-profile <spec_profile>
-python3 scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain --print-exports
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --platform-check --repo-root $HYPTEST_HOME --platform spike --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --platform-check --repo-root $HYPTEST_HOME --platform linknan --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_env.py --repo-root $HYPTEST_HOME --platform all --explain --print-exports
 ```
 
 完整检查：
 
 ```bash
-python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile>
-python3 scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.md
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/self_check.py --full --repo-root $HYPTEST_HOME --spec-profile <spec_profile> --json --json-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.json --md-out $HYPTEST_HOME/.hyptest_workflow_skill/reports/self_check_full.md
 ```
 
 综合健康检查：
 
 ```bash
-python3 scripts/doctor.py --repo-root $HYPTEST_HOME --pre-submit --strict --platform spike --spec-profile <spec_profile>
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/doctor.py --repo-root $HYPTEST_HOME --pre-submit --strict --platform spike --spec-profile <spec_profile>
 ```
 
 ## 修改 README 命令块
@@ -321,8 +321,8 @@ python3 scripts/doctor.py --repo-root $HYPTEST_HOME --pre-submit --strict --plat
 README 的“常用命令”由 `scripts/list_skill_commands.py` 生成。改命令清单后跑：
 
 ```bash
-python3 scripts/update_readme_commands.py
-python3 scripts/list_skill_commands.py --markdown
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_readme_commands.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/list_skill_commands.py --markdown
 ```
 
 ## 修改任务参数或失败日志规则
@@ -330,14 +330,14 @@ python3 scripts/list_skill_commands.py --markdown
 任务参数规格入口：
 
 ```bash
-python3 scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/validate_task_request.py --repo-root $HYPTEST_HOME --test-point-file <test_point_file> --platform spike --spec-profile <spec_profile> --task-mode new-case-only --new-case-count 1-3
 ```
 
 失败日志分类入口：
 
 ```bash
-python3 scripts/classify_failure_log.py --log-file <log> --json
-python3 scripts/eval_failure_log_workflow.py
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/classify_failure_log.py --log-file <log> --json
+python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/eval_failure_log_workflow.py
 ```
 
 ## 修改触发条件或核心规则时跑 skill-creator Evals

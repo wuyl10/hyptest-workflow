@@ -92,9 +92,9 @@
 - `scripts/classify_failure_log.py`
   - 从失败日志文本中抽取场景、错误点、候选 `reason_code` 和下一步动作；用于 workflow 级失败日志 eval。
 - `scripts/make_triage_handoff.py`
-  - 从失败日志生成 workflow-to-triage handoff JSON。
+  - 从失败日志生成 workflow-to-triage handoff JSON；可附带可选 `waveform_context`，但不直接调用 waveform-debug。
 - `scripts/validate_task_request.py`
-  - 校验 prompt 中的 `HYPTEST_HOME`（脚本 CLI 参数为 `--repo-root`）、`test_point_file`、`platform`、`spec_profile`、`task_mode` 等任务输入；支持 CLI、`--request-json`、`--request-md`。
+  - 校验 prompt 中的 `HYPTEST_HOME`（脚本 CLI 参数为 `--repo-root`）、`test_point_file`、`platform`、`spec_profile`、`task_mode` 等任务输入；支持 CLI、`--request-json`、`--request-md`，并可校验/传递 workflow-to-triage 的可选 `waveform_context`。
 - `scripts/check_case_lint.py`
   - 检查 case 源文件结构问题；支持 `--changed-only`、`--strict-case-end`、`--warnings-as-errors`、`--baseline`、`--write-baseline`，并提示弱断言文案/缺少断言。
 - `scripts/check_case_uniqueness.py`
@@ -253,7 +253,7 @@
 <!-- BEGIN GENERATED RESOURCE COVERAGE -->
 ## Generated Resource Coverage
 
-该段由 `python3 scripts/update_resource_index.py --write` 维护，只记录必须被索引覆盖的资源路径。
+该段由 `python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_resource_index.py --write` 维护，只记录必须被索引覆盖的资源路径。
 
 - `assets/joint_handoff_contract.json`
 - `assets/reason_codes.json`

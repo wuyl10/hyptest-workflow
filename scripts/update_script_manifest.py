@@ -150,7 +150,7 @@ def main() -> int:
             for value in values:
                 print(f"  {kind}: {value}")
         if not ok and not args.write:
-            print("  next: python3 scripts/update_script_manifest.py --write")
+            print("  next: python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_script_manifest.py --write")
     return 0 if ok or not args.check else 1
 
 

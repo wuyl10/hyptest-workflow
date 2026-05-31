@@ -49,6 +49,16 @@
   ],
   "next_single_run": "python3 get_result.py ...",
   "waveform_needed": false,
+  "waveform_context": {
+    "waveform_path": null,
+    "rtl_root": null,
+    "top_module": null,
+    "debug_target": null,
+    "time_window": null,
+    "expected_behavior": null,
+    "observed_behavior": null,
+    "suggested_waveform_report": null
+  },
   "log_paths": ["run.log", "assert.log"]
 }
 ```
@@ -59,4 +69,8 @@
 - 可用 `scripts/validate_triage_handoff.py --handoff-json <handoff.json>` 校验字段 contract。
 - 如果需要 FSDB、stuck、difftest mismatch 深挖，把该 JSON 连同日志路径交给
   `hyptest-failure-triage`。
+- 如果 workflow 已经知道 waveform 文件、RTL 根目录、top、debug target 或希望
+  failure-triage 生成 waveform-aware report，可以把这些信息放进
+  `waveform_context`。这个字段是可选的，用于把“直接波形分析”与“失败闭环里需要
+  波形”的场景区分开。
 - 不要把该 handoff 当作最终 RTL 结论；它只是交接卡片。

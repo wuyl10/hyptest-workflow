@@ -17,7 +17,7 @@ END = "<!-- END GENERATED COMMANDS -->"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Refresh README generated command block.")
+    parser = argparse.ArgumentParser(description="Refresh command_index.md generated command block.")
     return parser.parse_args()
 
 

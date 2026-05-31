@@ -37,7 +37,7 @@ def generated_block(required: list[str]) -> str:
         MARKER_BEGIN,
         "## Generated Resource Coverage",
         "",
-        "该段由 `python3 scripts/update_resource_index.py --write` 维护，只记录必须被索引覆盖的资源路径。",
+        "该段由 `python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_resource_index.py --write` 维护，只记录必须被索引覆盖的资源路径。",
         "",
     ]
     for rel in required:
@@ -87,7 +87,7 @@ def main() -> int:
             for item in missing:
                 print(f"- `{item}`")
         if stale and not args.write:
-            print("next: python3 scripts/update_resource_index.py --write")
+            print("next: python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/update_resource_index.py --write")
     return 0 if payload["ok"] or not args.check else 1
 
 

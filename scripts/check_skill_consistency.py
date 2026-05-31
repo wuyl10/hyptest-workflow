@@ -37,6 +37,7 @@ PUBLIC_ENV_DOCS = [
 CURRENT_PROMPT_ENV_FORBIDDEN_TERMS = [
     ("HYPTEST_REPO", "repo environment variable"),
     ("HYPTEST_NANHU_HOME", "standalone Nanhu environment variable"),
+    ("HYPTEST_" + "SKILL_HOME", "ambiguous skill-home environment variable"),
     ("NANHU_HOME", "standalone Nanhu environment variable"),
     ("ignored legacy", "compatibility warning text"),
     ("accepted for compatibility", "prompt compatibility text"),

@@ -31,8 +31,13 @@ def extract_script(cmd: str) -> str | None:
     for index, part in enumerate(parts):
         if part == "python3" and index + 1 < len(parts):
             script = parts[index + 1]
-            if script.startswith("scripts/") and script.endswith(".py"):
-                return script
+            prefixes = (
+                "scripts/",
+                "$HYPTEST_WORKFLOW_SKILL_HOME/scripts/",
+            )
+            for prefix in prefixes:
+                if script.startswith(prefix) and script.endswith(".py"):
+                    return "scripts/" + script[len(prefix) :]
     return None
 
 
