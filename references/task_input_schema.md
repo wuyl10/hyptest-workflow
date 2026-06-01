@@ -64,7 +64,17 @@
 | `HYPTEST_TMPDIR` | 可省略 | path | `/tmp` 空间不足时指定临时目录；脚本参数写作 `--env HYPTEST_TMPDIR=<path>`。 |
 | `HYPTEST_WORKFLOW_SKILL_HOME` | 手动运行 workflow 自带脚本时 | path | 指向 `hyptest-workflow` skill 目录；用于 `$HYPTEST_WORKFLOW_SKILL_HOME/scripts/<tool>.py`，不传给 hyptest repo runner。 |
 
-这些字段不是长期配置要求。若 shell 环境已经正确设置，prompt 不必填写；若 shell 环境没有对应变量，prompt 必须填写。若 prompt 显式填写，workflow 执行脚本时应把它们映射成重复的 `--env KEY=VALUE` 参数。Nanhu 源码是 LinkNan submodule 检查项，不是 prompt 环境字段。
+这些 runner/path 字段不是长期配置要求。若 shell 环境已经正确设置，prompt 不必填写；若 shell 环境没有对应变量，prompt 必须填写。若 prompt 显式填写 runner 环境字段，workflow 执行支持 `--env` 的脚本时应映射成重复的 `--env KEY=VALUE` 参数。Nanhu 源码是 LinkNan submodule 检查项，不是 prompt 环境字段。
+
+## Cross-Skill Script Path Fields
+
+这些字段不是 workflow gate / runner 环境，不传给 `$HYPTEST_HOME/compile_elf.py` 或 `$HYPTEST_HOME/get_result.py`，也不应写成 workflow `--env KEY=VALUE`。它们只用于 handoff 后由对应 skill 运行自己的 bundled scripts。
+
+| Field | Required When | Value | Notes |
+| --- | --- | --- | --- |
+| `HYPTEST_FAILURE_TRIAGE_SKILL_HOME` | workflow 交接到 failure-triage 后，需要手动运行 triage 自带 scripts 时 | path | 指向 `hyptest-failure-triage` skill 目录；用于 `$HYPTEST_FAILURE_TRIAGE_SKILL_HOME/scripts/triage_snapshot.py`、`triage_report_template.py`、`update_failure_list.py` 等。workflow 本身不读取它做 gate。 |
+
+`WAVEFORM_DEBUG` 不属于 workflow 输入字段；只有 failure-triage 决定调用 waveform-debug scripts 时才需要在 failure-triage / waveform-debug 侧提供。
 
 常见路径组合：
 

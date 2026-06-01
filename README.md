@@ -225,6 +225,7 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 | `HYPTEST_DIFFTEST_REF_SO` | 项目维护的 difftest Spike `.so` 路径 | LinkNan/difftest gate |
 | `HYPTEST_TMPDIR` | 临时目录 | 需要控制临时产物位置时 |
 | `HYPTEST_WORKFLOW_SKILL_HOME` | hyptest-workflow skill 目录 | 手动运行本 skill 自带 `scripts/*.py` 时 |
+| `HYPTEST_FAILURE_TRIAGE_SKILL_HOME` | hyptest-failure-triage skill 目录 | 仅当 workflow 交接到 triage 后，需要手动运行 triage 自带 `scripts/*.py` 时；不是 workflow gate 必需变量 |
 
 完整字段说明和默认值策略见 `references/task_input_schema.md`。平台名只使用 `spike` 或 `linknan`。
 
