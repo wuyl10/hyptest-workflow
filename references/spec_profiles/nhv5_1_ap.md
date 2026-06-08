@@ -391,7 +391,20 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 - 仅支持 **address trigger（访存地址）** 和 **execute-PC trigger（取指地址）**。
 - **不支持 data trigger**（trigger 匹配数据值）；相关 case 不应设计。
 - FOF / fault-only-first vector load（`vle*ff.v`、`vlseg*e*ff.v`）的非 0 元素后续异常上报只适用于 Data trigger 语义；NHV5.1AP 不支持 Data trigger，因此非 0 元素的 address trigger 命中不应上报 breakpoint/debug exception，不应设置 `excpt.triggered` / `CAUSE_BKP` / `tval` / `vstart`，也不应仅因此截断 `vl` 或屏蔽元素写回。期望 FOF 非 0 元素 address trigger 报异常的 case 属于 profile-invalid/selfcheck bug；若 Spike/ref model 将其当成 breakpoint 或 `vl` 截断，则按 Spike/model gap 处理。
-- Debug address breakpoint 当前匹配粒度按指令类别区分：向量 UnitStride 访存按访问 byte range 内匹配，包含跨 16B 非对齐 UnitStride 访问的 byte range；除向量 UnitStride 外，其它访存按 flow base address 匹配，不按整个访问范围内任意 byte 匹配。非 UnitStride 跨 16B 非对齐访问会拆成两个 split flow，并分别检查低半 flow base 与高半 split flow base，因此 trigger 可以命中任一 split flow 的 base；但仍不能默认命中这些 flow 内部任意非 base byte。相关 case 设置 trigger 时，不能默认 scalar、segment、strided、indexed、cross-page 或 cross-16B 非 UnitStride 访问会因范围内某个普通中间 byte 命中 breakpoint。
+- Debug address breakpoint 当前匹配粒度按访存指令类型与微架构访存粒度区分，不再单独区分非对齐或跨 16B 场景；相关 case 设置 trigger 时，只能按下表口径选择预期，不应额外引入“非对齐访问”“跨 16B 访问”或“split flow”特殊 breakpoint 语义：
+
+  | 指令类型 | 微架构访存粒度 | trigger 匹配粒度 |
+  |---|---|---|
+  | 标量访存指令 | 指令（元素） | 检查元素小端地址，支持 `>=`、`=`、`<` match type |
+  | 原子访存指令（LR/SC） | 指令（元素） | 检查元素小端地址，支持 `>=`、`=`、`<` match type；LR 视为 load，SC 视为 store（不管 SC 成功与否） |
+  | 原子访存指令（AMO） | 指令（元素） | 检查元素小端地址，支持 `>=`、`=`、`<` match type；拿到 vaddr 时同时检查 load 与 store 方向 |
+  | 向量访存指令（UnitStride） | 向量寄存器宽度（128bit） | 按该指令访存地址范围内任意 byte 匹配，但仅支持 `=` match type |
+  | 向量访存指令（whole register） | 向量寄存器宽度（128bit） | 按该指令访存地址范围内任意 byte 匹配，但仅支持 `=` match type |
+  | 向量访存指令（FOF UnitStride） | 向量寄存器宽度（128bit） | 仅 0 号元素对应的访问地址范围可按任意 byte 匹配并触发 fire，且仅支持 `=` match type；非 0 元素 address trigger 命中不产生 breakpoint/debug exception 或 shortened-`vl` |
+  | 向量访存指令（segment） | 元素 | 检查每个元素的小端地址，但仅支持 `=` match type |
+  | 其它类型的向量访存指令 | 元素 | 检查每个元素小端地址，支持 `>=`、`=`、`<` match type |
+
+  对向量访存指令，若多个元素/地址同时满足 trigger 条件，按元素索引较小者触发 trigger fire；该选择规则同时适用于 breakpoint 与 debug action。
 - 源码证据：`LinkNan/dependencies/nanhu/src/main/scala/xiangshan/Parameters.scala` 定义 `TriggerNum = 4`、`TriggerChainMaxLength = 2`；CSR/DebugLevel 中 `tdata1/tdata2` 用 `Seq.fill(TriggerNum)` / `Range(0, TriggerNum)` 生成，`tselect` 写入以 `wdata < TriggerNum.U` 为合法条件。
 
 **Nanhu NHV5.1AP Vector FOF 实现与 oracle 约束**（用于判断自校验应断言哪些寄存器图像）：
@@ -485,10 +498,10 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
   },
   {
     "category": "Debug address trigger match granularity",
-    "keywords": ["trigger_byte_range", "byte_range_trigger", "vector_us_byte_range_trigger", "base_address_trigger", "flow_base_trigger", "split_flow_trigger", "non_us_base_trigger", "vlseg_trigger_base", "strided_trigger_base", "indexed_trigger_base", "cross16_trigger_base", "cross16_split_flow_base"],
+    "keywords": ["trigger_byte_range", "byte_range_trigger", "vector_us_byte_range_trigger", "vector_whole_byte_range_trigger", "fof_unit_stride_trigger", "fof_element0_trigger", "scalar_element_base_trigger", "atomic_lr_sc_trigger", "atomic_amo_trigger", "base_address_trigger", "flow_base_trigger", "element_base_trigger", "non_us_base_trigger", "vlseg_trigger_base", "segment_equal_trigger", "strided_trigger_base", "indexed_trigger_base", "vector_lower_index_fire"],
     "module_hints": ["trigger", "memblock", "load_queue", "store_queue", "vector"],
     "classification": "platform_guarded",
-    "note": "Current NHV5.1AP matches debug address breakpoints by byte range for vector UnitStride accesses, including cross-16B unaligned UnitStride byte ranges. All non-UnitStride memory accesses match by flow base address. Non-UnitStride cross-16B unaligned accesses are split into two flows and both the low-half flow base and high-half split-flow base are checked, but arbitrary interior bytes of those flows are not range-matched. Cases must not assume range-byte matching for scalar, segment, strided, indexed, cross-page, or cross-16B non-UnitStride accesses unless a dedicated implementation update is confirmed."
+    "note": "Current NHV5.1AP debug address breakpoint matching is independent of alignment-specific or cross-16B-specific special handling. Scalar, LR/SC, AMO, and element-granular vector accesses check the element low-end/base address; scalar/LR/SC/AMO and other element-granular vector accesses support >=, =, < match types, while vector segment supports only =. Vector UnitStride and whole-register accesses match any byte in the accessed range but support only =. FOF UnitStride can fire only on element-0 address-range matches with = match type; nonzero-element address-trigger matches must not raise breakpoint/debug exception or shorten vl. For vector accesses, if multiple elements/addresses satisfy the trigger condition, the lower element index fires, for both breakpoint and debug actions. Cases must not add separate breakpoint expectations for unaligned, cross-16B, or split-flow scenarios unless a dedicated implementation update is confirmed."
   },
   {
     "category": "Debug trigger Nanhu implementation limits",
