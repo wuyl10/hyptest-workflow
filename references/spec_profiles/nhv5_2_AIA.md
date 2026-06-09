@@ -12,6 +12,7 @@ pmp_granularity: 4KB
 official_spike_has_tlb_model: false
 official_spike_has_cache_model: false
 official_spike_has_pma_csr: false
+linknan_difftest_ref_has_pma_csr: true
 default_spike_gate: ordinary_non_AIA_arch_only
 default_case_elf_dir: case_elf_asm/linknan
 linknan_mmio_requires_responder: true
@@ -43,6 +44,9 @@ primary_aia_gate: LinkNan RTL regression
 - AIA/APLIC/IMSIC case 默认不使用 official/community Spike 作为 golden。
 - LinkNan AIA 自测的主 gate 是 LinkNan RTL/difftest 回归。
 - LinkNan 仓库内定制 Spike 是 difftest 对齐模型，不等同于 official Spike AIA golden；CPU_NANHU 的 ISA string、stateen、hviprio、hgeie/GEILEN 等行为需要与 RTL 保持同步。
+- 当前 LinkNan difftest reference (`HYPTEST_DIFFTEST_REF_SO`) 支持 PMA CSR/行为对齐；
+  `official_spike_has_pma_csr=false` 只说明 official/community Spike gate 不适合
+  PMA CSR/routing，不说明 LinkNan difftest REF 缺少 PMA。
 - QEMU `virt,aia=aplic-imsic` 只作为可选参考模型，适合观察一部分通用 AIA 行为，不替代 LinkNan 平台专属路径。
 - LinkNan `intr_gen -> APLIC -> IMSIC -> trap handler` 的完整外部线闭环只能由 LinkNan/RTL 环境确认。
 
@@ -56,7 +60,9 @@ primary_aia_gate: LinkNan RTL regression
 - 当前 QEMU 常用参考命令口径为 `qemu-system-riscv64 -machine virt,aia=aplic-imsic,aclint=on -cpu rv64,v=true,h=true -smp 1 -m 256M -nographic -monitor none -serial mon:stdio -bios none -kernel <elf>`。
 - 单 hart QEMU 配置不能完整覆盖 LinkNan `intr_gen`、LinkNan IMSIC remap、多 hart MSI routing、真实异步 WFI 唤醒和当前 Nanhu/Spike difftest 特性。
 
-## 3. LinkNan AIA 平台事实
+## 3. PMP 粒度约定与 LinkNan AIA 平台事实
+
+PMP 构造粒度沿用当前 profile metadata 的 `pmp_granularity: 4KB`。AIA profile 的核心目标是 APLIC/IMSIC/AIA CSR/MMIO/interrupt routing；普通 PMP 边界 corner 不在本文新增专属口径内，除非测试点明确要求与 AIA MMIO window 组合。
 
 当前 LinkNan 参数来自 `LinkNan/src/main/scala/linknan/soc/LinkNanParams.scala`、`devicetree/Predefined.scala` 和 hyptest `platform/linknan/inc/platform.h`。
 
@@ -88,7 +94,7 @@ raise_ext_intr(source + 1) -> ext_intr(source) -> APLIC source N
 
 因此有效 APLIC 外部线用例必须使用 `raise_ext_intr(source + 1)`，并从 source 1 开始。
 
-## 4. PMP / PMA / MMIO / cacheability
+## 4. PMA / PBMT / MMIO / cacheability
 
 AIA 的核心观测对象是 MMIO/CSR/interrupt side effect，不是普通 cacheable DRAM。写 case 时必须区分：
 
@@ -116,9 +122,9 @@ AIA 的核心观测对象是 MMIO/CSR/interrupt side effect，不是普通 cache
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "confirmed_in_linknan_rtl",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate"
+    "default_decision": "manual_linknan_rtl_gate_candidate"
   },
   {
     "id": "linknan_intr_gen_mmio",
@@ -128,21 +134,21 @@ AIA 的核心观测对象是 MMIO/CSR/interrupt side effect，不是普通 cache
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "confirmed_in_linknan_sim",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate"
+    "default_decision": "manual_linknan_rtl_gate_candidate"
   },
   {
     "id": "linknan_imsic_global_window",
-    "window": "0xE000000000-0xE00000ffff per hart by current default",
+    "window": "0xE000000000-0xE000010000",
     "pma": "IO",
     "pbmt": "None",
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "confirmed_in_linknan_rtl",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "capability_gated_manual_by_default"
+    "default_decision": "manual_capability_gated_by_default"
   },
   {
     "id": "qemu_virt_aplic_mmio",
@@ -152,9 +158,9 @@ AIA 的核心观测对象是 MMIO/CSR/interrupt side effect，不是普通 cache
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "qemu_reference_only",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "optional_reference_not_linknan_gate"
+    "default_decision": "manual_optional_reference_not_linknan_gate"
   },
   {
     "id": "qemu_virt_imsic_m_s_mmio",
@@ -164,13 +170,13 @@ AIA 的核心观测对象是 MMIO/CSR/interrupt side effect，不是普通 cache
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "qemu_reference_only",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "optional_reference_not_linknan_gate"
+    "default_decision": "manual_optional_reference_not_linknan_gate"
   },
   {
     "id": "ordinary_dram_arch",
-    "window": "0x80000000-0x90000000 for current hyptest linknan MEM_SIZE",
+    "window": "0x80000000-0x90000000",
     "pma": "MEM",
     "pbmt": "None",
     "memattr_device": false,
@@ -193,7 +199,7 @@ MMIO responder 表：
     "responder_type": "register-like",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate",
+    "default_decision": "manual_linknan_rtl_gate_candidate",
     "notes": "平台私有外设；QEMU/official Spike 无对应模型。"
   },
   {
@@ -202,31 +208,31 @@ MMIO responder 表：
     "responder_type": "register-like",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate",
+    "default_decision": "manual_linknan_rtl_gate_candidate",
     "notes": "当前设计仅 MSI delivery，source 0 保留。"
   },
   {
     "id": "linknan_imsic",
     "target": "LinkNan IMSIC global base 0xE000000000, M file offset 0x8000, S/VS offset 0x0",
-    "responder_type": "msi-window-plus-csr",
+    "responder_type": "testbench_dependent",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "capability_gated_manual_by_default",
+    "default_decision": "manual_capability_gated_by_default",
     "notes": "RTL 已集成，hyptest LinkNan 平台头记录 LINKNAN_IMSIC_M_BASE_ADDR=0xE000008000、LINKNAN_IMSIC_S_BASE_ADDR=0xE000000000；只有定义 LINKNAN_ENABLE_IMSIC_MMIO_TESTS 时才暴露 IMSIC_M_BASE_ADDR/S_BASE_ADDR。"
   },
   {
     "id": "qemu_virt_aia",
     "target": "QEMU virt,aia=aplic-imsic APLIC/IMSIC",
-    "responder_type": "reference-model",
+    "responder_type": "testbench_dependent",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "optional_reference",
+    "default_decision": "manual_optional_reference",
     "notes": "可用于通用 AIA 行为观察，但不是 LinkNan gate。"
   }
 ]
 ```
 
-## 5. Spike / QEMU / LinkNan Gate 边界
+## 5. Official Spike 模型边界（Spike / QEMU / LinkNan Gate 边界）
 
 official/community Spike：
 
@@ -282,7 +288,11 @@ QEMU：
 ]
 ```
 
-## 6. 用例写法和分层默认口径
+## 6. 非对齐与异常优先级
+
+AIA profile 不新增通用非对齐优先级口径；普通 scalar/vector/atomic misaligned、PF/AF/tval 优先级仍按当前通用 profile 与 `references/spec_and_model_limits.md`。若访问目标是 APLIC/IMSIC/intr_gen MMIO，则必须优先按本文 §4 的 responder、Device/MMIO、平台能力和 LinkNan difftest/RTL oracle 判读，不得用 ordinary DRAM 非对齐结果替代。
+
+## 7. 分层默认口径（用例写法和分层默认口径）
 
 - `default`：非 AIA 普通架构 case，且 Spike gate 适用并通过；或 AIA case 已经在 LinkNan RTL 回归中稳定通过，且不依赖未暴露平台能力。
 - `manual`：AIA case 当前阶段默认落点。包括 Spike 不适用但 LinkNan/QEMU 可观测的 AIA 基础功能、平台配置依赖能力、LinkNan/RTL 复核项。
@@ -295,7 +305,7 @@ QEMU：
 - case 只触及普通 ISA/privilege 架构行为且无其它模型边界，则可为 `spike_gate_applicable=true`。
 - AIA case 即使 QEMU PASS，也不要在 Spike-first workflow 中因为 Spike 不适用而误判为 `blocked`；应写成 manual/LinkNan RTL evidence 或 QEMU reference evidence。
 
-## 7. LinkNan 当前 65 例口径
+## 8. LinkNan 当前 65 例口径
 
 历史 56 个 AIA case 已在 LinkNan 回归中跑通。该基线结果：
 
@@ -323,7 +333,7 @@ total_cases: 65
 - `aia_p5b_aia_vs_csr_redirection_capability` 需要 `mstateen0/hstateen0` 打开 IMSIC，并设置 `hstatus.VGEIN=1`，这是 LinkNan `geilen=1` 下的有效 CSR redirection smoke。
 - `aia_p4g_aia_stateen_access_control` 当前为独立 difftest mismatch：LinkNan difftest Spike 在 `mstateen0.IMSIC=0` 时对 HS `stopei` 访问报 illegal，DUT 没有同步陷入。该问题不应和 P6I/P6J/P6K 的 MSI 投递链路问题混为一个根因。
 
-## 8. Spike 不一致时
+## 9. Spike 不一致时
 
 当 Spike 结果和 AIA 预期不一致：
 
@@ -333,7 +343,7 @@ total_cases: 65
 4. 对通用 AIA 行为可以改跑 QEMU `virt,aia=aplic-imsic` 作参考，但最终仍以 LinkNan RTL 回归和设计文档为准。
 5. 若 LinkNan RTL FAIL，先检查平台宏、case oracle、helper cleanup、`intr_gen` 编号和是否误把 capability skip 当强 oracle。
 
-## 9. 常见 reason_code 映射
+## 10. 常见 reason_code 映射
 
 - AIA/APLIC/IMSIC 在 official Spike 下不可 gate：`D-MANUAL-NONGATE`。
 - QEMU 未配置 guest file、SMP、真实 WFI wakeup 等能力：`D-MANUAL-NONGATE`，并在 case/test_point 文本中注明配置依赖。

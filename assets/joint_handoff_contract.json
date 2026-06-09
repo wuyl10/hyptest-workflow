@@ -3,6 +3,7 @@
   "description": "Shared workflow-to-triage contract fields. Workflow must emit these fields and hyptest-failure-triage must mention/consume them.",
   "required_shared_fields": [
     "case_name",
+    "case_names",
     "platform",
     "spec_profile",
     "scenario",
@@ -11,19 +12,26 @@
     "exception_observed",
     "excpt_dump",
     "log_markers",
+    "runner_context",
     "error_points",
     "reason_code_candidates",
     "reason_code_details",
     "next_single_run",
+    "runner_request",
     "waveform_needed",
+    "waveform_context",
     "log_paths"
   ],
   "triage_skill_required_terms": [
+    "case_names",
     "assert_site",
     "assert_expr",
     "exception_observed",
     "log_markers",
+    "runner_context",
+    "runner_request",
     "reason_code",
+    "waveform_context",
     "FSDB"
   ]
 }

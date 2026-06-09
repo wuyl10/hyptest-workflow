@@ -23,6 +23,7 @@
   - 触发：场景不宜以 Spike 作为 gate（常见于 PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等模型边界）
   - 最小证据：规则引用 + 场景说明 + 运行/环境限制说明
   - 后续动作：标为 manual，回填原因
+  - 注意：PMA/PBMT/MMIO 关键词只产生候选。若当前现象是 `linknan-difftest` / `HYPTEST_DIFFTEST_REF_SO` 的 REF-DUT mismatch，先交 `hyptest-failure-triage` 做 first-divergence、PMA CSR/profile、PA window、responder 分析；不能只凭关键词直接用本 code 收口。
 
 - `D-MANUAL-UNSTABLE`
   - 触发：语义可解释，但 Spike 运行不稳定
@@ -35,9 +36,10 @@
   - 后续动作：标为 manual，等待 RTL 环境验证
 
 - `D-MANUAL-SPIKE-GAP`
-  - 触发：Nanhu RTL 按 spec 正确实现了该语义，Spike 有实现 gap（未建模该 spec 场景）；Spike 过或不过都不能作为 gate
+  - 触发：Nanhu RTL 按 spec 正确实现了该语义，通常是 official/community Spike (`HYPTEST_SPIKE_BIN`) 有实现 gap（未建模该 spec 场景）；Spike 过或不过都不能作为 gate。若暂时复用本 code 表达 `linknan-difftest` / `HYPTEST_DIFFTEST_REF_SO` 的 reference gap，必须已有 REF-DUT first-divergence 证明这是 LinkNan difftest REF/model alignment gap，而不是待定位的 DUT/PMA/responder 问题。
   - 最小证据：指向 spec 的引用（spec 哪段要求该行为）+ Spike 实测不一致证据 + LinkNan/RTL 复核证据（或待补记录）
   - 后续动作：标为 manual；step 16 `check_manual_reference_topic.py` 按 verdict 路由（profile §5 已覆盖则引用、memory confirmed 已覆盖则复用、MR 已有未解决条目则叠加、否则 auto-append `#### <id>.（**自动生成，待人工确认**）` 记录 Spike gap 位置）；RTL 跑通后可回归
+  - LinkNan difftest 注意：若不一致来自 `linknan-difftest` / `HYPTEST_DIFFTEST_REF_SO`，不要只写“Spike gap”。摘要和 test_point 短状态必须明确 runner 是 LinkNan difftest reference、写出 LinkNan difftest REF/model alignment gap、REF-DUT first-divergence 证据和为什么按本 code 暂放；若只是待定位的 REF-DUT PMA/MMIO/CSR 对齐问题，优先交 `hyptest-failure-triage` 继续归因，不用本 code 直接收口。
 
 - `D-MANUAL-NANHU-NOT-IMPL`
   - 触发：目标语义超出 Nanhu 当前实现范围（例如 data trigger / 3+ 层 chain / 本版本未实现的 debug 特性）

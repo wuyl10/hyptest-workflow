@@ -3,7 +3,16 @@
     "id": "pma_pbmt_mmio_nongate",
     "symptom": "PMA PBMT MMIO Device cacheability path is an official Spike model gap",
     "expected_top_code": "D-MANUAL-NONGATE",
-    "expected_codes": ["D-MANUAL-NONGATE"]
+    "expected_codes": ["D-MANUAL-NONGATE"],
+    "forbidden_warnings": ["do_not_close_without_first_divergence"]
+  },
+  {
+    "id": "linknan_difftest_pma_warning",
+    "symptom": "LinkNan difftest HYPTEST_DIFFTEST_REF_SO PMA PBMT MMIO REF-DUT mismatch",
+    "expected_top_code": "D-BLOCK-RUN-UNEXPLAINED",
+    "expected_codes": ["D-BLOCK-RUN-UNEXPLAINED", "D-MANUAL-NONGATE"],
+    "expected_warnings": ["do_not_close_without_first_divergence"],
+    "expected_warning_text": ["LinkNan difftest REF/model alignment gap"]
   },
   {
     "id": "missing_mmio_responder_compile_only",

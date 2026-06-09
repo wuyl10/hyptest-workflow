@@ -28,7 +28,7 @@
 1. **本 corner 是否落在 Nanhu 未实现范围内**（data trigger / 3+ 层 chain / profile `classification=nanhu_not_impl`）？**是 → STOP**，回退或请用户确认，不动笔；`D-MANUAL-NANHU-NOT-IMPL` 只作占位逃生口，默认不写这类 case。
 2. **`spike_gate_applicable` 是 true 还是 false**？依据 profile §5 哪条？
    - true → default-first 路径（注册开启、必须跑 Spike、结果决定分层）
-   - false → **nongate 路由**：`// TEST_REGISTER(...)` 注释 → `compile_elf.py --include-commented`；有 LinkNan/RTL/special-run 闭环则落 `manual`，只有编译条件则落 `compile-only`。step 10 可选跑 Spike 看行为但不翻 default；manual reason 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY`
+   - false → **nongate 路由**：`// TEST_REGISTER(...)` 注释 → 默认只做 official Spike 编译 smoke（`compile_elf.py --plat spike --include-commented`）；step 10 可选跑 official Spike 看行为但不翻 default。若需要 LinkNan difftest/no-diff/RTL/waveform 证据，workflow 不自行选择 oracle，先交给 `hyptest-failure-triage` 决定 `runner_request`，再按指定 `compile_plat` / `run_platform` / `difftest_mode` 执行；manual reason 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY`
 3. 若涉及 PMA/PBMT/MMIO/no-response，`spec_allowed` 与 `testbench_responder_confirmed` 分别是什么，证据路径是什么？
 4. 相似检索 top 中有 `register_status=commented` **且（Manual_Reference.md 或 memory/events.jsonl 有对应历史）**的同主题 case 吗？有 → 先 Read 该 case 源 + 命中来源条目，再决定选同类角度的理由。
 

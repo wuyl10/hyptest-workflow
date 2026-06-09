@@ -43,7 +43,7 @@
    - 其他：结论 `blocked`
 3. 若 `spike_gate_applicable = false`（nongate 路由）：
    - 且 `target_policy = compile-only-ok`，或当前只有编译条件、缺少该场景所需 LinkNan/RTL/special-run runner：结论 `compile-only`
-   - 且 `target_policy = manual-ok`，或 `spike_gate_applicable=false` 由 step 5 Q2 显式判出且场景有可预期的 LinkNan/RTL/special-run 闭环：结论 `manual`（**不要求 official Spike `run_attempted`**；case 注册注释 + `--include-commented` 编译即可；step 10 可选跑 Spike 看行为但 Spike PASS 不翻 default）
+   - 且 `target_policy = manual-ok`，或 `spike_gate_applicable=false` 由 step 5 Q2 显式判出且场景有可预期的 LinkNan/RTL/special-run 闭环：结论 `manual`（**不要求 official Spike `run_attempted`**；case 注册注释 + official Spike `--include-commented` 编译 smoke 即可；step 10 可选跑 official Spike 看行为但 Spike PASS 不翻 default。若需要 LinkNan difftest/no-diff/RTL/waveform 证据，先交给 `hyptest-failure-triage` 决定 `runner_request`，workflow 只按请求执行并回传证据）
    - 且 `run_attempted = true` 但结果不可归因：结论 `blocked`
 4. 其他情况：
    - 结论：`manual`
@@ -61,7 +61,7 @@ manual 档（5 个）：
 - `D-MANUAL-NONGATE`：场景不宜 Spike gate 的通用兜底（PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等 profile §5 类）
 - `D-MANUAL-UNSTABLE`：Spike 运行不稳定但语义可解释（flaky）
 - `D-MANUAL-RTL-ONLY`：需要 RTL/波形才能观察的现象，LinkNan difftest 或 FSDB 分析为主
-- `D-MANUAL-SPIKE-GAP`：Nanhu 按 spec 实现，Spike 有实现 gap（例：mcontrol6 chain 闭合后 AMO BP Spike 不抛）
+- `D-MANUAL-SPIKE-GAP`：Nanhu 按 spec 实现，通常是 official/community Spike (`HYPTEST_SPIKE_BIN`) 有实现 gap（例：mcontrol6 chain 闭合后 AMO BP Spike 不抛）；若暂时复用在 `linknan-difftest` / `HYPTEST_DIFFTEST_REF_SO`，必须已有 REF-DUT first-divergence 证明这是 LinkNan difftest REF/model alignment gap，摘要必须写清 runner 和 first-divergence，不能只写“Spike gap”；未定位的 REF-DUT PMA/MMIO/CSR 对齐问题先交 `hyptest-failure-triage`
 - `D-MANUAL-NANHU-NOT-IMPL`：超出 Nanhu 当前实现范围（应回退；仅作为未来支持的占位）
 
 compile-only 档（2 个）：

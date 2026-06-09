@@ -100,7 +100,7 @@ python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/case_preflight_pack.py \
    - **Q1**：本 corner 是否落在 **Nanhu 未实现**范围内（data trigger / 3+ 层 chain / `classification=nanhu_not_impl`）？**是 → STOP**，回退到已实现的等价角度或请用户确认，不动笔。
    - **Q2**：本 case 的 `spike_gate_applicable` 是 true 还是 false？依据 profile §5 哪条？
      - **true → default-first 路径**：注册开启、必须跑 Spike、结果决定分层。
-     - **false → nongate 路由**：`// TEST_REGISTER(...)` 注释注册 → `compile_elf.py --include-commented`；有 LinkNan/RTL/special-run 闭环则落 `manual`，只有编译条件则落 `compile-only`。step 10 可选跑 Spike 看行为但**不翻 default**；manual reason 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY`。
+     - **false → nongate 路由**：`// TEST_REGISTER(...)` 注释注册 → 默认只做 official Spike 编译 smoke（`compile_elf.py --plat spike --include-commented`）；step 10 可选跑 official Spike 看行为但**不翻 default**。若需要 LinkNan difftest/no-diff/RTL/waveform 证据，workflow 不自行选择 oracle，先生成 handoff 给 `hyptest-failure-triage`，由 triage 返回 `runner_request` 后再按指定 `compile_plat` / `run_platform` / `difftest_mode` 执行。manual reason 用 `D-MANUAL-SPIKE-GAP` / `D-MANUAL-NONGATE` / `D-MANUAL-RTL-ONLY`。
    - **Q3**：若涉及 PMA/PBMT/MMIO/no-response，`spec_allowed` 与 `testbench_responder_confirmed` 分别是什么，证据路径是什么？
    - **Q4**：相似检索 top 中有 `register_status=commented` **且（Manual_Reference.md 有对应条目 _或_ memory/events.jsonl 有对应历史）**的同主题 case 吗？若有，Read case 源 + 命中来源条目后再决定。
 5. 需要骨架时，再从 `assets/templates/new_case_template.c` 起步；若测试点变化较大，直接按 `references/writing_cases.md` 的结构与断言原则自行展开，不要被模板形状反向限制。

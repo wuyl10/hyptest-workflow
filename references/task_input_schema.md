@@ -37,7 +37,7 @@
 | `coverage_scope` | auto | `file` / `repo` | 一般不用填；workflow 根据任务目的推导。补已有点默认 `file`；新增测试点或跨文件排重默认 `repo`。 |
 | `target_policy` | `default-first` | enum | 可选 `default-first`、`manual-ok`、`compile-only-ok`。 |
 | `reason_code` | none | catalog code | 已有结论时可指定；否则由日志/profile 推断。 |
-| `failure_log` | none | path/text | 失败归因或分层初判时提供。 |
+| `failure_log` | none | path/text | 失败归因或分层初判时提供。workflow 只能给候选分类或 handoff；失败闭环、mismatch root cause 和 cleanup 决策由 `hyptest-failure-triage` 收口。 |
 
 ## Optional Waveform Handoff Fields
 

@@ -49,15 +49,19 @@ def remove_path(path: Path, removed: list[str]) -> None:
     if not path.exists():
         return
     if path.is_dir():
-        shutil.rmtree(path)
+        shutil.rmtree(path, ignore_errors=True)
     else:
-        path.unlink()
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
     removed.append(str(path))
 
 
 def remove_selected_generated(root: Path, only: str, removed: list[str]) -> None:
     if only in ("all", "tmp"):
         remove_path(workflow_tmp_dir(root), removed)
+        remove_path(root / ".tmp", removed)
     if only in ("all", "cache"):
         remove_path(workflow_cache_dir(root), removed)
     if only in ("all", "reports"):

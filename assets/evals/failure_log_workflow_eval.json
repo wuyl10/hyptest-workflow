@@ -10,6 +10,18 @@
     }
   },
   {
+    "id": "official_spike_cli_runner_context",
+    "log": "python3 get_result.py --platform spike --case ai_arch_pma_cli_context_corner\\nai_arch_pma_cli_context_corner PMA PBMT FAILED\\n",
+    "expected": {
+      "case_name": "ai_arch_pma_cli_context_corner",
+      "scenario_terms": ["pma", "pbmt"],
+      "error_terms": ["assertion"],
+      "reason_code_any": ["D-MANUAL-NONGATE", "D-BLOCK-RUN-UNEXPLAINED"],
+      "next_action_terms": ["profile"],
+      "runner_context_terms": ["official_spike", "true"]
+    }
+  },
+  {
     "id": "missing_exception_setup_assert",
     "log": "ai_arch_trigger_case FAILED\\nassert_site=ai_arch_trigger_breakpoint_cases.c:6021\\nassert_expr=excpt.triggered && excpt.cause == CAUSE_LOAD_PAGE_FAULT\\nexcpt.triggered = 0\\n",
     "expected": {
@@ -28,13 +40,170 @@
     }
   },
   {
+    "id": "linknan_difftest_pma_ref_dut_mismatch",
+    "log": "ai_arch_pma_mem_io_cross_boundary_scalar_fault_no_partial_corner\\nHYPTEST_DIFFTEST_REF_SO=/nfs/project/difftest/riscv64-spike-so\\nLinkNan difftest enabled\\nREF mcause=0x7 mepc=0x80000e7c mtval=0x0000030000000ff8\\nDUT mcause=0x0 mepc=0x0 mtval=0x0\\nPMA/PBMT/MMIO cross-boundary store REF-DUT mismatch: REF trapped, DUT continued\\nDIFFTEST FAILED at cycle 31294\\n",
+    "expected": {
+      "scenario_terms": ["pma", "pbmt", "mmio"],
+      "error_terms": ["LinkNan difftest", "first-divergence"],
+      "reason_code_any": ["D-COMPILE-ONLY-ENV", "D-BLOCK-RUN-UNEXPLAINED"],
+      "reason_code_all": ["D-BLOCK-RUN-UNEXPLAINED"],
+      "next_action_terms": ["hyptest-failure-triage", "REF-DUT first divergence"],
+      "runner_context_terms": ["linknan_difftest", "true"],
+      "runner_context_values": {
+        "linknan_difftest": true,
+        "runner_conflict": false,
+        "runner_ambiguous": false
+      },
+      "log_marker_values": {
+        "has_difftest_failed": true,
+        "has_mismatch": true,
+        "has_ref_dut_delta": true,
+        "has_selfcheck_failed": false
+      },
+      "forbidden_reason_codes": ["D-MANUAL-SPIKE-GAP"],
+      "forbidden_error_terms": ["official Spike model gap"]
+    }
+  },
+  {
+    "id": "ansi_difftest_failed_no_instruction_io_false_positive",
+    "log": "The first instruction of core 0 has commited. Difftest enabled.\\nrisc-v NH-V5 tests\\n\\u001b[34mai_arch_pma_boundary_scalar_fault_corner      \\u001b[0m\\nDIFFTEST FAILED at cycle 31294\\nREF mcause=0x7 mtval=0x0000030000000ff8\\nDUT mcause=0x0 mtval=0x0\\n",
+    "expected": {
+      "case_name": "ai_arch_pma_boundary_scalar_fault_corner",
+      "scenario_terms": ["pma"],
+      "forbidden_scenario_terms": ["io"],
+      "error_terms": ["difftest mismatch"],
+      "reason_code_any": ["D-BLOCK-RUN-UNEXPLAINED"],
+      "reason_code_all": ["D-BLOCK-RUN-UNEXPLAINED"],
+      "next_action_terms": ["first-divergence", "cause", "tval"],
+      "runner_context_values": {
+        "linknan_difftest": true,
+        "difftest_disabled": false,
+        "linknan_no_diff": false,
+        "difftest_mode_conflict": false,
+        "runner_conflict": false,
+        "runner_ambiguous": false
+      },
+      "log_marker_values": {
+        "has_difftest_failed": true,
+        "has_mismatch": true,
+        "has_ref_dut_delta": true,
+        "has_selfcheck_failed": false
+      },
+      "forbidden_error_terms": ["case assertion failed"]
+    }
+  },
+  {
     "id": "linknan_stuck_timeout",
     "log": "ai_micro_hs_vector_store_tail_corner timeout, rc=124, missing_required=['PASSED']\\n50000 cycles no commit\\nrun.log saved under LinkNan/sim/simv/ai_micro_hs_vector_store_tail_corner/run.log\\n",
     "expected": {
       "scenario_terms": ["vector", "store"],
       "error_terms": ["timeout", "50000 cycles no commit"],
       "reason_code_any": ["D-BLOCK-RUN-UNEXPLAINED", "D-MANUAL-NONGATE"],
-      "next_action_terms": ["run.log", "FSDB"]
+      "next_action_terms": ["run.log", "FSDB"],
+      "runner_context_terms": ["linknan_platform", "true"],
+      "runner_context_values": {
+        "linknan_platform": true,
+        "linknan_difftest": false
+      },
+      "forbidden_runner_context_terms": ["linknan_difftest\": true"]
+    }
+  },
+  {
+    "id": "mixed_spike_and_linknan_difftest_runner_conflict",
+    "log": "python3 get_result.py --platform spike --case ai_arch_pma_mixed_corner\\nHYPTEST_DIFFTEST_REF_SO=/nfs/ref/riscv64-spike-so\\nLinkNan difftest enabled\\nPMA REF-DUT mismatch\\nFAILED\\n",
+    "expected": {
+      "case_name": "ai_arch_pma_mixed_corner",
+      "scenario_terms": ["pma"],
+      "error_terms": ["runner context is conflicting", "LinkNan difftest"],
+      "reason_code_any": ["D-BLOCK-RUN-UNEXPLAINED"],
+      "reason_code_all": ["D-BLOCK-RUN-UNEXPLAINED"],
+      "next_action_terms": ["separate HYPTEST_SPIKE_BIN", "REF-DUT first divergence"],
+      "runner_context_terms": ["runner_conflict", "true"],
+      "log_marker_values": {
+        "has_mismatch": true,
+        "has_ref_dut_delta": true,
+        "has_selfcheck_failed": false
+      },
+      "forbidden_error_terms": ["official Spike model gap", "case assertion failed"]
+    }
+  },
+  {
+    "id": "mixed_spike_and_linknan_no_diff_runner_conflict",
+    "log": "python3 get_result.py --platform spike --case ai_arch_pma_no_diff_mixed_corner\nai_arch_pma_no_diff_mixed_corner FAILED\npython3 get_result.py --platform linknan --case ai_arch_pma_no_diff_mixed_corner --no-diff\nDifftest disabled\nLinkNan/sim/simv/ai_arch_pma_no_diff_mixed_corner/run.log\nHIT GOOD TRAP\n",
+    "expected": {
+      "case_name": "ai_arch_pma_no_diff_mixed_corner",
+      "scenario_terms": ["pma"],
+      "error_terms": ["runner context is conflicting"],
+      "reason_code_any": ["D-MANUAL-NONGATE", "D-BLOCK-RUN-UNEXPLAINED"],
+      "next_action_terms": ["LinkNan difftest/no-diff/RTL evidence"],
+      "runner_context_values": {
+        "official_spike": true,
+        "linknan_platform": true,
+        "linknan_difftest": false,
+        "difftest_disabled": true,
+        "linknan_no_diff": true,
+        "runner_conflict": true,
+        "runner_ambiguous": false
+      },
+      "forbidden_runner_context_terms": ["linknan_difftest\": true"]
+    }
+  },
+  {
+    "id": "batch_log_multiple_cases",
+    "log": "python3 get_result.py --platform linknan --case ai_arch_pma_batch_one_corner\\nDifftest enabled\\nrisc-v NH-V5 tests\\nai_arch_pma_batch_one_corner\\nDIFFTEST FAILED at cycle 12\\npython3 get_result.py --platform linknan --case ai_arch_pma_batch_two_corner\\nrisc-v NH-V5 tests\\nai_arch_pma_batch_two_corner\\nDIFFTEST FAILED at cycle 34\\n",
+    "expected": {
+      "case_name": "ai_arch_pma_batch_one_corner",
+      "case_names": ["ai_arch_pma_batch_one_corner", "ai_arch_pma_batch_two_corner"],
+      "case_name_count": 2,
+      "scenario_terms": ["pma"],
+      "error_terms": ["multiple runner commands", "difftest mismatch"],
+      "reason_code_all": ["D-BLOCK-RUN-UNEXPLAINED"],
+      "next_action_terms": ["split batch log", "first-divergence"],
+      "runner_context_values": {
+        "linknan_difftest": true,
+        "multi_run": true,
+        "difftest_mode_conflict": false
+      },
+      "log_marker_values": {
+        "has_difftest_failed": true,
+        "has_mismatch": true,
+        "has_selfcheck_failed": false
+      },
+      "forbidden_error_terms": ["official Spike model gap"]
+    }
+  },
+  {
+    "id": "mixed_difftest_enabled_and_no_diff",
+    "log": "python3 get_result.py --platform linknan --case ai_arch_pma_mode_mix_corner\nDifftest enabled\nai_arch_pma_mode_mix_corner\nDIFFTEST FAILED at cycle 12\npython3 get_result.py --platform linknan --case ai_arch_pma_mode_mix_corner --no-diff\nDifftest disabled\nHIT GOOD TRAP\n",
+    "expected": {
+      "case_name": "ai_arch_pma_mode_mix_corner",
+      "scenario_terms": ["pma"],
+      "error_terms": ["difftest enabled and disabled/no-diff markers both appear", "difftest mismatch"],
+      "reason_code_all": ["D-BLOCK-RUN-UNEXPLAINED"],
+      "next_action_terms": ["separate difftest-enabled evidence", "first-divergence"],
+      "runner_context_values": {
+        "linknan_platform": true,
+        "linknan_difftest": true,
+        "difftest_disabled": true,
+        "difftest_mode_conflict": true,
+        "linknan_no_diff": false,
+        "multi_run": true
+      },
+      "log_marker_values": {
+        "has_difftest_failed": true,
+        "has_mismatch": true,
+        "has_selfcheck_failed": false
+      },
+      "forbidden_error_terms": ["official Spike model gap"]
+    }
+  },
+  {
+    "id": "non_corner_tests_case_name",
+    "log": "The first instruction of core 0 has commited. Difftest enabled.\\nrisc-v NH-V5 tests\\ncustom_csr_stateen_tests_3\\nFAILED\\n",
+    "expected": {
+      "case_name": "custom_csr_stateen_tests_3",
+      "error_terms": ["assertion"],
+      "reason_code_any": ["D-BLOCK-RUN-UNEXPLAINED"]
     }
   }
 ]

@@ -5,7 +5,8 @@
     "expected_facts": {
       "official_spike_has_tlb_model": "false",
       "official_spike_has_cache_model": "false",
-      "official_spike_has_pma_csr": "false"
+      "official_spike_has_pma_csr": "false",
+      "linknan_difftest_ref_has_pma_csr": "true"
     },
     "expected_terms": [
       "RTL-only",

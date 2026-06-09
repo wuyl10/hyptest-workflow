@@ -11,6 +11,7 @@ from pathlib import Path
 
 from classify_failure_log import classify
 from skill_config import default_spec_profile
+from validate_triage_handoff import validate as validate_handoff
 
 
 EXCPT_RE = re.compile(r"excpt\.(triggered|cause|tval2?|tinst|priv)\s*=\s*([^\s]+)")
@@ -28,6 +29,29 @@ def parse_args() -> argparse.Namespace:
         help=f"Spec profile name. Defaults to {default_spec_profile()} from the profile registry.",
     )
     parser.add_argument("--next-single-run", help="Suggested single-run command.")
+    parser.add_argument(
+        "--runner-mode",
+        choices=["spike-gate", "linknan-difftest", "linknan-no-diff"],
+        help="Optional triage-to-workflow runner request mode.",
+    )
+    parser.add_argument("--compile-plat", choices=["spike", "linknan"], help="Runner request compile platform.")
+    parser.add_argument("--run-platform", choices=["spike", "linknan"], help="Runner request run platform.")
+    parser.add_argument(
+        "--difftest-mode",
+        choices=["not-applicable", "enabled", "disabled"],
+        help="Runner request difftest mode.",
+    )
+    parser.add_argument(
+        "--include-commented",
+        action="store_true",
+        help="Runner request should include commented registrations.",
+    )
+    parser.add_argument(
+        "--cleanup-allowed",
+        action="store_true",
+        help="Runner request evidence may be used for cleanup/removal decisions.",
+    )
+    parser.add_argument("--runner-purpose", help="Short purpose for the runner request.")
     parser.add_argument("--log-path", action="append", default=[], help="Related log path.")
     parser.add_argument("--waveform-path", help="Related FSDB/VCD/FST path for downstream triage.")
     parser.add_argument("--rtl-root", help="RTL/source root to pass to waveform triage.")
@@ -37,6 +61,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-behavior", help="Expected behavior to check in waveform triage.")
     parser.add_argument("--observed-behavior", help="Observed behavior to contrast with expected behavior.")
     parser.add_argument("--waveform-report", help="Suggested or existing waveform-debug report.md path.")
+    parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="Emit the generated handoff without validating it against the bundled schema.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON only.")
     return parser.parse_args()
 
@@ -70,14 +99,99 @@ def has_waveform_context(context: dict[str, str | None]) -> bool:
     return any(value for value in context.values())
 
 
+def runner_request(args: argparse.Namespace) -> dict[str, object] | None:
+    if not args.runner_mode:
+        return None
+    mode = args.runner_mode
+    if mode == "spike-gate":
+        compile_plat = args.compile_plat or "spike"
+        run_platform = args.run_platform or "spike"
+        difftest_mode = args.difftest_mode or "not-applicable"
+    elif mode == "linknan-no-diff":
+        compile_plat = args.compile_plat or "linknan"
+        run_platform = args.run_platform or "linknan"
+        difftest_mode = args.difftest_mode or "disabled"
+    else:
+        compile_plat = args.compile_plat or "linknan"
+        run_platform = args.run_platform or "linknan"
+        difftest_mode = args.difftest_mode or "enabled"
+    return {
+        "runner_mode": mode,
+        "compile_plat": compile_plat,
+        "run_platform": run_platform,
+        "difftest_mode": difftest_mode,
+        "include_commented": bool(args.include_commented),
+        "cleanup_allowed": bool(args.cleanup_allowed),
+        "purpose": args.runner_purpose,
+    }
+
+
+def runner_arg_combo_errors(
+    mode: str | None,
+    compile_plat: str | None,
+    run_platform: str | None,
+    difftest_mode: str | None,
+) -> list[str]:
+    if mode is None:
+        return []
+    expected = {
+        "spike-gate": ("spike", "spike", "not-applicable"),
+        "linknan-difftest": ("linknan", "linknan", "enabled"),
+        "linknan-no-diff": ("linknan", "linknan", "disabled"),
+    }[mode]
+    actual = (
+        compile_plat or expected[0],
+        run_platform or expected[1],
+        difftest_mode or expected[2],
+    )
+    if actual == expected:
+        return []
+    return [
+        f"{mode} runner_request must use {expected[0]}/{expected[1]}/{expected[2]}; "
+        f"got {actual[0]}/{actual[1]}/{actual[2]}"
+    ]
+
+
+def validate_runner_args(args: argparse.Namespace) -> list[str]:
+    if args.runner_mode:
+        return runner_arg_combo_errors(
+            args.runner_mode,
+            args.compile_plat,
+            args.run_platform,
+            args.difftest_mode,
+        )
+    partial_args = []
+    for attr, flag in [
+        ("compile_plat", "--compile-plat"),
+        ("run_platform", "--run-platform"),
+        ("difftest_mode", "--difftest-mode"),
+        ("include_commented", "--include-commented"),
+        ("cleanup_allowed", "--cleanup-allowed"),
+        ("runner_purpose", "--runner-purpose"),
+    ]:
+        if getattr(args, attr):
+            partial_args.append(flag)
+    if not partial_args:
+        return []
+    return [
+        "runner request arguments require explicit --runner-mode; got "
+        + ", ".join(partial_args)
+    ]
+
+
 def main() -> int:
     args = parse_args()
+    runner_arg_errors = validate_runner_args(args)
+    if runner_arg_errors:
+        for error in runner_arg_errors:
+            print(error, file=sys.stderr)
+        return 2
     try:
         text, implicit_paths = read_log(args)
     except OSError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    classified = classify(text)
+    classified = classify(text, spec_profile=args.spec_profile)
     excpt_dump = {match.group(1): match.group(2) for match in EXCPT_RE.finditer(text)}
     wave_ctx = waveform_context(args)
     classifier_wants_waveform = any(
@@ -86,6 +200,7 @@ def main() -> int:
     )
     handoff = {
         "case_name": classified.get("case_name"),
+        "case_names": classified.get("case_names", []),
         "platform": args.platform,
         "spec_profile": args.spec_profile,
         "scenario": classified.get("scenario", []),
@@ -94,14 +209,23 @@ def main() -> int:
         "exception_observed": classified.get("exception_observed", {}),
         "excpt_dump": excpt_dump,
         "log_markers": classified.get("log_markers", {}),
+        "runner_context": classified.get("runner_context", {}),
         "error_points": classified.get("error_points", []),
         "reason_code_candidates": classified.get("reason_code_candidates", []),
         "reason_code_details": classified.get("reason_code_details", []),
         "next_single_run": args.next_single_run,
+        "runner_request": runner_request(args),
         "waveform_needed": classifier_wants_waveform or has_waveform_context(wave_ctx),
         "waveform_context": wave_ctx,
         "log_paths": [*implicit_paths, *args.log_path],
     }
+    if not args.no_validate:
+        validation = validate_handoff(handoff)
+        if not validation["ok"]:
+            print("generated handoff does not satisfy triage schema:", file=sys.stderr)
+            for issue in validation["issues"]:
+                print(f"  - {issue}", file=sys.stderr)
+            return 1
     if args.json:
         print(json.dumps(handoff, ensure_ascii=False, indent=2))
     else:

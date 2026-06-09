@@ -31,6 +31,28 @@ def contains_any(haystack: object, needles: list[str]) -> bool:
     return any(needle.lower() in text for needle in needles)
 
 
+def contains_none(haystack: object, needles: list[str]) -> bool:
+    text = json.dumps(haystack, ensure_ascii=False).lower()
+    return all(needle.lower() not in text for needle in needles)
+
+
+def check_expected_values(
+    actual: object,
+    expected: object,
+    *,
+    label: str,
+    failures: list[str],
+) -> None:
+    if not isinstance(expected, dict):
+        return
+    if not isinstance(actual, dict):
+        failures.append(f"{label} should be an object")
+        return
+    for key, expected_value in expected.items():
+        if actual.get(key) != expected_value:
+            failures.append(f"{label}.{key} mismatch")
+
+
 def main() -> int:
     args = parse_args()
     fixture = Path(args.fixture).expanduser().resolve()
@@ -59,31 +81,61 @@ def main() -> int:
         case_failures: list[str] = []
         if not contains_all(payload.get("scenario", []), expected.get("scenario_terms", [])):
             case_failures.append("missing expected scenario terms")
+        if not contains_none(payload.get("scenario", []), expected.get("forbidden_scenario_terms", [])):
+            case_failures.append("forbidden scenario terms present")
         if not contains_all(payload.get("error_points", []), expected.get("error_terms", [])):
             case_failures.append("missing expected error terms")
-        if not contains_any(
+        reason_code_any = expected.get("reason_code_any", [])
+        if reason_code_any and not contains_any(
             payload.get("reason_code_candidates", []),
-            expected.get("reason_code_any", []),
+            reason_code_any,
         ):
             case_failures.append("missing expected reason_code candidate")
+        if not contains_all(
+            payload.get("reason_code_candidates", []),
+            expected.get("reason_code_all", []),
+        ):
+            case_failures.append("missing required reason_code candidate")
         if not contains_all(payload.get("next_actions", []), expected.get("next_action_terms", [])):
             case_failures.append("missing expected next-action terms")
+        if not contains_all(payload.get("runner_context", {}), expected.get("runner_context_terms", [])):
+            case_failures.append("missing expected runner-context terms")
+        if not contains_none(payload.get("runner_context", {}), expected.get("forbidden_runner_context_terms", [])):
+            case_failures.append("forbidden runner-context terms present")
+        check_expected_values(
+            payload.get("runner_context", {}),
+            expected.get("runner_context_values", {}),
+            label="runner_context",
+            failures=case_failures,
+        )
+        if not contains_none(payload.get("reason_code_candidates", []), expected.get("forbidden_reason_codes", [])):
+            case_failures.append("forbidden reason_code candidate present")
+        if not contains_none(payload.get("error_points", []), expected.get("forbidden_error_terms", [])):
+            case_failures.append("forbidden error terms present")
         if expected.get("assert_site") and payload.get("assert_site") != expected.get("assert_site"):
             case_failures.append("assert_site mismatch")
         if expected.get("assert_expr") and payload.get("assert_expr") != expected.get("assert_expr"):
             case_failures.append("assert_expr mismatch")
+        if expected.get("case_name") and payload.get("case_name") != expected.get("case_name"):
+            case_failures.append("case_name mismatch")
+        if not contains_all(payload.get("case_names", []), expected.get("case_names", [])):
+            case_failures.append("missing expected case_names")
+        if expected.get("case_name_count") is not None and len(payload.get("case_names", [])) != expected.get("case_name_count"):
+            case_failures.append("case_name_count mismatch")
+        if expected.get("spec_profile") and payload.get("spec_profile") != expected.get("spec_profile"):
+            case_failures.append("spec_profile mismatch")
         expected_exception = expected.get("exception_observed", {})
         if isinstance(expected_exception, dict):
             observed = payload.get("exception_observed", {})
             for key, expected_value in expected_exception.items():
                 if observed.get(key) != expected_value:
                     case_failures.append(f"exception_observed.{key} mismatch")
-        marker_values = expected.get("log_marker_values", {})
-        if isinstance(marker_values, dict):
-            markers = payload.get("log_markers", {})
-            for key, expected_value in marker_values.items():
-                if markers.get(key) != expected_value:
-                    case_failures.append(f"log_markers.{key} mismatch")
+        check_expected_values(
+            payload.get("log_markers", {}),
+            expected.get("log_marker_values", {}),
+            label="log_markers",
+            failures=case_failures,
+        )
         if case_failures:
             failures.append(f"{item['id']}: {', '.join(case_failures)}")
         results.append({"id": item["id"], "ok": not case_failures, "payload": payload})

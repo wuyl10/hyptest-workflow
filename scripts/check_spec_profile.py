@@ -40,6 +40,7 @@ REQUIRED_PROFILE_FIELDS = [
     "official_spike_has_tlb_model:",
     "official_spike_has_cache_model:",
     "official_spike_has_pma_csr:",
+    "linknan_difftest_ref_has_pma_csr:",
     "default_spike_gate:",
 ]
 
@@ -75,12 +76,14 @@ PROFILE_BOOL_FIELDS = {
     "official_spike_has_tlb_model",
     "official_spike_has_cache_model",
     "official_spike_has_pma_csr",
+    "linknan_difftest_ref_has_pma_csr",
     "linknan_mmio_requires_responder",
 }
 PROFILE_VALUE_ENUMS = {
     "official_spike_has_tlb_model": {"true", "false", "unknown"},
     "official_spike_has_cache_model": {"true", "false", "unknown"},
     "official_spike_has_pma_csr": {"true", "false", "unknown"},
+    "linknan_difftest_ref_has_pma_csr": {"true", "false", "unknown"},
     "linknan_mmio_requires_responder": {"true", "false", "unknown"},
 }
 PMA_VALUES = {"IO", "MEM", "unknown"}

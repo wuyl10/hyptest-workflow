@@ -12,6 +12,7 @@ pmp_granularity: 4KB
 official_spike_has_tlb_model: false
 official_spike_has_cache_model: false
 official_spike_has_pma_csr: false
+linknan_difftest_ref_has_pma_csr: true
 default_spike_gate: ordinary_cacheable_dram_arch_only
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: true
@@ -373,6 +374,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 
 - 本版本 official Spike 没有 TLB/cache 模型；凡涉及 TLB 一致性、cache 一致性、stale translation、cache residency、dirty line preservation、refill image、cacheline side effect 的 case，都只能走 RTL-only/LinkNan 仿真，不走 official Spike gate。
 - 本版本 official Spike 没有实现 PMA CSR；凡涉及访问 `PMAADDR*`、`PMACFG*` 等 PMA CSR 的 case，都只能走 RTL-only/LinkNan 仿真，不走 official Spike gate。
+- `official Spike` / `HYPTEST_SPIKE_BIN` 指上游/社区版 Spike gate，不等同于 LinkNan difftest 使用的 `HYPTEST_DIFFTEST_REF_SO`。当前 LinkNan difftest reference 支持 PMA 行为；LinkNan difftest 中的 PMA mismatch 不能按“official Spike 没有 PMA”直接归为 Spike model gap，必须继续分析 PMA CSR 配置、区间解释、默认 entry、物理 map/responder 与 REF-DUT 一致性。
 - CBO 的架构可见异常、权限、编码语义可以作为测试目标；是否可作为 Spike gate 取决于是否只依赖 Spike 可建模的普通架构行为。
 - CBO 的内部 line 状态、cache side effect、refill image、以及无 A/D 权限时的实现分类差异，不作为 official Spike default gate。
 - replay queue、sbuffer、uncache buffer、MSHR、ROB head、response-context binding。
@@ -426,7 +428,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
     "category": "PMA CSR",
     "keywords": ["pmaaddr", "pmacfg", "pma_csr"],
     "module_hints": ["csr", "pma", "mmu"],
-    "note": "PMA CSR not implemented in this Spike."
+    "note": "PMA CSR not implemented in official/community Spike (`HYPTEST_SPIKE_BIN`); this does not describe LinkNan difftest reference (`HYPTEST_DIFFTEST_REF_SO`)."
   },
   {
     "category": "CBO internal line state",
@@ -518,6 +520,7 @@ Spike 结果使用口径：
 - 普通 cacheable DRAM、ISA 可见、无平台私有依赖的 case，可以用 Spike 做 default gate。
 - Spike fail 但场景属于上述模型边界时，先标 `manual` / `compile-only` / `blocked`；涉及 TLB/cache 一致性或访问 PMA CSR 的 case 直接按 RTL-only/LinkNan 仿真路径处理，不要直接改弱断言。
 - Spike pass 也不证明 PMA/PBMT/MMIO/cache/TLB 微架构路径正确；这类仍需要 LinkNan/RTL/波形证据。
+- 本段的 Spike 结果默认指 `HYPTEST_SPIKE_BIN` official Spike gate；`HYPTEST_DIFFTEST_REF_SO` 的 LinkNan difftest reference 是另一条 runner/oracle 路径，PMA mismatch 应按 LinkNan difftest 证据单独 triage。
 
 ### 5.1 LR/SC 同 PA 不同 VA 口径
 

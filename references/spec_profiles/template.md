@@ -14,10 +14,16 @@ pmp_granularity: <写清 PMP 构造粒度>
 official_spike_has_tlb_model: <true|false|unknown>
 official_spike_has_cache_model: <true|false|unknown>
 official_spike_has_pma_csr: <true|false|unknown>
+linknan_difftest_ref_has_pma_csr: <true|false|unknown>
 default_spike_gate: <写清哪些场景可作为 default Spike gate>
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: <true|false|unknown>
 ```
+
+`linknan_difftest_ref_has_pma_csr: unknown` 只表示本 profile 尚未登记或确认
+`HYPTEST_DIFFTEST_REF_SO` 的 PMA 能力，不能推导为 false。若当前项目的 LinkNan
+difftest reference 已支持 PMA，应显式改成 `true`；若明确不支持，才写 `false`
+并补对应 model-gap 说明。
 
 ## 1. 口径优先级
 

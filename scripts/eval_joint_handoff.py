@@ -84,6 +84,8 @@ def main() -> int:
             for field in required_fields:
                 if field not in payload:
                     failures.append(f"handoff missing {field}")
+            if "runner_context" not in payload:
+                failures.append("handoff missing runner_context")
             for term in triage_required_terms:
                 if term not in triage_text:
                     failures.append(f"triage skill does not mention {term}")

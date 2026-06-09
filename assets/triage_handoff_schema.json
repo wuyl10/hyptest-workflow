@@ -3,6 +3,7 @@
   "description": "Workflow-to-triage handoff schema. This is a lightweight contract, not a full JSON Schema implementation.",
   "required_fields": [
     "case_name",
+    "case_names",
     "platform",
     "spec_profile",
     "scenario",
@@ -11,15 +12,19 @@
     "exception_observed",
     "excpt_dump",
     "log_markers",
+    "runner_context",
     "error_points",
     "reason_code_candidates",
     "reason_code_details",
     "next_single_run",
+    "runner_request",
     "waveform_needed",
+    "waveform_context",
     "log_paths"
   ],
   "field_types": {
     "case_name": ["string", "null"],
+    "case_names": ["array"],
     "platform": ["string"],
     "spec_profile": ["string"],
     "scenario": ["array"],
@@ -28,12 +33,38 @@
     "exception_observed": ["object"],
     "excpt_dump": ["object"],
     "log_markers": ["object"],
+    "runner_context": ["object"],
     "error_points": ["array"],
     "reason_code_candidates": ["array"],
     "reason_code_details": ["array"],
     "next_single_run": ["string", "null"],
+    "runner_request": ["object", "null"],
     "waveform_needed": ["boolean"],
     "waveform_context": ["object", "null"],
     "log_paths": ["array"]
-  }
+  },
+  "runner_context_boolean_fields": [
+    "official_spike",
+    "linknan_platform",
+    "linknan_difftest",
+    "difftest_disabled",
+    "linknan_no_diff",
+    "difftest_mode_conflict",
+    "multi_run",
+    "runner_conflict",
+    "runner_ambiguous"
+  ],
+  "log_marker_boolean_fields": [
+    "has_passed",
+    "has_failed",
+    "has_difftest_failed",
+    "has_mismatch",
+    "has_ref_dut_delta",
+    "has_selfcheck_failed",
+    "has_error",
+    "has_untested_exception",
+    "has_hit_good_trap",
+    "has_bad_trap",
+    "timed_out"
+  ]
 }

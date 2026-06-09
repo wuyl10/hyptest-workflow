@@ -35,6 +35,14 @@ def main() -> int:
         payload = {}
     if not payload.get("ok"):
         failures.append("--nongate-summary --json payload should have ok=true")
+    metadata = payload.get("profile_metadata", {})
+    if not isinstance(metadata, dict):
+        failures.append("--nongate-summary --json payload should contain profile_metadata")
+    else:
+        if metadata.get("official_spike_has_pma_csr") != "false":
+            failures.append("nhv5_1_ap official_spike_has_pma_csr should be false")
+        if metadata.get("linknan_difftest_ref_has_pma_csr") != "true":
+            failures.append("nhv5_1_ap linknan_difftest_ref_has_pma_csr should be true")
     nongate = payload.get("nongate", {})
     if not isinstance(nongate, dict):
         failures.append("--nongate-summary --json payload should contain a nongate block")

@@ -12,6 +12,7 @@ pmp_granularity: 4KB
 official_spike_has_tlb_model: false
 official_spike_has_cache_model: false
 official_spike_has_pma_csr: false
+linknan_difftest_ref_has_pma_csr: unknown
 default_spike_gate: ordinary_cacheable_dram_arch_only
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: true

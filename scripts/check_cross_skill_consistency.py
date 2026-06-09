@@ -130,6 +130,21 @@ def read_all_text(root: Path) -> tuple[str, list[str]]:
     return "\n".join(chunks), missing
 
 
+def first_fenced_block(text: str, language: str) -> str | None:
+    match = re.search(
+        rf"```{re.escape(language)}\s*\n(.*?)\n```",
+        text,
+        re.S,
+    )
+    return match.group(1) if match else None
+
+
+def markdown_section(text: str, heading: str) -> str:
+    pattern = rf"(?ms)^##\s+{re.escape(heading)}\s*$\n(.*?)(?=^##\s+|\Z)"
+    match = re.search(pattern, text)
+    return match.group(1) if match else ""
+
+
 def main() -> int:
     args = parse_args()
     workflow_root = skill_root()
@@ -158,11 +173,29 @@ def main() -> int:
         issues.append("workflow missing references/triage_handoff_schema.md")
     else:
         handoff_text = workflow_handoff.read_text(encoding="utf-8", errors="ignore")
+        json_block = first_fenced_block(handoff_text, "json")
+        if not json_block:
+            issues.append("triage_handoff_schema.md missing JSON example block")
+        else:
+            try:
+                example_payload = json.loads(json_block)
+            except json.JSONDecodeError as exc:
+                issues.append(f"triage_handoff_schema.md JSON example is invalid: {exc}")
+                example_payload = {}
+            if isinstance(example_payload, dict):
+                for field in handoff_required_fields:
+                    if field not in example_payload:
+                        issues.append(f"triage_handoff_schema.md JSON example missing `{field}`")
+        triage_handoff_section = markdown_section(triage_text, "Workflow Handoff")
         for field in handoff_required_fields:
             if field not in handoff_text:
                 issues.append(f"triage_handoff_schema.md missing field `{field}`")
             if field not in triage_text:
                 issues.append(f"hyptest-failure-triage docs do not mention handoff field `{field}`")
+            if field not in triage_handoff_section:
+                issues.append(
+                    f"hyptest-failure-triage Workflow Handoff section does not list `{field}`"
+                )
         for field in TRIAGE_OPTIONAL_HANDOFF_TERMS:
             if field not in handoff_text:
                 issues.append(f"triage_handoff_schema.md missing optional handoff field `{field}`")

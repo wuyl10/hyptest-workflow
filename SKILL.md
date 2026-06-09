@@ -14,9 +14,27 @@ Agent 执行入口。触发后按以下优先级执行：
 
 用户面向的用法/字段表/触发范例在 `README.md`——agent 不用看 README，只管按本文件执行。
 
+## Owner Decision
+
+先用这个短路径定 owner；后面的 Cross-Skill Routing 只补细节：
+
+1. 只有失败日志、`FAILED` / selfcheck、stuck、timeout、`50000 cycles no commit`、
+   LinkNan difftest mismatch、suspected RTL bug 或失败列表清理？
+   → 转 `hyptest-failure-triage`，workflow 不直接归因。
+2. 需要新增/修改 case、`test_register.c`、`test_point/**/*.md`、编译/运行、
+   profile guard 或分层初判？
+   → 留在 `hyptest-workflow`。
+3. 涉及 PMA/PBMT/MMIO/Device/no-response？
+   → 先读 active `spec_profile` 做 profile guard，再区分 runner：
+   `HYPTEST_SPIKE_BIN` 是 official Spike gate，`HYPTEST_DIFFTEST_REF_SO`
+   是 LinkNan difftest reference。
+4. 已经出现 LinkNan difftest mismatch？
+   → `hyptest-failure-triage` 拥有分类和 `runner_request` 决策；workflow 只按
+   handoff 执行指定 compile/run/edit 动作并回传证据。
+
 ## Cross-Skill Routing
 
-`hyptest-workflow` 是 case/workflow/profile/runner owner，不是失败闭环 owner，也不是波形分析 owner。跨 skill 时按下面边界走，避免 workflow 看到失败或 FSDB 后直接越权下结论。
+`hyptest-workflow` 是 case/workflow/profile/runner owner，不是失败闭环 owner，也不是波形分析 owner。跨 skill 时遵守 Owner Decision，避免 workflow 看到失败或 FSDB 后直接越权下结论。
 
 继续留在 `hyptest-workflow`：
 
@@ -64,37 +82,19 @@ hyptest 失败 + waveform 需求:
 
 ## Data Sources and Roles
 
-三个可读写文件，各司其职、各有生命周期——**不要混用**：
+三个状态源不要混用：
 
-| 文件 | 定位 | 谁写 | 谁读 | 生命周期 |
-|---|---|---|---|---|
-| `references/spec_profiles/<profile>.md` | **项目真值**：当前架构 Nanhu 实现了 spec 什么、Spike 建模了 spec 什么、Nanhu 未实现 spec 什么；PMA/PBMT/MMIO 表 | 人工长期维护；audit 后迁入 | agent 分层/选点**必读**（Source Priority §1） | 随项目 + Spike 版本演化 |
-| `.hyptest_workflow_skill/memory/events.jsonl` | **可直接复用的事实**：人工确认过的结论 + agent 低风险自动沉淀；原信息不再成立时由人工直接删对应行（无 obsolete 占位） | `workflow_memory.py append`（3 门槛 + status 分档）| agent bug hunt / fix-case / 相似检索查询；`status=confirmed` 进 Source Priority §2，`status=unconfirmed` 仅作辅助 | 长期累积，带 status（unconfirmed / confirmed） |
-| `test_point/Manual_Reference.md` | **面向人的收件箱**：agent 跑出来的新 manual/blocked 观察、待人工判决的问题；所有"人工确认后的结论"会被迁出到 profile 或 memory，本文件只承载待办 | skill step 16 auto-append；人工 audit 后迁出 + `> 已解决` 或直接删条目 | 人工 audit；agent 仅在 step 16 `check_manual_reference_topic.py` 查重时读一次 | 短暂——人工审完就流出去（进 profile / memory / 删除） |
+- `references/spec_profiles/<profile>.md` 是项目真值，profile / PMA / PBMT /
+  MMIO / Spike gate 口径都以它为准。
+- `.hyptest_workflow_skill/memory/events.jsonl` 只存可复用事实；
+  `confirmed` 可进入 Source Priority，`unconfirmed` 仅作辅助。过时记录由人工
+  直接删 JSON 行，没有 `obsolete` 占位。
+- `test_point/Manual_Reference.md` 是待人工 audit 的收件箱；人工确认后迁入
+  profile 或 memory，判为作废/过时则直接删除相关条目。
 
-### 三文件之间的流转
-
-```
-agent 写 case 遇到新 manual/blocked
-  → step 16 判断（按顺序）：
-    1. profile §5 / reason_code_catalog 已覆盖？     → 是 → 不新增 MR，摘要引用 profile
-    2. memory 有 confirmed 条目覆盖本主题？          → 是 → 不新增 MR，复用 memory 条目
-    3. Manual_Reference 有未解决同主题条目？         → 是 → 不新增 MR，在已有条目下补"本轮也碰到"一行
-    4. 以上都否                                       → auto-append 新的 `#### <id>.（待人工确认）`
-  → 同时 step 15 按 3 门槛 append memory（status=unconfirmed）
-
-  [人工 audit Manual_Reference 条目]
-  ├─ 判为"规则真值" → 内容迁进 spec_profiles/<profile>.md，MR 该条标 `> 已解决：已进 profile §X`
-  ├─ 判为"复用线索" → append memory（status=confirmed），MR 标 `> 已解决：已进 memory`
-  └─ 判为"作废 / 过时" → **直接从 Manual_Reference 删除该条目**；相关 memory 行也一并删除
-
-agent 后续执行:
-  profile 做分层决策时读
-  memory 做相似检索 commented 判据 / bug hunt query 时读（优先 confirmed，unconfirmed 作辅助）
-  Manual_Reference 检查是否有本 case 的待确认条目（强信号）
-```
-
-判断 1-3 可用脚本辅助：
+Manual_Reference ↔ memory 的完整流转和 audit 规则见
+`references/workflow_state.md`。判断 profile / memory / Manual_Reference
+是否已覆盖当前主题时用：
 
 ```bash
 python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_manual_reference_topic.py \
@@ -105,19 +105,6 @@ python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_manual_reference_topic.py \
 ```
 
 返回 `verdict` ∈ `{profile_covered, memory_confirmed, manual_reference_open, new_entry_needed}` 以及 `next_action`。
-
-### memory status 分档
-
-memory 只存**可以直接参考的事实**，不存"待确认问题"（那属于 Manual_Reference.md）、也不存"过时占位"（过时记录由人工直接编辑 `events.jsonl` 删除对应行）。2 档 status：
-
-| status | 含义 | 读取优先级 |
-|---|---|---|
-| `unconfirmed` | agent 自动沉淀的**未经人工确认的事实观察**（3 门槛过，可作辅助线索）；`workflow_memory.py append` 的默认值 | 次级参考 |
-| `confirmed` | **人工确认过的经验**（从 Manual_Reference 迁入） | **首选** |
-
-过时处理：`events.jsonl` 是 append-only 但手工可编辑；若某条记录因 Spike/RTL 升级不再成立，**人工直接打开文件删除对应行**（Manual_Reference.md 相关条目同时删除）。memory 没有 `obsolete` 占位——保持"memory 里每条都是当前成立的事实"的单一真值。
-
-详细维护 CLI、Manual_Reference → memory 迁入操作见 `references/workflow_state.md`。
 
 ## Non-Negotiables
 
@@ -135,6 +122,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
 
 - **本轮需要的 `HYPTEST_*` 变量缺失时停 gate，不 fallback 到个人路径或 PATH**。Why: 用 PATH 里的 `spike` 可能跑到 LinkNan 定制 difftest Spike 而不是社区版，得到"看起来过了其实不是 architecture gate"的假 default；fallback 到别人绝对路径也会让 CI 和本地行为分叉。必要组合：Spike gate = `HYPTEST_HOME` + `HYPTEST_SPIKE_BIN`；LinkNan gate = `HYPTEST_HOME` + `HYPTEST_LINKNAN_HOME` + `HYPTEST_DIFFTEST_REF_SO`；Nanhu 源码从 `HYPTEST_LINKNAN_HOME/dependencies/nanhu/src/main` 推导；详细字段见 `references/task_input_schema.md`。
 - **runner 角色不可混用**：`HYPTEST_SPIKE_BIN` 只用于社区版/上游 Spike 的 default gate；LinkNan/difftest 走 `HYPTEST_DIFFTEST_REF_SO`，不要把定制 difftest Spike 当作 `HYPTEST_SPIKE_BIN`。Why: 定制 difftest Spike 为了和 RTL 对齐会刻意复制 RTL quirk，用它当 gate 等于"把 RTL bug 当成规范"——失去架构 gate 意义。两种 runner 职责严格分开才能形成有效交叉验证。
+- **official Spike PMA gap 只约束 official gate**：profile 中 `official_spike_has_pma_csr=false` 只说明 `HYPTEST_SPIKE_BIN` 不适合作为 PMA CSR/routing 的 default gate；不得据此推断 `HYPTEST_DIFFTEST_REF_SO` 缺少 PMA。LinkNan difftest 的 PMA mismatch 应交给 `hyptest-failure-triage` 按 REF-DUT PMA 一致性分析。
 - **prompt 显式给的运行环境字段**（`HYPTEST_SPIKE_BIN` / `HYPTEST_LINKNAN_HOME` / `HYPTEST_DIFFTEST_REF_SO` / `HYPTEST_CROSS_COMPILE` / `HYPTEST_TMPDIR`）**必须映射成 `--env KEY=VALUE`** 传给支持 `--env` 的脚本；`$HYPTEST_WORKFLOW_SKILL_HOME` 由调用者 export，skill 文档不写死个人绝对路径。Why: 脚本子进程不继承 shell 别名和 prompt 字段，不显式传会拿到 OS 默认或旧值；skill 里写死绝对路径会让其他人 clone 后直接报错。
 - **路径 / runner 分层必须显式**：skill 自带工具用 `$HYPTEST_WORKFLOW_SKILL_HOME/scripts/<tool>.py`；hyptest repo runner 用 `$HYPTEST_HOME/<tool>.py`，例如 `$HYPTEST_HOME/compile_elf.py`、`$HYPTEST_HOME/get_result.py`；`HYPTEST_SPIKE_BIN` 只用于 official/community Spike gate；`HYPTEST_DIFFTEST_REF_SO` 只用于 LinkNan/difftest gate。不要用裸相对路径调用 skill 工具，也不要混用 runner。
 - **跨 skill 脚本路径单独处理**：`HYPTEST_FAILURE_TRIAGE_SKILL_HOME` 是 failure-triage 自带脚本目录，只在 workflow 生成 handoff 后需要用户/triage 执行 `triage_snapshot.py`、`triage_report_template.py`、`update_failure_list.py` 等 triage scripts 时使用；它不属于 workflow runner 环境，不传给 `$HYPTEST_HOME/compile_elf.py` / `$HYPTEST_HOME/get_result.py`，也不作为 workflow gate 的必需变量。`WAVEFORM_DEBUG` 不属于 workflow 环境；只有 failure-triage 决定调用 waveform-debug scripts 时才需要。
@@ -191,7 +179,7 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
 
    写前检查答完走**分路**：
    - 第 1 问 "否" + 第 2 问 "**true**"（Spike 可 gate）→ **default-first 路径**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**开启** `TEST_REGISTER(...);` → 步骤 9 compile → 步骤 10 跑 Spike → 步骤 11 失败分类（如需）→ 步骤 12-14 正常回填
-   - 第 1 问 "否" + 第 2 问 "**false**"（Spike 不可 gate，但 case 照编）→ **nongate 路由**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**直接注释** `// TEST_REGISTER(...);` → 步骤 9 compile 用 `--include-commented` → 步骤 10 **可选跑 Spike 看行为但不以结果翻 default**（Spike PASS 也不翻 default；跑出 FAILED 才进步骤 11 归因）→ 步骤 14 按证据落 `manual` / `compile-only` / `blocked` 并填写对应 `reason_code:` → 步骤 16 跑 submission card；若需要 LinkNan/no-diff、difftest、RTL-only 或 waveform 证据闭环，不在 workflow 内直接归因，生成 handoff 交给 failure-triage 指定 `runner_mode=linknan-no-diff|linknan-difftest`，workflow 只执行被指定的 compile/run/edit 动作；若最终分层是 `manual` / `blocked`，再按 4 档 verdict 处理 Manual_Reference。
+   - 第 1 问 "否" + 第 2 问 "**false**"（Spike 不可 gate，但 case 照编）→ **nongate 路由**：步骤 6 写 case → 步骤 7 预编译 lint → 步骤 8 注册**直接注释** `// TEST_REGISTER(...);` → 步骤 9 默认只做 official Spike 编译 smoke（`--include-commented`），步骤 10 可选跑 official Spike 观察但不以结果翻 default（Spike PASS 也不翻 default；跑出 FAILED 才进步骤 11 归因）→ 步骤 14 按证据落 `manual` / `compile-only` / `blocked` 并填写对应 `reason_code:` → 步骤 16 跑 submission card；若需要 LinkNan/no-diff、difftest、RTL-only 或 waveform 证据闭环，按 Non-Negotiables §2 的 runner 角色生成 handoff，交给 failure-triage 指定 `runner_request`；workflow 只执行该 request 并回传证据。若最终分层是 `manual` / `blocked`，再按 4 档 verdict 处理 Manual_Reference。
 
    写前检查答不出 + 答案对不上证据 → 回补步骤 3-4 证据，**不要直接下笔**。这一步成本是几行文字，省的是错走 default-first 后再回退的 ~60-90s compile/run。
 6. **写或改 case**：AI/批量生成放 `ai_test_cases/*.c`；人工维护放 `manual_test_cases/<module>/`；结构和断言以 `references/writing_cases.md` 为准。
@@ -201,17 +189,21 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
    ```
    pre-compile lint 拦截 `TEST_END` 多写 / `TEST_SETUP_EXCEPT()` 漏调 / 多余 register 等结构错；命中 error 立即修，**不要先 compile**——一次 compile 在 NFS 上 ~30-60s，预编译 lint 只 1-2s。
 8. **调整 `test_register.c`** 注册状态，**按步骤 5 分路**：default-first 路径**开启**注册 `TEST_REGISTER(...);`；nongate 路由**直接注释** `// TEST_REGISTER(...);`。
-9. **单 case 编译**：default-first 用 `python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name>`；nongate 路由用 `python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name> --include-commented`（扫注释注册行）。
+9. **单 case 编译**：
+   - default-first：`python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name>`
+   - nongate smoke：`python3 $HYPTEST_HOME/compile_elf.py --plat spike --name <case_name> --include-commented`（只证明 official Spike 编译/普通 ISA smoke，不作为 LinkNan/RTL oracle）
+   - triage runner_request：若 `hyptest-failure-triage` 返回 `runner_request`，按其中 `compile_plat` 执行对应平台编译；`include_commented=true` 时加 `--include-commented`。workflow 不自行改写 `runner_request` 字段。
 10. **单 case 运行**：
    - default-first：**必须**跑 `python3 $HYPTEST_HOME/get_result.py --platform spike --case <case_name>`；结果决定分层（PASSED → `default`；FAILED / untested → 步骤 11 归因）
-   - nongate 路由：**可选**跑 Spike——想拿观察证据就跑，但结果**不翻 default**；最终仍按当前 runner/oracle 条件落 `manual` / `compile-only` / `blocked`
+   - nongate smoke：**可选**跑 official Spike——想拿观察证据就跑，但结果**不翻 default**；最终仍按当前 runner/oracle 条件落 `manual` / `compile-only` / `blocked`
+   - triage runner_request：按 `run_platform` 和 `difftest_mode` 执行；`linknan-difftest` / `linknan-no-diff` 的证据用途按 Non-Negotiables §2 和 failure-triage handoff，不在 workflow 内重新裁决。
    - `compile-only` 分层：Gate D = `N/A`，明确写不运行原因
    运行前确认平台环境变量在当前进程可见。`compile-only` 允许 Gate D=`N/A`，但必须写明不运行原因。
 11. **失败分类（强制）**：运行结果出现 `FAILED` / `untested exception` / `timeout` 时**必须**跑：
    ```bash
    python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/classify_failure_log.py --log-file <log> --spec-profile <spec_profile> --json
    ```
-   并把 `scenario` / `error_points` / `reason_code_candidates` 写进交付摘要——分层归因必须以 classifier 输出为依据，**禁止凭旁证或感觉直接归 manual / blocked**。跳过此步等同于 `D-BLOCK-EVIDENCE`，不能交付非 default 分层。运行成功（`PASSED` 单独出现）的 case 跳过此步。
+   并把 `scenario` / `runner_context` / `error_points` / `reason_code_candidates` 写进交付摘要——classifier 输出只是**候选证据**，最终分层仍要结合 profile、runner 和 gate 结果；**禁止凭旁证或感觉直接归 manual / blocked**。PMA/PBMT/MMIO 的 `linknan-difftest` mismatch 必须回到 `hyptest-failure-triage` 做 REF-DUT first-divergence，不能只凭候选 reason 收口。跳过此步等同于 `D-BLOCK-EVIDENCE`，不能交付非 default 分层。运行成功（`PASSED` 单独出现）的 case 跳过此步。
 12. **test_point → case 映射表自查**：运行通过后，对照 `test_point` 正文逐条列出每个要求落在 case 哪一行断言。发现漏项立即补；发现偏移立即改。详见 `references/writing_cases.md` §14.1。
 13. **回填 `test_point`**：默认轻量回填（只写 `case_name` + 必要短状态；不追加审计块）。详细模板和复用口径见 `references/writing_cases.md`。
 14. **回填核对（含 `reason_code` 强制查表）**：
@@ -232,35 +224,22 @@ memory 只存**可以直接参考的事实**，不存"待确认问题"（那属�
 
     `compile-only` 只需要交付卡和摘要里说明 Gate D=`N/A` / 不运行原因；除非同时存在待人工判决的问题，否则不写 Manual_Reference。`default` 不触发本步。
 
-    **人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status confirmed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。若人工判决"作废/过时"，**直接从 Manual_Reference 删除该条目**；memory 如有对应记录也一并删除对应 JSON 行。
+    **人工后续确认或 LinkNan 复核完成后**，把该 Manual_Reference 条目标记为已解决（在条目后加 `> 已解决（<日期>）：<结论一句话>`），并用 `workflow_memory.py append --status confirmed` 把解决结论追加到 memory，同时对应 case 的注册状态也一并更新。若人工判决"作废/过时"，**直接从 Manual_Reference 删除该条目**；memory 如有对应记录，按 `references/workflow_state.md` 的 audit/delete 权限处理，只有用户确认具体 entry 或要求 Codex 执行 audit 结果时才删除对应 JSON 行。
 
 ## Workflow Memory
 
 `$HYPTEST_HOME/.hyptest_workflow_skill/memory/` 是本地经验白名单，**不是流水账**。目标：skill 越用越聪明，只沉淀**几乎确定有用且不会错**的经验。不替代本轮证据，不替代 SKILL.md 硬规则。
 
-### 读端 + 写端：按任务类型分档
+默认只在这些场景查/写 memory：bug hunt、新增测试点、`fix-case` 遇到非平凡失败、用户明确提到历史问题、或用户本轮给出 Manual_Reference / LinkNan 复核的人工确认结论。补已有 `### PnX` 小改、`run-only`、`preflight-only`、`writeback-only` 默认不查不写；`triage-only` 交给 failure-triage 自决。
 
-| 任务类型 | 默认 query | 完成后自问 append |
-|---|---|---|
-| bug hunt（`target_module=<m>` + `new-case-only`，或 test_point 文件名含 `suspected_bug_corner_points`） | ✓ 按 `target_module` 关键词 | ✓ |
-| 新增测试点 `new-case-only`（有明确模块特征的 `test_point_file`） | ✓ 按 test_point 文件名模块部分 | ✓ |
-| `fix-case` 遇到非平凡失败 | ✓ 按 `case_name` / `cause` | ✓ |
-| 用户明确提到"以前的 XX 问题 / 复盘 / 历史问题" | 强制查 | 强制自问 |
-| **用户本轮给出 Manual_Reference 条目的人工确认结论 / LinkNan 复核结果** | 强制查同 topic 历史 | ✓ 强制 append（`--status confirmed`，附结论） |
-| 补已有 `### PnX` 小改 / `run-only` / `preflight-only` / `writeback-only` | ✗ | ✗ |
-| `triage-only` | triage skill 自决 | triage skill 自决 |
-
-查询按 topic 精确匹配，memory 2 档状态都直接返回（`unconfirmed` / `confirmed`），人工删行的过时记录自然不再出现；即使总量 100+ 条也只返回相关 10-20 条。
-
-### 写端 3 条强门槛（同时满足才 append；任一不过 → 摘要里写"无经验可沉淀"）
+写端 3 条强门槛同时满足才 append；任一不过 → 摘要里写"无经验可沉淀"：
 
 1. **可验证事实，不是猜测**（✗ "感觉 StoreQueue 有问题"）
 2. **下次相似任务会用得上**（✗ "今天补了 P13A" 这种流水账）
 3. **非平凡**——文档/源码 5 分钟能查到的**不记**（✗ "TEST_END 只能一个"）
 
-每条带日期标签、一条一事、不确定就不写。
-
-CLI 入口（`append` / `query` / `summarize` / 按需 audit）、膨胀控制、与 Claude auto memory 的分工都在 `references/workflow_state.md`。
+每条带日期标签、一条一事、不确定就不写。Memory 检索按 `workflow_memory.py query --term` / case / module / tag 执行。
+Manual_Reference 覆盖检查才用 `check_manual_reference_topic.py --topic`。status 口径、膨胀控制和 Manual_Reference 迁入流程都在 `references/workflow_state.md`。
 
 ## Bug Hunt Evidence（仅 bug hunt 场景自动触发）
 
@@ -306,7 +285,7 @@ profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spi
 
 三类用途：
 
-1. **为 LinkNan / RTL 环境准备回归素材**：Spike 不建模但 LinkNan difftest / 真实 RTL 仿真可以 gate。case 写好并 `// TEST_REGISTER(...)` 注释；需要 LinkNan/no-diff、difftest 或 waveform 证据时，把场景、日志和可选 `waveform_context` 交给 `hyptest-failure-triage`，由 triage 指定 runner_mode，workflow 只执行对应 compile/run/edit。
+1. **为 LinkNan / RTL 环境准备回归素材**：official Spike 不建模时，LinkNan difftest / 真实 RTL 仿真可提供闭环证据或候选 gate；能否作为 cleanup/default/manual 依据，由 `hyptest-failure-triage` 的 `runner_request`、profile guard 和当前 oracle 决定。case 写好并 `// TEST_REGISTER(...)` 注释；需要 LinkNan/no-diff、difftest 或 waveform 证据时，把场景、日志和可选 `waveform_context` 交给 `hyptest-failure-triage`，由 triage 返回 `runner_request`，workflow 只执行对应 compile/run/edit。
 2. **覆盖完成度**：test_point 要求的场景必须有 case——即使 Spike 不能 gate，case 本身是"场景已构造、待跑 LinkNan"的证据。未来 Spike 补了 gap，去掉注释即可翻 default。
 3. **验证 profile §5 的描述**：nongate 路由允许"可选跑 Spike 看行为但不翻 default"，实际跑一次能**实证** profile §5 的说法——例如发现"chain mismatch 抑制路径 Spike 可观测，但 chain closed BP 确实不抛"，这类观察可以通过 step 15/16 append memory，或在 `manual` / `blocked` 需要人工复核时写进 Manual_Reference 扩 profile §5。
 
@@ -329,8 +308,8 @@ profile §5 说"Spike 不适合 gate"时，**case 仍要写**，只是不以 Spi
 - **test_point → case 映射表**：逐条列出 test_point 每个要求对应到 case 哪一行断言（详见 `references/writing_cases.md` §14.1）。
 - `compile-only` 时显式写 Gate D=`N/A` 与不运行原因。
 - 若任务是 `new-case-only` 但最终没有新增 `### PnX` 条目和新 case，必须明确说明原因，不能把旧条目或旧 case 当成"新增结果"。
-- **memory 动作**（仅在 Workflow 步骤 15 触发的任务类型输出）：列本轮 query 了哪些 topic（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 15 的任务不用列。
-- **非 default 交付卡 / Manual_Reference 动作**：`manual` / `compile-only` / `blocked` 必须说明 submission card 路径。只有 `manual` / `blocked` 触发 Manual_Reference 四档 verdict：说明 `check_manual_reference_topic.py` 的 `verdict`（`profile_covered` / `memory_confirmed` / `manual_reference_open` / `new_entry_needed`）以及对应动作：是否引用了 profile 条目 / 复用了 memory confirmed 条目 / 在已有 MR 条目下补"本轮也碰到"行 / 新 append 了 `#### <id>.（**自动生成，待人工确认**）`；或本轮收到人工 / LinkNan 复核结论，给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status confirmed`，或者人工判决"作废/过时"**直接删除了 MR 条目 + 对应 memory 行**。`compile-only` 默认不写 Manual_Reference；`default` 不触发本项。
+- **memory 动作**（仅在 Workflow 步骤 15 触发的任务类型输出）：列本轮用哪些 `--term` / case / module / tag 查了 memory（或"未查"），append 了什么 / 或明确"无经验可沉淀"。补已有 `### PnX` 小改、run-only 等不触发步骤 15 的任务不用列。
+- **非 default 交付卡 / Manual_Reference 动作**：`manual` / `compile-only` / `blocked` 必须说明 submission card 路径。只有 `manual` / `blocked` 触发 Manual_Reference 四档 verdict：说明 `check_manual_reference_topic.py` 的 `verdict`（`profile_covered` / `memory_confirmed` / `manual_reference_open` / `new_entry_needed`）以及对应动作：是否引用了 profile 条目 / 复用了 memory confirmed 条目 / 在已有 MR 条目下补"本轮也碰到"行 / 新 append 了 `#### <id>.（**自动生成，待人工确认**）`；或本轮收到人工 / LinkNan 复核结论，给对应 Manual_Reference 条目加了 `> 已解决（<日期>）：<结论一句话>` + 同步 `workflow_memory.py append --status confirmed`，或者人工判决"作废/过时"**直接删除了 MR 条目**，memory 删除则按 `workflow_state.md` 的用户确认 / audit 执行边界处理。`compile-only` 默认不写 Manual_Reference；`default` 不触发本项。
 
 ## What To Read
 

@@ -125,6 +125,7 @@ def main() -> int:
             "official_spike_has_tlb_model: false\n"
             "official_spike_has_cache_model: false\n"
             "official_spike_has_pma_csr: false\n"
+            "linknan_difftest_ref_has_pma_csr: unknown\n"
             "default_spike_gate: ordinary\n"
             "```\n\n"
             "## 1. 口径优先级\n\n"

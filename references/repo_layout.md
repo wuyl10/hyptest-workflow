@@ -52,15 +52,16 @@ case_elf_asm/
 .hyptest_workflow_skill/cache/      rebuildable workflow indexes and preflight packs
 .hyptest_workflow_skill/reports/    saved preflight/gate/postcheck/submission/ledger reports
 .hyptest_workflow_skill/tmp/        temporary workflow helper files
-.hyptest_workflow_skill/memory/     append-only local lessons/failure records; review before deleting
+.hyptest_workflow_skill/memory/     local lessons/failure records; normal writes append, audited stale cleanup deletes JSONL lines
 .tmp/hyptest_compile/                compile_elf.py register sources and compiler TMPDIR
 .tmp/result_log/                     get_result.py Spike/LinkNan run logs
 ```
 
 Most helper state under `cache/`, `reports/`, and `tmp/` is safe to delete and
 rebuild. Treat `memory/` differently: it is local evidence for repeated failure
-patterns and fixes, so mark stale records `obsolete` instead of casually
-dropping them.
+patterns and fixes. Normal writes are append-only, but after human audit confirms
+that a record is stale, delete the affected JSONL line(s) directly. There is no
+`obsolete` memory status.
 
 Use `python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/clean_generated.py --repo-root $HYPTEST_HOME` to remove
 workflow cache/report/tmp directories after confirming no useful logs need to

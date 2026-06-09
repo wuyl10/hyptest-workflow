@@ -71,9 +71,28 @@ def main() -> int:
         for expected in item.get("expected_codes", []):
             if str(expected) not in codes:
                 case_failures.append(f"missing expected code {expected}")
+        warning_codes = [
+            str(row.get("code"))
+            for row in payload.get("warnings", [])
+            if isinstance(row, dict) and row.get("code")
+        ]
+        for expected in item.get("expected_warnings", []):
+            if str(expected) not in warning_codes:
+                case_failures.append(f"missing expected warning {expected}")
+        for forbidden in item.get("forbidden_warnings", []):
+            if str(forbidden) in warning_codes:
+                case_failures.append(f"forbidden warning present {forbidden}")
+        warning_text = " ".join(
+            str(row.get("message", ""))
+            for row in payload.get("warnings", [])
+            if isinstance(row, dict)
+        )
+        for expected_text in item.get("expected_warning_text", []):
+            if str(expected_text) not in warning_text:
+                case_failures.append(f"missing expected warning text {expected_text}")
         if case_failures:
             failures.append(f"{case_id}: {', '.join(case_failures)}")
-        results.append({"id": case_id, "ok": not case_failures, "codes": codes})
+        results.append({"id": case_id, "ok": not case_failures, "codes": codes, "warnings": warning_codes})
 
     report = {
         "ok": not failures,

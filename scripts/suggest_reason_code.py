@@ -48,6 +48,48 @@ def keyword_rules(catalog: dict[str, dict[str, Any]]) -> list[tuple[str, list[st
     return rules
 
 
+def needs_linknan_first_divergence(symptom: str) -> bool:
+    lowered = tokenize(symptom)
+    has_linknan = any(
+        token in lowered
+        for token in [
+            "linknan difftest",
+            "hyptest_difftest_ref_so",
+            "hyptest-difftest-ref-so",
+            "ref-dut",
+            "ref dut",
+            "difftest ref",
+        ]
+    )
+    has_sensitive = any(
+        token in lowered
+        for token in ["pma", "pbmt", "mmio", "csr", "illegal instruction", "unknown csr"]
+    )
+    return has_linknan and has_sensitive
+
+
+def prioritize_for_linknan_first_divergence(scored: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for item in scored:
+        if item.get("code") == "D-BLOCK-RUN-UNEXPLAINED":
+            item["score"] = int(item.get("score", 0)) + 100
+            matched = item.setdefault("matched_keywords", [])
+            if isinstance(matched, list) and "linknan first-divergence required" not in matched:
+                matched.append("linknan first-divergence required")
+            return scored
+    scored.append(
+        {
+            "code": "D-BLOCK-RUN-UNEXPLAINED",
+            "score": 100,
+            "matched_keywords": ["linknan first-divergence required"],
+            "class": "BLOCK",
+            "default_decision": "blocked",
+            "meaning": "已运行，但失败结果不可归因。",
+            "typical_followup": "先完成归因，不用关键词直接落 manual/nongate。",
+        }
+    )
+    return scored
+
+
 def main() -> int:
     args = parse_args()
     symptom = " ".join(args.symptom).strip()
@@ -75,6 +117,9 @@ def main() -> int:
             }
         )
 
+    needs_first_divergence = needs_linknan_first_divergence(symptom)
+    if needs_first_divergence:
+        scored = prioritize_for_linknan_first_divergence(scored)
     scored.sort(key=lambda item: (-int(item["score"]), str(item["code"])))
     if not scored:
         scored.append(
@@ -88,11 +133,26 @@ def main() -> int:
                 "typical_followup": "No specific keyword matched; collect logs/rules before final tiering.",
             }
         )
+    warnings: list[dict[str, Any]] = []
+    if needs_first_divergence:
+        warnings.append(
+            {
+                "code": "do_not_close_without_first_divergence",
+                "requires_triage": True,
+                "message": (
+                    "LinkNan difftest/REF-DUT symptoms are not closed by reason_code "
+                    "keywords alone; hand off to hyptest-failure-triage for first-divergence. "
+                    "If this becomes a model limitation for HYPTEST_DIFFTEST_REF_SO, "
+                    "report it as a LinkNan difftest REF/model alignment gap, not an official Spike gap."
+                ),
+            }
+        )
 
     payload = {
         "ok": True,
         "symptom": symptom,
         "suggestions": scored[:5],
+        "warnings": warnings,
     }
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -108,6 +168,9 @@ def main() -> int:
             print(f"  meaning: {item['meaning']}")
         if item.get("typical_followup"):
             print(f"  followup: {item['typical_followup']}")
+    for warning in warnings:
+        print(f"warning: {warning['code']} requires_triage={warning['requires_triage']}")
+        print(f"  message: {warning['message']}")
     return 0
 
 

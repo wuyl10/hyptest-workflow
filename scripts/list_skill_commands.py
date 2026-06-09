@@ -239,13 +239,13 @@ COMMAND_GROUPS: list[dict[str, Any]] = [
             },
             {
                 "name": "failure-log",
-                "cmd": "python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/classify_failure_log.py --log-file <log> --json",
-                "desc": "Extract scenario, error points, reason_code candidates and next actions from a failure log.",
+                "cmd": "python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/classify_failure_log.py --log-file <log> --spec-profile <spec_profile> --json",
+                "desc": "Extract case_names, scenario, log_markers, runner_context (official Spike, LinkNan platform/difftest/no-diff, runner conflict, difftest-mode conflict, ambiguous, multi-run), error points, reason_code candidates and next actions from a failure log.",
             },
             {
                 "name": "triage-handoff",
                 "cmd": "python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/make_triage_handoff.py --log-file <log> --platform linknan --spec-profile <spec_profile> --json",
-                "desc": "Create a workflow-to-triage handoff card for deeper failure analysis; optional waveform context is passed through for failure-triage to decide whether to call waveform-debug.",
+                "desc": "Create and schema-validate a workflow-to-triage handoff card for deeper failure analysis; optional waveform context is passed through for failure-triage to decide whether to call waveform-debug.",
             },
         ],
     },

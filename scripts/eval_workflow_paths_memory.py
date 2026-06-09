@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -42,8 +43,73 @@ def expect(condition: bool, failures: list[str], message: str) -> None:
         failures.append(message)
 
 
+def assert_memory_docs(failures: list[str]) -> None:
+    reference_paths = [
+        SKILL_ROOT / "SKILL.md",
+        SKILL_ROOT / "references" / "workflow_state.md",
+        SKILL_ROOT / "references" / "repo_layout.md",
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in reference_paths)
+    lowered = combined.lower()
+    normalized = re.sub(r"\s+", " ", lowered.replace("`", ""))
+    skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8", errors="ignore")
+    tabbed_skill_lines = [
+        f"{line_no}: {line}"
+        for line_no, line in enumerate(skill_text.splitlines(), start=1)
+        if line.startswith("\t")
+    ]
+    expect(
+        not tabbed_skill_lines,
+        failures,
+        "workflow SKILL should not use tab-indented prose lines: " + "; ".join(tabbed_skill_lines[:3]),
+    )
+    forbidden_patterns = [
+        (
+            r"workflow_memory\.py\s+(?:append|query|summarize)?[^。；;\n]*--topic",
+            "workflow_memory.py docs should not use unsupported --topic",
+        ),
+        (r"query\s+了哪些\s+topic", "workflow SKILL should not describe memory query output as topic-based"),
+        (r"topic\s+精确匹配", "workflow SKILL should not describe workflow memory matching as topic-based"),
+        (
+            r"(?:自动|一并|同时|顺手)[^。；;\n]{0,24}(?:删除|清理)[^。；;\n]{0,24}(?:memory|JSON\s*行|events\.jsonl)",
+            "workflow SKILL should not imply automatic memory JSON deletion",
+        ),
+        (
+            r"(?:删除|清理)[^。；;\n]{0,24}(?:memory|JSON\s*行|events\.jsonl)[^。；;\n]{0,24}(?:无需|不用|不需要)(?:用户确认|audit|人工确认)",
+            "workflow SKILL should not allow memory JSON deletion without user/audit confirmation",
+        ),
+        (r"mark stale (?:records|entries) [`']?obsolete[`']?", "docs should not tell users to mark stale memory obsolete"),
+        (r"mark stale (?:records|entries).*obsolete", "docs should not tell users to mark stale memory obsolete"),
+    ]
+    for pattern, message in forbidden_patterns:
+        expect(re.search(pattern, combined, flags=re.IGNORECASE) is None, failures, message)
+    expect(
+        "there is no obsolete memory status" in normalized,
+        failures,
+        "repo layout should state obsolete memory status does not exist",
+    )
+    expect(
+        "audited stale cleanup deletes jsonl lines" in lowered
+        or "audit 确认" in combined
+        or "audit confirms" in lowered,
+        failures,
+        "memory docs should describe audited stale cleanup by deleting JSONL lines",
+    )
+    expect(
+        "--term" in combined and "check_manual_reference_topic.py --topic" in combined,
+        failures,
+        "workflow SKILL should distinguish workflow_memory --term from Manual_Reference --topic",
+    )
+    expect(
+        "只有用户确认具体 entry" in combined or "用户明确确认删除哪些 entry" in combined,
+        failures,
+        "workflow SKILL should mention user-confirmed memory deletion boundary",
+    )
+
+
 def main() -> int:
     failures: list[str] = []
+    assert_memory_docs(failures)
     with tempfile.TemporaryDirectory(prefix="hyptest_paths_memory_", dir=temp_parent()) as tmpdir:
         repo = Path(tmpdir) / "repo"
         repo.mkdir()
@@ -176,6 +242,24 @@ def main() -> int:
         if summary:
             expect(summary.get("count") == 1, failures, "summary should count appended memory record")
             expect(summary.get("phase_counts", [{}])[0].get("value") == "compile", failures, "summary should count compile phase")
+            boundary = str(summary.get("quality_boundary", ""))
+            lowered_boundary = boundary.lower()
+            expect(
+                "no obsolete status" in lowered_boundary,
+                failures,
+                "summary should say obsolete status does not exist",
+            )
+            expect(
+                "mark stale entries obsolete" not in lowered_boundary,
+                failures,
+                "summary should not tell users to mark stale entries obsolete",
+            )
+            expect(
+                "deletes jsonl lines directly" in lowered_boundary
+                or "deleted directly" in lowered_boundary,
+                failures,
+                "summary should say stale entries are deleted directly",
+            )
 
     if failures:
         print("FAIL workflow paths/memory eval")

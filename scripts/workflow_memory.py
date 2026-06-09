@@ -33,20 +33,27 @@ ALLOWED_PHASES = (
 #                     reference hint but NOT human-confirmed)
 #   - "confirmed"  — human-confirmed experience (promoted from Manual_Reference
 #                     after audit)
-# If a record becomes stale, **human edits events.jsonl directly to delete
-# the line(s) in question** — there is no `obsolete` placeholder. events.jsonl
-# is small (~20-50 rows per year); direct edits keep the file as a single-
-# source truth of currently-valid facts.
+# Normal writes are append-only. If a record becomes stale after audit, delete
+# the affected JSONL line(s) directly from events.jsonl — there is no `obsolete`
+# placeholder. events.jsonl is small (~20-50 rows per year); direct edits keep
+# the file as a single-source truth of currently-valid facts.
 # "open" and "obsolete" are NOT legal values; pending/suspicious items belong
 # in test_point/Manual_Reference.md, stale records should be removed.
 ALLOWED_STATUSES = ("unconfirmed", "confirmed")
+MEMORY_QUALITY_BOUNDARY = (
+    "Memory is local evidence and only a local hint. Normal writes are "
+    "append-only; audited stale cleanup deletes JSONL lines directly. Re-check "
+    "current source, logs, spec_profile, and platform evidence before using "
+    "memory in a decision. There is no obsolete status."
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Record and query local workflow memory. Memory is append-only evidence "
-            "for future hints; it is not a tiering decision source."
+            "Record and query local workflow memory. Normal writes are append-only; "
+            "audited stale cleanup deletes JSONL lines directly. Memory is not a "
+            "tiering decision source."
         )
     )
     parser.add_argument("--repo-root", required=True, help="Path to hyptest repo root.")
@@ -207,10 +214,7 @@ def query_records(args: argparse.Namespace) -> dict[str, Any]:
         "count": len(records),
         "records": records[:limit],
         "limit": limit,
-        "quality_boundary": (
-            "Memory records are local hints. Re-check current source, logs, spec_profile, "
-            "and platform evidence before using them in a decision."
-        ),
+        "quality_boundary": MEMORY_QUALITY_BOUNDARY,
     }
 
 
@@ -242,9 +246,7 @@ def summarize_records(args: argparse.Namespace) -> dict[str, Any]:
         "reason_code_counts": top(reason_counts, limit),
         "tag_counts": top(tag_counts, limit),
         "latest_records": sorted(records, key=lambda record: str(record.get("timestamp", "")), reverse=True)[:limit],
-        "quality_boundary": (
-            "Memory is append-only local evidence. Mark stale entries obsolete instead of deleting them silently."
-        ),
+        "quality_boundary": MEMORY_QUALITY_BOUNDARY,
     }
 
 

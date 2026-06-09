@@ -8,7 +8,7 @@ import json
 import sys
 from typing import Any
 
-from profile_utils import load_json_block, read_profile_text, window_contains
+from profile_utils import extract_fenced_block, load_json_block, read_profile_text, window_contains
 from skill_config import default_spec_profile
 
 
@@ -90,6 +90,19 @@ def format_bool(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def parse_profile_metadata(text: str) -> dict[str, str]:
+    block = extract_fenced_block(text, "hyptest-profile")
+    if block is None:
+        return {}
+    values: dict[str, str] = {}
+    for raw_line in block.splitlines():
+        if ":" not in raw_line:
+            continue
+        key, value = raw_line.split(":", 1)
+        values[key.strip()] = value.strip()
+    return values
 
 
 def pma_summary(row: dict[str, Any]) -> str:
@@ -218,17 +231,29 @@ def main() -> int:
         ]
 
     if args.nongate_summary:
+        metadata = parse_profile_metadata(text)
         summary = nongate_summary(text, pma_rows, responder_rows, args.match_module)
         payload = {
             "ok": True,
             "profile": args.spec_profile,
             "profile_path": str(profile_path),
+            "profile_metadata": {
+                "official_spike_has_pma_csr": metadata.get("official_spike_has_pma_csr", "unknown"),
+                "linknan_difftest_ref_has_pma_csr": metadata.get(
+                    "linknan_difftest_ref_has_pma_csr", "unknown"
+                ),
+            },
             "nongate": summary,
         }
         if args.json:
             print(json.dumps(payload, ensure_ascii=False, indent=2))
         else:
             print(f"profile: {profile_path}")
+            print(
+                "pma csr model: "
+                f"official_spike={payload['profile_metadata']['official_spike_has_pma_csr']} "
+                f"linknan_difftest_ref={payload['profile_metadata']['linknan_difftest_ref_has_pma_csr']}"
+            )
             print(render_nongate_summary_text(summary))
         return 0
 

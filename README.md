@@ -14,7 +14,9 @@ Agent 被触发后执行的硬规则和流程步骤在 `SKILL.md`；本文件讲
 - 跨 `test_point/**/*.md` 排重、扩点
 - 围绕某模块找 suspected bug point 并写新测试点
 - 编译单 case、小批量 case
-- 跑 Spike / LinkNan 并输出运行日志
+- run-only 跑 Spike / LinkNan 并输出运行日志；若目标是失败复现、mismatch
+  清理、LinkNan difftest/no-diff 选择或 suspected RTL 归因，先由
+  `hyptest-failure-triage` 给出 `runner_request`
 - 做 `default/manual/compile-only/blocked` 初判分层
 
 **不触发**（转给其它 skill）：
@@ -76,6 +78,19 @@ test_point_file=test_point/suspected/memblock/memblock_suspected_bug_corner_poin
 "只跑 ai_micro_foo 这条 case 的 Spike 单测，输出结果和日志路径"
 ```
 
+LinkNan difftest/no-diff 复现应来自 triage 的 runner 请求；workflow 只执行，不解释 mismatch root cause：
+
+```text
+runner_request:
+  runner_mode: linknan-difftest
+  compile_plat: linknan
+  run_platform: linknan
+  difftest_mode: enabled
+  include_commented: true
+  cleanup_allowed: false
+  purpose: reproduce REF-DUT mismatch with difftest enabled
+```
+
 开写前摸底：
 
 ```
@@ -107,7 +122,7 @@ skill 能从 prompt 里自动推断大部分字段。下表按"什么时候写"�
 | `target_module` | bug hunt 任务 | 模块名；**拼写必须对**（`memblock` 不是 `mmemblock`）否则 skill 按模块找源码 / 相似 test_point 都会跑偏 |
 | `target_test_point` | 补已有条目 | `"### P<id>. <title>"` |
 | `case_name` | `run-only` / `fix-case` / 补 assert | 目标 case 名 |
-| `failure_log` | `triage-only` | 失败日志路径 `.tmp/result_log/<platform>/<log>` |
+| `failure_log` | `triage-only` | 失败日志路径 `.tmp/result_log/<platform>/<log>`；workflow 只生成候选分类或 handoff，失败归因和 mismatch root cause 由 `hyptest-failure-triage` 收口 |
 
 **可选覆盖**（不写则用默认值）：
 
@@ -143,7 +158,7 @@ skill 有两档执行路径，默认走**快速版**。需要切到**完整 pack
 **快速版（默认）**——约 2-3 分钟，单次新增 case 推荐：
 
 - 预热 `repo_evidence_index` 缓存
-- 直接跑 `find_similar_cases` + `check_case_uniqueness` + `compile_elf` + `get_result`
+- 直接跑 `find_similar_cases` + `check_case_uniqueness` + `compile_elf`，再按分层和 `runner_request` 决定是否 `get_result`
 - lint / 失败分类 / 回填核对照跑（质量工具不省）
 - **不跑** pack 聚合脚本，不生成标准 JSON/Markdown 报告
 - 摘要直接写到对话里
@@ -184,7 +199,7 @@ pack 每个脚本的功能见 `references/resource_index.md` 的 Public Scripts 
 | 场景 | 先查什么 | 初始处理 |
 | --- | --- | --- |
 | 新增普通架构 case | `references/spec_profiles/<spec_profile>.md` + 相似 case | 按 Gate 跑完后落位；Spike 跑通即 `default` |
-| PMA/PBMT/MMIO/cache/TLB/CBO 等 profile-sensitive case | `$HYPTEST_WORKFLOW_SKILL_HOME/scripts/query_spec_profile.py` + profile 的 Spike gate | 若 `spike_gate_applicable=false`，走 nongate 路由并按环境落 `manual` / `compile-only` / `blocked`；不要先用 Spike/default gate 或改成 Spike-friendly baseline |
+| PMA/PBMT/MMIO/cache/TLB/CBO 等 profile-sensitive case | `$HYPTEST_WORKFLOW_SKILL_HOME/scripts/query_spec_profile.py` + profile 的 Spike gate | 若 `spike_gate_applicable=false`，走 nongate 路由并按环境落 `manual` / `compile-only` / `blocked`；若已是 LinkNan difftest mismatch，先交 failure-triage 做 first-divergence；不要先用 Spike/default gate 或改成 Spike-friendly baseline |
 | 访问 MMIO/Device 区间 | profile 的 MMIO responder 表 | 先确认 responder；无 responder 或 Spike 不建模时走 manual/compile-only/blocked，不用普通 DRAM/cacheable 近似替代 |
 | 只改回填或注册状态 | `test_register.c` + `$HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_writeback_format.py --check-register` | 保证 `已实现 case` 状态与注册一致 |
 | Spike/LinkNan 运行失败 | `hyptest-failure-triage` + `references/build_run_debug.md` + `references/tiering_decision.md` | 先由 failure-triage 归因；需要改 case/注册/重跑时 workflow 执行，最终再回 triage 收口 |

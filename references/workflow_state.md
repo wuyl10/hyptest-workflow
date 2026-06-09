@@ -39,7 +39,7 @@ python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/clean_generated.py --repo-root $HYP
 
 - `memory/` 记录本 repo 范围内**已知对的事实**——agent 可以直接复用的经验线索（历史失败现象、debug 路径、发现的 RTL quirk 等），**不替代**当前源码/日志/`spec_profile`/平台证据。
 - 做 `default / manual / compile-only / blocked` 决策时，仍以**本轮证据**为准；memory 只是检索线索。
-- **过时处理**：events.jsonl 是 append-only 但文件手工可编辑。某条记录因 Spike/RTL 升级不再成立 → **人工直接打开 `events.jsonl` 删除对应 JSON 行**，同时审阅 `test_point/Manual_Reference.md` 是否有相关条目需要一起删除。memory 没有 `obsolete` 占位——"memory 里每条都是当前仍然成立的事实"是单一真值约束。
+- **过时处理**：正常写入只追加；人工 audit 确认某条记录因 Spike/RTL 升级不再成立后，直接从 `events.jsonl` 删除对应 JSON 行，同时审阅 `test_point/Manual_Reference.md` 是否有相关条目需要一起删除。memory 没有 `obsolete` 占位——"memory 里每条都是当前仍然成立的事实"是单一真值约束。
 
 ### Status 分档（读写优先级）
 
@@ -60,7 +60,7 @@ memory 只存**可以直接参考的事实**；"可疑/待确认"一律放 `test
 
 1. **"规则真值"**：把内容迁进 `references/spec_profiles/<profile>.md`（例如新的 Nanhu 实现约束、新的 Spike gap 类别，同步 `hyptest-nongate-keywords` JSON 块）；Manual_Reference 该条标 `> 已解决（<日期>）：已进 profile §X`，**不进 memory**（规则真值在 profile）。
 2. **"复用线索"**：结论简化后 append memory `status=confirmed`；Manual_Reference 该条标 `> 已解决（<日期>）：已进 memory`。
-3. **"作废 / 过时"**：**直接从 Manual_Reference 删除该条目**（不留 `> 已解决` 墓碑）；若 memory 里有对应的 `unconfirmed` 行，**同时从 `events.jsonl` 删除**。保持两边"干净 + 当前仍成立"的单一真值。
+3. **"作废 / 过时"**：**直接从 Manual_Reference 删除该条目**（不留 `> 已解决` 墓碑）；若 memory 里有对应的 `unconfirmed` 行，在用户确认具体 entry 后**同时从 `events.jsonl` 删除**。保持两边"干净 + 当前仍成立"的单一真值。
 
 对应 CLI（"复用线索" 路径）：
 
@@ -104,13 +104,20 @@ python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/check_manual_reference_topic.py \
 # 追加一条经验（3 门槛过才跑；status 默认 unconfirmed，可省略）
 python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_memory.py append \
   --repo-root $HYPTEST_HOME \
-  --topic <topic> \
-  --note "<结论 / 现象 / 关键命令>"
+  --phase <phase> \
+  --case <case_name> \
+  --module <module> \
+  --platform <spike|linknan|all> \
+  --symptom "<一句话症状>" \
+  --tag <keyword> \
+  --fix "<一句话结论或规避方式>" \
+  --note "<可选补充>"
 
-# 按 topic 或关键词检索
+# 按关键词 / case / module / platform 检索
 python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_memory.py query \
   --repo-root $HYPTEST_HOME \
-  --topic <topic>
+  --term <keyword> \
+  --limit 10
 
 # 汇总当前有哪些活跃经验
 python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_memory.py summarize \
@@ -127,8 +134,8 @@ python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_paths.py --repo-root $HYPT
 
 ## 膨胀控制
 
-- 3 门槛把关（写端） + 按需 audit 人工删行 + 过时记录不留占位
-- 典型规模：一年 20-50 条、几十 KB、按 topic 检索不会线性变慢
+- 3 门槛把关（写端） + 按需 audit 确认后删行 + 过时记录不留占位
+- 典型规模：一年 20-50 条、几十 KB、按 `--term`/case/module 检索不会线性变慢
 
 ## 按需 audit（用户 prompt 触发）
 
@@ -139,15 +146,15 @@ python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/workflow_paths.py --repo-root $HYPT
    - 含"可能 / 也许 / 感觉 / 估计"等模糊词（违反 3 门槛"可验证事实"）
    - 未带日期标签（违反补充准入）
    - 一条内容同时讲多件事（违反"一条一事"）
-   - 日期早于 6 个月，但 topic 近期没被任何任务 query 命中（低复用）
+   - 日期早于 6 个月，但相关 `--term` / case / module 近期没被任何任务 query 命中（低复用）
    - 内容已在 SKILL.md / references / test_point 中正式文档化（不符合"非平凡"）
 3. 把候选清单列给用户：`timestamp / case / module / symptom / 可疑原因`
-4. 用户**逐条确认**后，**人工直接在 `events.jsonl` 中删除对应 JSON 行**（memory 没有 obsolete 占位，审完即清）；同时审阅 `test_point/Manual_Reference.md` 是否有相关条目一起删除。
+4. 用户**逐条确认**后，**直接在 `events.jsonl` 中删除对应 JSON 行**（memory 没有 obsolete 占位，审完即清）；同时审阅 `test_point/Manual_Reference.md` 是否有相关条目一起删除。
 5. 完成后给用户出**audit 报告**：保留 X 条、删除 Y 条、建议人工再核 Z 条
 
 **约束**：
-- **agent 不自动改** `events.jsonl`；只列候选 + 让用户决定，最后由用户亲手编辑文件
-- **不自动判定**过时，只列候选 + 让用户决定
+- **agent 不主动判 stale，也不自动删 memory**；只列候选 + 让用户决定
+- 只有用户明确确认删除哪些 entry，或明确要求 Codex 执行 audit 结果时，才可编辑 `events.jsonl` 删除对应 JSON 行
 - 建议频次：每积累 50 条 entry 或每 3 个月手工触发一次，不定时
 
 ## 与 Claude auto memory 的分工

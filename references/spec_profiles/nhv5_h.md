@@ -12,6 +12,7 @@ pmp_granularity: 4KB
 official_spike_has_tlb_model: false
 official_spike_has_cache_model: false
 official_spike_has_pma_csr: false
+linknan_difftest_ref_has_pma_csr: true
 default_spike_gate: ordinary_h_extension_with_aia_arch_only
 default_case_elf_dir: case_elf_asm
 linknan_mmio_requires_responder: true
@@ -258,9 +259,9 @@ AIA（IMSIC + APLIC）在本 profile 范围内；CSR 架构面（`mtopi` / `stop
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "confirmed_in_linknan_rtl",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate"
+    "default_decision": "manual_linknan_rtl_gate_candidate"
   },
   {
     "id": "linknan_intr_gen_mmio",
@@ -270,21 +271,21 @@ AIA（IMSIC + APLIC）在本 profile 范围内；CSR 架构面（`mtopi` / `stop
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "confirmed_in_linknan_sim",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate"
+    "default_decision": "manual_linknan_rtl_gate_candidate"
   },
   {
     "id": "linknan_imsic_global_window",
-    "window": "0xE000000000-0xE00000ffff per hart by current default",
+    "window": "0xE000000000-0xE000010000",
     "pma": "IO",
     "pbmt": "None",
     "memattr_device": true,
     "allowed": true,
     "responder_required": true,
-    "responder_status": "confirmed_in_linknan_rtl",
+    "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "capability_gated_manual_by_default"
+    "default_decision": "manual_capability_gated_by_default"
   }
 ]
 ```
@@ -396,7 +397,7 @@ LinkNan responder/source evidence（LinkNan testbench 共享，与 `nhv5_1_ap` �
     "responder_type": "register-like",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate",
+    "default_decision": "manual_linknan_rtl_gate_candidate",
     "notes": "平台私有外设；QEMU/official Spike 无对应模型。"
   },
   {
@@ -405,25 +406,25 @@ LinkNan responder/source evidence（LinkNan testbench 共享，与 `nhv5_1_ap` �
     "responder_type": "register-like",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "linknan_rtl_gate_candidate",
+    "default_decision": "manual_linknan_rtl_gate_candidate",
     "notes": "当前设计仅 MSI delivery，source 0 保留。"
   },
   {
     "id": "linknan_imsic",
     "target": "LinkNan IMSIC global base 0xE000000000, M file offset 0x8000, S/VS offset 0x0",
-    "responder_type": "msi-window-plus-csr",
+    "responder_type": "testbench_dependent",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "capability_gated_manual_by_default",
+    "default_decision": "manual_capability_gated_by_default",
     "notes": "RTL 已集成，hyptest LinkNan 平台头记录 LINKNAN_IMSIC_M_BASE_ADDR=0xE000008000、LINKNAN_IMSIC_S_BASE_ADDR=0xE000000000；只有定义 LINKNAN_ENABLE_IMSIC_MMIO_TESTS 时才暴露 IMSIC_M_BASE_ADDR/S_BASE_ADDR。"
   },
   {
     "id": "qemu_virt_aia",
     "target": "QEMU virt,aia=aplic-imsic APLIC/IMSIC",
-    "responder_type": "reference-model",
+    "responder_type": "testbench_dependent",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "optional_reference",
+    "default_decision": "manual_optional_reference",
     "notes": "可用于通用 AIA 行为观察，但不是 LinkNan gate。"
   }
 ]
@@ -482,6 +483,9 @@ raise_ext_intr(source + 1) -> ext_intr(source) -> APLIC source N
 **继承 `nhv5_1_ap` §5 全部 gap**（无 TLB 模型、无 cache 模型、无 PMA CSR、CBO 内部 line 状态不建模、replay queue / sbuffer / uncache buffer / MSHR / ROB head / response-context 不建模、PMA / PBMT / MMIO routing 不建模、LR/SC reservation timeout / alias DCache hit 不建模、custom CSR / instruction / NMI / double trap 不在范围、运行时动态更新 misa / IALIGN=32 动态切换不支持、Debug trigger chain 闭合 AMO BP 不建模、Nanhu Debug trigger 实现约束 chain ≤2 层 + 仅 address/execute-PC trigger + 无 data trigger），下面只补 H + AIA 的增量。
 
 前提：official Spike 必须在编译时启用 H、Smaia、Ssaia、Sstc、Svpbmt；任一开关缺失时不构成 model gap，按 `D-BLOCK-COMPILE` 或 `D-BLOCK-EVIDENCE` 处理（参见 §9）。
+本 profile 中 `official_spike_has_pma_csr=false` 只约束 official/community
+Spike gate；当前 LinkNan difftest reference (`HYPTEST_DIFFTEST_REF_SO`) 支持
+PMA CSR/行为对齐，PMA mismatch 仍按 LinkNan REF-DUT first-divergence 分析。
 
 ### 5.1 H 架构面（可作 default Spike gate 候选）
 
@@ -531,7 +535,7 @@ LinkNan AIA capability gate 补充：
 
 - 泛化 IMSIC M-file / S-file MMIO case（依赖 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR`）默认保持 **capability-gated / manual**；只有显式定义 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 且 LinkNan difftest 参考模型对 IMSIC 间接 CSR/MMIO 状态完成对齐后，才作为 LinkNan RTL gate candidate 收紧。
 - LinkNan 专用 `intr_gen → APLIC → IMSIC → core trap/claim` 闭环探针（如 M / HS / VS 三档 guest file 验证）可直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 硬件地址，保持 manual / RTL-only。当前若该类闭环出现 APLIC pending / enable / target 已成立但 IMSIC `topei` / `pending` 为 0、对应 MEIP / SEIP / VSEIP 未进入的现象，应聚焦 APLIC MSI output → outbound / remap → IMSIC write front-end / `msiio` → IMSIC file pending 链路定位，按 LinkNan RTL bug 候选处理，不直接归 official Spike model gap。
-- `mstateen0.IMSIC` 与 IMSIC 访问门禁相关 case 在 LinkNan difftest Spike 上若出现 REF 报 illegal 但 DUT 未陷入的差异，属于独立的 difftest 对齐问题，不与 IMSIC MSI 投递链路问题混为同一根因；按 `D-MANUAL-SPIKE-GAP` 或 `D-MANUAL-RTL-ONLY` 分别归因。
+- `mstateen0.IMSIC` 与 IMSIC 访问门禁相关 case 在 LinkNan difftest Spike 上若出现 REF 报 illegal 但 DUT 未陷入的差异，属于独立的 difftest 对齐问题，不与 IMSIC MSI 投递链路问题混为同一根因；先交 `hyptest-failure-triage` 保留 `linknan-difftest` 证据并定位 REF-DUT first-divergence，再按 `D-MANUAL-SPIKE-GAP`（需写清 runner 为 `HYPTEST_DIFFTEST_REF_SO`）或 `D-MANUAL-RTL-ONLY` 分别归因。
 
 ### 5.5 H + AIA 不可 gate keyword 速查
 
@@ -549,7 +553,7 @@ LinkNan AIA capability gate 补充：
     "category": "PMA CSR",
     "keywords": ["pmaaddr", "pmacfg", "pma_csr"],
     "module_hints": ["csr", "pma", "mmu"],
-    "note": "PMA CSR not implemented in this Spike."
+    "note": "PMA CSR not implemented in official/community Spike (`HYPTEST_SPIKE_BIN`); this does not describe LinkNan difftest reference (`HYPTEST_DIFFTEST_REF_SO`)."
   },
   {
     "category": "CBO internal line state",
@@ -733,7 +737,7 @@ LinkNan AIA 平台增量：
 
 - LinkNan `intr_gen` 注入 / APLIC source 路由 / APLIC → IMSIC MSI 投递链路 / IMSIC `topei` / guest-file HGEIP 等 RTL-only 闭环：`D-MANUAL-RTL-ONLY` 或 `D-MANUAL-NONGATE`。
 - 依赖 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 才暴露 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR` 的泛化 IMSIC MMIO case（capability-gated）：默认 `D-MANUAL-NONGATE`；capability flag + difftest 参考模型对齐后再收紧为 LinkNan RTL gate candidate。
-- `mstateen0.IMSIC` 等 stateen 与 AIA CSR 交互的 LinkNan difftest 独立 mismatch（REF 报 illegal、DUT 未陷入）：`D-MANUAL-SPIKE-GAP`，与 MSI 投递链路问题分别归因。
+- `mstateen0.IMSIC` 等 stateen 与 AIA CSR 交互的 LinkNan difftest 独立 mismatch（REF 报 illegal、DUT 未陷入）：先保留 `linknan-difftest` first-divergence 证据；若暂用 `D-MANUAL-SPIKE-GAP`，摘要必须写明这是 `HYPTEST_DIFFTEST_REF_SO` 对齐问题而非 official Spike gate gap，并与 MSI 投递链路问题分别归因。
 - 注：当前 reason_code catalog **没有**专门的 `LINKNAN_RTL_GOLDEN` 类型；不要自造 reason_code。需要表达 LinkNan 证据时，在最终摘要和测试点短状态里写明 LinkNan RTL PASS / FAIL，分层 reason_code 仍按通用 catalog 选项（`D-MANUAL-RTL-ONLY` / `D-MANUAL-NONGATE` / `D-BLOCK-EVIDENCE`）选择。
 
 环境与 Spike 配置：

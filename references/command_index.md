@@ -279,7 +279,7 @@ python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/validate_task_request.py --repo-roo
 - `failure-log`: 从失败日志提取场景、错误点、候选 reason_code 和下一步动作。
 
   ```bash
-  python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/classify_failure_log.py --log-file <log> --json
+  python3 $HYPTEST_WORKFLOW_SKILL_HOME/scripts/classify_failure_log.py --log-file <log> --spec-profile <spec_profile> --json
   ```
 
 - `triage-handoff`: 生成 workflow 交给 failure-triage 深入分析的交接卡片；可附带可选波形上下文，由 failure-triage 决定是否调用 waveform-debug。

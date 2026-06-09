@@ -13,8 +13,8 @@
     "code": "D-MANUAL-NONGATE",
     "class": "MANUAL",
     "default_decision": "manual",
-    "meaning": "场景不宜以 Spike 作为 gate，常见于 PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等模型边界。",
-    "typical_followup": "标为 manual，回填规则引用和运行/环境限制。",
+    "meaning": "场景不宜以 Spike 作为 gate，常见于 PMA/PBMT/MMIO/cache/TLB/CBO/refill/replay/sbuffer/MSHR/PMP 粒度等模型边界。PMA/PBMT/MMIO 关键词只产生候选，不能单独证明最终分层。",
+    "typical_followup": "标为 manual 前必须补规则引用和运行/环境限制；若现象来自 `linknan-difftest` / `HYPTEST_DIFFTEST_REF_SO`，先交 `hyptest-failure-triage` 保留 REF-DUT first-divergence、PMA CSR/profile、PA window 和 responder 证据，不能只凭关键词落本 code。",
     "owner": "workflow",
     "next_required_evidence": ["spec profile quote", "model boundary explanation"],
     "keywords": [
@@ -62,8 +62,8 @@
     "code": "D-MANUAL-SPIKE-GAP",
     "class": "MANUAL",
     "default_decision": "manual",
-    "meaning": "Nanhu RTL 按 spec 实现了该语义，Spike 有实现 gap（未建模该 spec 场景）。Spike 过或不过都不能 gate；需 RTL/LinkNan 验证。",
-    "typical_followup": "标为 manual，记录 Spike gap 位置（哪段 spec Spike 没做）；step 16 `check_manual_reference_topic.py` 按 verdict 路由落条目（未覆盖时 auto-append 待人工确认）；RTL 跑通后可回归。",
+    "meaning": "Nanhu RTL 按 spec 实现了该语义，通常是 official/community Spike (`HYPTEST_SPIKE_BIN`) 有实现 gap（未建模该 spec 场景）。Spike 过或不过都不能 gate；需 RTL/LinkNan 验证。若暂时复用本 code 表达 `linknan-difftest` / `HYPTEST_DIFFTEST_REF_SO` 的 reference gap，必须已有 REF-DUT first-divergence 证明这是 LinkNan difftest REF/model alignment gap。",
+    "typical_followup": "标为 manual，记录 official Spike gap 位置（哪段 spec Spike 没做）；若不一致来自 `linknan-difftest` / `HYPTEST_DIFFTEST_REF_SO`，摘要必须写清 runner、LinkNan difftest REF/model alignment gap、REF-DUT first-divergence 证据和为什么暂用本 code，不能只写 Spike gap；未定位的 REF-DUT PMA/MMIO/CSR 对齐问题先交 `hyptest-failure-triage`，不用本 code 直接收口；step 16 `check_manual_reference_topic.py` 按 verdict 路由落条目（未覆盖时 auto-append 待人工确认）；RTL 跑通后可回归。",
     "owner": "workflow",
     "next_required_evidence": ["spec reference for the gap", "LinkNan/RTL run evidence"],
     "keywords": ["spike gap", "spike not modeled", "spike 不建模", "mcontrol6 chain closed bp", "chain closed bp"]
