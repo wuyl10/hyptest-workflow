@@ -50,7 +50,7 @@ primary_aia_gate: LinkNan RTL regression
 3. **fence**：`hfence.gvma`（可选 GVMID / GPA 操作数）、`hfence.vvma`（VS-stage，带 VMID 隔离）、与 `sfence.vma` 在不同特权下的语义差异。
 4. **trap 委托与路由**：`medeleg` / `mideleg` 把异常/中断委托到 HS；`hedeleg` / `hideleg` 把 HS 收到的进一步委托到 VS；trap 进入 V 模式时 `hstatus.SPV` / `hstatus.SPVP` / `mstatus.MPV` / `mstatus.GVA` 设置；**虚拟指令异常**（cause 22）；guest-page-fault 异常码（20 / 21 / 23）；`mtval2` / `htval` / `htinst` / `mtinst` 写入。
 5. **模式切换 + CSR 影子**：`MRET` / `SRET` 从 V 上下文返回的语义；`vsstatus` ↔ `sstatus` / `vsie` ↔ `sie` / `vsip` ↔ `sip` / `vstvec` ↔ `stvec` / `vsepc` ↔ `sepc` / `vscause` ↔ `scause` / `vstval` ↔ `stval` / `vsscratch` ↔ `sscratch` / `vsatp` ↔ `satp` 在 V=0 / V=1 下的投影规则；计数器虚拟化（`hcounteren` / `scounteren` 交互）；WFI 在 VS 下的 `hstatus.VTW` 行为。
-6. **VS 中断侧**：`vstip` / `vssip` / `vseip`（传统三大 V 中断）；`hvip` 注入路径；`hgeip` / `hgeie`（guest external interrupt 的传统侧，不含 IMSIC）；**Sstc**：`vstimecmp` / `stimecmp`（本 profile 在范围内）；`htimedelta` 时间偏移读取（VS 看到的 `time` 寄存器值）。
+6. **VS 中断侧**：`vstip` / `vssip` / `vseip`（传统三大 V 中断）；`hvip` 注入路径；`hgeip` / `hgeie`（guest external interrupt 聚合与 HS gate；在 LinkNan AIA 下可由 guest IMSIC file pending 驱动）；**Sstc**：`vstimecmp` / `stimecmp`（本 profile 在范围内）；`htimedelta` 时间偏移读取（VS 看到的 `time` 寄存器值）。
 7. **AMO / LR-SC 在 2-stage 下**：reservation 在 G-stage 翻译失败时的行为；AMO 触发 G-stage 写权限缺失时异常归属（guest store/AMO page-fault, cause 23 vs guest load page-fault, cause 21）。
 8. **PBMT 与 H 翻译交互**（`Svpbmt` 在范围内）：`vsatp` / `hgatp` 翻出的 PTE PBMT 字段如何决定最终内存属性；两级翻译 PBMT 冲突时的优先级。
 
@@ -83,7 +83,7 @@ primary_aia_gate: LinkNan RTL regression
 
 ### AIA 在本 profile 下的处理
 
-AIA（IMSIC + APLIC）在本 profile 范围内；CSR 架构面（`mtopi` / `stopi` / `vstopi` 候选选择、`mvien` / `mvip` 过滤、`hvictl` / `hviprio1` / `hviprio2` 字段语义、IMSIC 间接访问、`mtopei` / `stopei` / `vstopei` claim）和平台路径（IMSIC 内存映射 MSI、APLIC routing / 委派、IOMMU + MRIF）的 gate 边界详见 §5。与 `nhv5_2_AIA` 在 AIA 维度上的覆盖重叠属于项目设计；如果某 case 不涉及 H-extension 交互而是纯 AIA 路径，按测试点意图选择更合适的 profile。
+AIA（IMSIC + APLIC）在本 profile 范围内；CSR 架构面（`mtopi` / `stopi` / `vstopi` 候选选择、`mvien` / `mvip` 过滤、`hvictl` / `hviprio1` / `hviprio2` 字段语义、IMSIC 间接访问、`mtopei` / `stopei` / `vstopei` claim）和 LinkNan 平台路径（IMSIC 内存映射 MSI、APLIC MSI routing / 委派、guest file / `hgeip` 聚合）的 gate 边界详见 §5。IOMMU + MRIF 属于 AIA 相关扩展路径，但不属于当前 LinkNan AIA RTL gate，除非后续 profile/RTL 明确启用。与 `nhv5_2_AIA` 在 AIA 维度上的覆盖重叠属于项目设计；如果某 case 不涉及 H-extension 交互而是纯 AIA 路径，按测试点意图选择更合适的 profile。
 
 ## 3. PMP 粒度约定
 
@@ -285,7 +285,7 @@ AIA（IMSIC + APLIC）在本 profile 范围内；CSR 架构面（`mtopi` / `stop
     "responder_required": true,
     "responder_status": "confirmed",
     "spike_gate_applicable": false,
-    "default_decision": "manual_capability_gated_by_default"
+    "default_decision": "linknan_rtl_regression_candidate_when_case_capability_enabled"
   }
 ]
 ```
@@ -415,8 +415,8 @@ LinkNan responder/source evidence（LinkNan testbench 共享，与 `nhv5_1_ap` �
     "responder_type": "testbench_dependent",
     "memory_like_scratch": false,
     "spike_gate_applicable": false,
-    "default_decision": "manual_capability_gated_by_default",
-    "notes": "RTL 已集成，hyptest LinkNan 平台头记录 LINKNAN_IMSIC_M_BASE_ADDR=0xE000008000、LINKNAN_IMSIC_S_BASE_ADDR=0xE000000000；只有定义 LINKNAN_ENABLE_IMSIC_MMIO_TESTS 时才暴露 IMSIC_M_BASE_ADDR/S_BASE_ADDR。"
+    "default_decision": "linknan_rtl_regression_candidate_when_capability_enabled",
+    "notes": "RTL 已集成，hyptest LinkNan 平台头常开记录 LINKNAN_IMSIC_M_BASE_ADDR=0xE000008000、LINKNAN_IMSIC_S_BASE_ADDR=0xE000000000、IMSIC_S_GUEST_COUNT=1；定义 LINKNAN_ENABLE_IMSIC_MMIO_TESTS 时额外暴露 IMSIC_M_BASE_ADDR/S_BASE_ADDR，用于泛化 IMSIC MMIO case 生成。"
   },
   {
     "id": "qemu_virt_aia",
@@ -476,7 +476,7 @@ raise_ext_intr(source + 1) -> ext_intr(source) -> APLIC source N
 
 因此有效 APLIC 外部线 case 必须使用 `raise_ext_intr(source + 1)`，且 source 从 1 开始。
 
-`IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR` 默认**不**作为 hyptest 平台头公开宏；需要泛化 IMSIC MMIO case 时显式定义 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 才暴露这两个宏作为 hyptest 可执行能力。LinkNan 专用 `intr_gen → APLIC → IMSIC → core trap` 闭环探针（如 P6I/P6J/P6K 类）可直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 硬件地址作为 LinkNan RTL-only / manual 闭环 oracle，不依赖该 capability flag。
+`LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 是 LinkNan 平台硬件地址真值；`IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR` 是给泛化 IMSIC MMIO case 使用的可执行能力宏，当前需要显式定义 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 才暴露。该宏是 hyptest 生成/编译口径，不表示 RTL 默认关闭 IMSIC MMIO。当前 LinkNan RTL 集成 IMSIC M/S/guest file，`IMSIC_S_GUEST_COUNT = 1U`，针对单 hart、`geilen = 1`、支持地址窗口的 direct IMSIC MMIO / APLIC MSI 投递 case 可作为 LinkNan RTL regression candidate；official Spike 仍不作为该平台 MMIO 路径的 gate。LinkNan 专用 `intr_gen → APLIC → IMSIC → core trap` 闭环探针（如 P6I/P6J/P6K 类）可直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 硬件地址作为 LinkNan RTL 闭环 oracle，不依赖通用 `IMSIC_*_BASE_ADDR` 宏。
 
 ## 5. Official Spike 模型边界
 
@@ -524,17 +524,17 @@ PMA CSR/行为对齐，PMA mismatch 仍按 LinkNan REF-DUT first-divergence 分�
 | Smaia / Ssaia CSR 架构面：`mtopi` / `stopi` / `vstopi` 候选选择规则、`mvien` / `mvip` 过滤（AIA spec 表 11，bits 12:0 中只有 1 / 9 可写）、`hvictl` 字段、`hviprio1` / `hviprio2` 仅 IID 1 / 5 / 13 / 14–23 可配置、`mvien` 仅对 IID 1 / 9 / 13–63 可写 | true 候选 | 写 case 前在 Spike 上单点 sanity check；候选规则 5 种互斥配对 `[需 case 时严谨复读]` |
 | IMSIC CSR 间接访问：`eidelivery`（0 / 1 / 0x40000000）/ `eithreshold` / `eip` / `eie` via `*iselect` / `*ireg`；`vsireg` / `sireg` 在 V=1 下的 virtual instruction 触发条件 | true 候选 | 触发条件 `[需 case 时严谨复读]` |
 | `mtopei` / `stopei` / `vstopei` claim（写 = 完成）；`vstopei` 经 `hstatus.VGEIN` 选 guest IF 路径 | true 候选 | VGEIN 越界返回值 `[需 case 时严谨复读]` |
-| `hgeip` / `hgeie` 字段语义（与 IMSIC guest IF 解耦的纯 CSR 行为） | true 候选 | guest IF 实际 set bit 路径不 gate |
+| `hgeip` / `hgeie` 字段语义（`hgeie` WARL/gate、`hgeip` RO 宽度与无 pending 时读值） | true 候选 | guest IMSIC file 实际 set/clear `hgeip` 路径走 LinkNan RTL regression |
 | WFI 在 AIA 下"任意特权 `*topi != 0` 即唤醒"重定义 | 沿用 nhv5_1_ap：测语义不测真实等待 | — |
-| IMSIC 内存映射 MSI 路径（`seteipnum_le` / `seteipnum_be`） | false | 平台 MSI 路径，依赖 testbench responder；走 RTL-only / LinkNan |
-| APLIC：`domaincfg` / `sourcecfg`（Inactive / Detached / Edge0/1 / Level0/1）/ `target`（direct vs MSI）/ IDC 结构（`idelivery` / `iforce` / `ithreshold` / `topi` / `claimi`）/ MSI forwarding 公式 / 域委派 | false | 平台组件，level mode deassert 跟踪 RTL-only |
-| `hstatus.VGEIN` 选 guest IF + `hgeip` set bit 实际驱动路径 | false | 平台 + IMSIC guest IF 强耦合 |
-| IOMMU + MSI 转换（address mask / pattern、`extract` 公式）+ MSI 页表（基本转换 M=3、MRIF 模式 M=1）+ MRIF 结构 / 通知 MSI / 虚拟 hart 迁移 4 步 / 6 步 | false | Spike 无 IOMMU 模型；全部 RTL-only / LinkNan |
+| IMSIC 内存映射 MSI 路径（`seteipnum_le` / `seteipnum_be`） | false | 平台 MSI 路径，official Spike 不 gate；当前 LinkNan 单 hart / `geilen=1` / 支持窗口可走 RTL regression |
+| APLIC：`domaincfg` / `sourcecfg`（Inactive / Detached / Edge0/1 / Level0/1）/ `target`（direct vs MSI）/ IDC 结构（`idelivery` / `iforce` / `ithreshold` / `topi` / `claimi`）/ MSI forwarding 公式 / 域委派 | false | 平台组件；当前 LinkNan 只支持 MSI delivery，APLIC direct delivery 不进默认 LinkNan gate |
+| `hstatus.VGEIN` 选 guest IF + `hgeip` set bit 实际驱动路径 | false | official Spike 不 gate；当前 LinkNan `geilen=1` guest IMSIC file → `hgeip[1]` 可走 RTL regression |
+| IOMMU + MSI 转换（address mask / pattern、`extract` 公式）+ MSI 页表（基本转换 M=3、MRIF 模式 M=1）+ MRIF 结构 / 通知 MSI / 虚拟 hart 迁移 4 步 / 6 步 | false | Spike 无 IOMMU 模型；当前 LinkNan AIA gate 不覆盖 IOMMU/MRIF |
 
 LinkNan AIA capability gate 补充：
 
-- 泛化 IMSIC M-file / S-file MMIO case（依赖 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR`）默认保持 **capability-gated / manual**；只有显式定义 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 且 LinkNan difftest 参考模型对 IMSIC 间接 CSR/MMIO 状态完成对齐后，才作为 LinkNan RTL gate candidate 收紧。
-- LinkNan 专用 `intr_gen → APLIC → IMSIC → core trap/claim` 闭环探针（如 M / HS / VS 三档 guest file 验证）可直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 硬件地址，保持 manual / RTL-only。当前若该类闭环出现 APLIC pending / enable / target 已成立但 IMSIC `topei` / `pending` 为 0、对应 MEIP / SEIP / VSEIP 未进入的现象，应聚焦 APLIC MSI output → outbound / remap → IMSIC write front-end / `msiio` → IMSIC file pending 链路定位，按 LinkNan RTL bug 候选处理，不直接归 official Spike model gap。
+- 泛化 IMSIC M-file / S-file / guest-file MMIO case 若依赖 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR`，生成时必须显式定义 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS`；若直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR`，则不依赖该宏。当前 LinkNan 支持单 hart、`geilen=1`、little-endian `seteipnum_le` 路径，`seteipnum_be` 为可选行为且当前不作为必须实现项；合法 32-bit MSI 写、非法 size/AMO/LRSC/读无副作用等 case 可作为 LinkNan RTL regression candidate。official Spike 不作为这些 MMIO side effect 的 gate。
+- LinkNan 专用 `intr_gen → APLIC → IMSIC → core trap/claim` 闭环探针（如 M / HS / VS 三档 guest file 验证）可直接使用 `LINKNAN_IMSIC_M_BASE_ADDR` / `LINKNAN_IMSIC_S_BASE_ADDR` 硬件地址，作为 LinkNan RTL regression / manual oracle。当前若该类闭环出现 APLIC pending / enable / target 已成立但 IMSIC `topei` / `pending` 为 0、对应 MEIP / SEIP / VSEIP 未进入的现象，应聚焦 APLIC MSI output → outbound / remap → IMSIC write front-end / `msiio` → IMSIC file pending 链路定位，按 LinkNan RTL bug 候选处理，不直接归 official Spike model gap。
 - `mstateen0.IMSIC` 与 IMSIC 访问门禁相关 case 在 LinkNan difftest Spike 上若出现 REF 报 illegal 但 DUT 未陷入的差异，属于独立的 difftest 对齐问题，不与 IMSIC MSI 投递链路问题混为同一根因；先交 `hyptest-failure-triage` 保留 `linknan-difftest` 证据并定位 REF-DUT first-divergence，再按 `D-MANUAL-SPIKE-GAP`（需写清 runner 为 `HYPTEST_DIFFTEST_REF_SO`）或 `D-MANUAL-RTL-ONLY` 分别归因。
 
 ### 5.5 H + AIA 不可 gate keyword 速查
@@ -630,19 +630,19 @@ LinkNan AIA capability gate 补充：
     "category": "AIA platform MSI / APLIC routing",
     "keywords": ["seteipnum_le", "seteipnum_be", "aplic_routing", "aplic_sourcecfg_level", "aplic_target_msi", "aplic_domain_delegate", "idc_claimi", "idc_topi"],
     "module_hints": ["imsic", "aplic", "msi", "memblock"],
-    "note": "Platform components; route to RTL-only/LinkNan."
+    "note": "Official Spike does not gate platform MSI/APLIC side effects; supported LinkNan single-hart/geilen=1 paths route to LinkNan RTL regression."
   },
   {
     "category": "AIA guest interrupt file path",
     "keywords": ["vgein_guest_if", "hgeip_set_path", "guest_if_msi"],
     "module_hints": ["imsic", "guest_if"],
-    "note": "VGEIN selection field gateable; actual guest-IF MSI delivery not gateable."
+    "note": "VGEIN selection field gateable in CSR architecture; actual guest-file MSI delivery and hgeip assertion are LinkNan RTL regression paths."
   },
   {
     "category": "AIA IOMMU + MRIF",
     "keywords": ["iommu_msi_translate", "msi_pte_basic", "msi_pte_mrif", "mrif_storage", "mrif_notice_msi", "iommu_address_mask"],
     "module_hints": ["iommu", "mrif"],
-    "note": "Spike has no IOMMU model; all RTL-only."
+    "note": "Official Spike has no IOMMU model; current LinkNan AIA gate does not cover IOMMU/MRIF."
   }
 ]
 ```
@@ -687,7 +687,7 @@ LinkNan AIA capability gate 补充：
 
 1. 默认 false。
 2. 只有当场景明确落在 §5.1（H 架构面）或 §5.4（AIA CSR 架构面 true 候选行）时才提为 true 候选。
-3. 任一以下条件命中时强制 false：(a) 目标 PA 不在普通 cacheable DRAM；(b) 依赖 TLB / cache 一致性；(c) 依赖 PMA / PBMT / MMIO routing 实际效果；(d) 依赖 APLIC 委派 / IMSIC 平台 MSI / IOMMU；(e) 依赖 HFENCE 真实 TLB drain；(f) PMP sub-4KB 假设；(g) HLV / HSV 跨页第二半页落入 Device。
+3. 任一以下条件命中时强制 false：(a) 目标 PA 不在普通 cacheable DRAM；(b) 依赖 TLB / cache 一致性；(c) 依赖 PMA / PBMT / MMIO routing 实际效果；(d) 依赖 APLIC 委派 / IMSIC 平台 MSI / IOMMU；(e) 依赖 HFENCE 真实 TLB drain；(f) PMP sub-4KB 假设；(g) HLV / HSV 跨页第二半页落入 Device。这里的 false 只针对 official Spike gate；当前 LinkNan 支持范围内的 APLIC/IMSIC 平台路径仍可作为 LinkNan RTL regression candidate。
 
 本 profile 常见 `manual` / `compile-only` 候选（H + AIA 增量，继承 nhv5_1_ap §7 其它项）：
 
@@ -696,7 +696,7 @@ LinkNan AIA capability gate 补充：
 - 两级 PBMT 合成的实际内存属性效果。
 - PMP after G-stage 跨页 / sub-4KB 边界。
 - HLV / HSV 跨页第二半页落入 Device PA 的异常分类。
-- AIA：APLIC 任何 routing / 委派、IMSIC 内存映射 MSI 路径、IOMMU + MSI 页表 + MRIF、`hstatus.VGEIN` + `hgeip` set bit 实际驱动路径。
+- AIA：APLIC routing / 委派、IMSIC 内存映射 MSI 路径、`hstatus.VGEIN` + `hgeip` set bit 实际驱动路径在 official Spike 下属于 manual/nongate；若命中当前 LinkNan 单 hart、`geilen=1`、MSI delivery 支持范围，则作为 LinkNan RTL regression candidate。IOMMU + MSI 页表 + MRIF 不属于当前 LinkNan gate。
 - LR / SC 在 G-stage 翻译失败 / reservation 重试与同 PA 不同 VA alias 组合（继承 nhv5_1_ap §5.1）。
 
 ## 8. Spike 不一致时的 NHV5.1AP+H 处理流程
@@ -726,21 +726,21 @@ H 增量：
 
 AIA 增量：
 
-- IMSIC 内存映射 MSI 路径（`seteipnum_le` / `seteipnum_be`）：`D-MANUAL-RTL-ONLY`。
-- APLIC routing / 委派 / level mode deassert / IDC `claimi`：`D-MANUAL-RTL-ONLY`。
+- IMSIC 内存映射 MSI 路径（`seteipnum_le` / `seteipnum_be`）：official Spike 归 `D-MANUAL-RTL-ONLY`；当前 LinkNan 支持范围内可记录为 LinkNan RTL regression candidate，其中 `seteipnum_be` 为可选行为，不作为当前必须实现项。
+- APLIC routing / 委派 / level mode deassert / IDC `claimi`：official Spike 归 `D-MANUAL-RTL-ONLY`；当前 LinkNan 仅 MSI delivery 路径可作为 RTL regression candidate，APLIC direct delivery 不进当前默认 gate。
 - IOMMU + MSI 页表 + MRIF + 通知 MSI + 虚拟 hart 迁移：`D-MANUAL-RTL-ONLY`。
-- `hstatus.VGEIN` + IMSIC guest IF 实际 MSI 投递：`D-MANUAL-RTL-ONLY`。
+- `hstatus.VGEIN` + IMSIC guest IF 实际 MSI 投递：official Spike 归 `D-MANUAL-RTL-ONLY`；当前 LinkNan `geilen=1` guest-file/HGEIP 路径可作为 RTL regression candidate。
 - AIA CSR 架构面 case 但 Spike 未启用 Smaia / Ssaia：`D-BLOCK-COMPILE` 或 `D-BLOCK-EVIDENCE`。
 - AIA CSR 候选规则 / 触发条件 sanity check 通过但 Spike 与 spec 不一致（实测 spec gap）：`D-MANUAL-SPIKE-GAP`。
 
 LinkNan AIA 平台增量：
 
-- LinkNan `intr_gen` 注入 / APLIC source 路由 / APLIC → IMSIC MSI 投递链路 / IMSIC `topei` / guest-file HGEIP 等 RTL-only 闭环：`D-MANUAL-RTL-ONLY` 或 `D-MANUAL-NONGATE`。
-- 依赖 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 才暴露 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR` 的泛化 IMSIC MMIO case（capability-gated）：默认 `D-MANUAL-NONGATE`；capability flag + difftest 参考模型对齐后再收紧为 LinkNan RTL gate candidate。
+- LinkNan `intr_gen` 注入 / APLIC source 路由 / APLIC → IMSIC MSI 投递链路 / IMSIC `topei` / guest-file HGEIP 等闭环：official Spike 仍按 `D-MANUAL-RTL-ONLY` 或 `D-MANUAL-NONGATE`，但当前 LinkNan 支持范围内应作为 LinkNan RTL regression 证据使用。
+- 依赖 `LINKNAN_ENABLE_IMSIC_MMIO_TESTS` 才暴露 `IMSIC_M_BASE_ADDR` / `IMSIC_S_BASE_ADDR` 的泛化 IMSIC MMIO case：该宏只描述 hyptest 通用宏是否打开，不代表 RTL 能力关闭；宏打开且场景落在当前 LinkNan 单 hart、`geilen=1`、MSI delivery 支持范围时，作为 LinkNan RTL regression candidate。
 - `mstateen0.IMSIC` 等 stateen 与 AIA CSR 交互的 LinkNan difftest 独立 mismatch（REF 报 illegal、DUT 未陷入）：先保留 `linknan-difftest` first-divergence 证据；若暂用 `D-MANUAL-SPIKE-GAP`，摘要必须写明这是 `HYPTEST_DIFFTEST_REF_SO` 对齐问题而非 official Spike gate gap，并与 MSI 投递链路问题分别归因。
 - 注：当前 reason_code catalog **没有**专门的 `LINKNAN_RTL_GOLDEN` 类型；不要自造 reason_code。需要表达 LinkNan 证据时，在最终摘要和测试点短状态里写明 LinkNan RTL PASS / FAIL，分层 reason_code 仍按通用 catalog 选项（`D-MANUAL-RTL-ONLY` / `D-MANUAL-NONGATE` / `D-BLOCK-EVIDENCE`）选择。
 
 环境与 Spike 配置：
 
 - Spike 未启用 H 扩展导致 H 架构面 case 失败：`D-BLOCK-COMPILE` 或 `D-BLOCK-EVIDENCE`。
-- LinkNan testbench 无 IMSIC / APLIC / IOMMU responder：`blocked` + `D-MANUAL-RTL-ONLY` 或 `D-COMPILE-ONLY-ENV`。
+- LinkNan testbench 无目标 responder 时：`blocked` + `D-MANUAL-RTL-ONLY` 或 `D-COMPILE-ONLY-ENV`。当前 LinkNan APLIC/IMSIC responder 已作为集成 AIA 路径使用；IOMMU/MRIF responder 不属于当前 gate。
