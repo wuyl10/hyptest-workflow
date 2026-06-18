@@ -51,6 +51,8 @@ vmodule_current_linknan_gate_applicable: false
 - Smrnmi/RNMI case 需要按平台能力分层：CSR/`mnret` 基础语义在 runner 明确启用 Smrnmi 时可作为 default candidate；外部 RNMI 源、RNMI vector 注入、unexpected-trap timing、与 breakpoint/interrupt 同窗交叉通常需要 LinkNan/RTL 或 special-run 证据。
 - double trap 不再和 NMI 混为“范围外”判断；只有在 Smdbltrp/Ssdbltrp、RNMI 入口和 runner oracle 都确认后才进入对应分层，否则保持 manual/compile-only/blocked。
 - project/custom CSR 或 custom instruction 若 official Spike 不支持，按 official Spike model gap 处理；是否属于项目验证范围由测试点/项目需求决定，不自动等同于范围外。
+- 自定义 CSR `sfetchctl @ 0x9e0` 的 `PE[0]` 控制 ICache parity check enable，复位值为 0。ICache tag/data ECC/parity 注错（`SCEIC` source=0/1）consume 到 `SCEC/NMI43` 的正向用例必须先置 `PE=1`，并在结束时恢复原值。`sfetchctl` 与 `scacheop` 共用 CSR 地址；执行 cache operation 前后必须保存/恢复 `sfetchctl`，避免 `PE` 被覆盖。
+- 自定义 CSR `srnctl @ 0x5c4` 按当前 release RTL 口径为调度功能控制：`FE[0]` 为 fusion decoder enable、`WE[2]` 为 WFI instruction enable，二者复位值均为 1；`STUCK_BIT[7:3]` 复位值为 `0x10`，用于 ROB stuck 阈值，不按 WPRI 处理。写 `srnctl` 必须 read-modify-write 保存未测字段并在 case 结束恢复；WFI case 若需要真实 WFI/halt 路径，必须确认 `WE=1` 且提供 pending/wakeup source，若临时清 `WE` 防卡死，不能把结果当作真实 WFI 等待路径。
 - WFI 可能导致模拟器卡死；优先测试权限与控制位语义，不强制执行真实等待路径。
 - 当前 NHV5.1AP / LinkNan simv 不支持运行时动态更新 `misa` 扩展位；写 `misa` 后不要假设 `C` 等扩展位可以被临时清除/打开并立即改变执行语义。
 - 依赖动态清 `misa.C` 将当前核从 IALIGN=16 切到 IALIGN=32 的 case，不进入默认 selfcheck/default gate。若要测 JAL/JALR/branch 半字对齐目标 IAM，必须使用已确认支持 IALIGN=32 的构建配置，或把当前配置下的失败归为平台约束/用例假设不成立，而不是直接判 RTL 控制转移异常实现错误。
@@ -115,7 +117,7 @@ VModule 写 case 时的硬要求：
 - legal PMA/peripheral PA 不等于 testbench 有响应路径；没有 responder 时应标 `blocked` / `manual`，不要伪造 pass。
 - MMIO/Device 访问除了满足下表允许组合外，还必须确认当前 LinkNan testbench 对目标 PA 有模拟 IO responder；部分允许区间当前没有模拟 IO 返回路径，访问会无响应并导致卡死。
 - UART/IntrGen 这类 register-like responder 不能替代 memory-like MMIO scratch；若 case 需要 byte/half/word lane merge、整行 readback 或任意地址可读写，必须确认 responder 语义足够。
-- AMO/LR/SC 是否允许由有效 memory type/cacheability 与 PMA `Atomic` 位共同决定：MMIO/Device 路径无论 `Atomic` 开关与否，原子访问都不能执行；cacheable memory 且 `Atomic` 开时，原子访问能执行；cacheable memory 但 `Atomic` 关时，原子访问不能执行。相关 case 必须同时写清目标地址的 MMIO/cacheable 属性和 `Atomic` 位状态，不能只凭其中一个条件下结论。
+- 当前 RTL 口径不再实现/使用 PMA `Atomic` 位作为原子访问准入条件：AMO/SC 等写方向原子访问通过 PMA 判定时看目标区域的 `cache + write`；LR 通过 PMA 判定时看 `cache + read`。MMIO/Device 或 non-cacheable 路径不能只因旧 `Atomic` 字段状态而判为允许；相关 case 必须写清目标地址的 MMIO/cacheable 属性以及 read/write/cache 判定依据，其它 PMA 位按具体访问类型和实现路径分别确认。
 - `MENVCFG.CBIE=Flush` 时，当前实现会把 `CBO.INVAL` 走成 flush 语义而不是普通“只失效不回写”的清线语义；具体是否触发该特殊路径还取决于当前特权级和 `CBIE` 生效层级。写 `cbo_inval` 相关 selfcheck 时，不能默认它一定只是清掉 cacheline，更不能默认它会把另一个 alias 的 NC 写入立即传播成 cacheable/backing 视图的一致值。
 - M-mode direct physical read/write 或 cacheable alias 访问没有 PBMT=NC 属性；PBMT=NC store/load 的自校验不要用后续 `read64(paddr)`、普通 M-mode direct 访问、或 cacheable alias convergence 作为唯一 oracle。若测试意图是验证 NC 路径本身，应优先通过同一个 PBMT=NC alias seed/readback；若测试意图确实是跨 cacheable/NC 视图一致性，必须额外建立 flush/ordering/responder 条件并把该语义写清楚。
 
@@ -453,7 +455,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
   },
   {
     "category": "Custom CSR / instruction",
-    "keywords": ["custom_csr", "custom_instruction"],
+    "keywords": ["custom_csr", "custom_instruction", "sfetchctl", "scacheop", "icache_parity_enable", "icache_ecc", "icache_sceic", "srnctl", "fusion_enable", "wfi_enable", "stuck_bit", "rob_stuck", "wfi_halt"],
     "module_hints": ["csr", "rob", "trap"]
   },
   {
