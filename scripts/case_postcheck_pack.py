@@ -279,7 +279,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         ]
         if lint_files:
             for path in lint_files:
-                lint_cmd.extend(["--file", path])
+                lint_cmd.extend(["--file", str(repo_root / path)])
         else:
             lint_cmd.append("--changed-only")
         commands["case_lint"] = lint_cmd
@@ -292,11 +292,23 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "--file",
         str(test_point_file),
         "--check-register",
+        "--check-reason-code",
         "--spec-profile",
         args.spec_profile,
         "--json",
     ]
     report["commands"] = run_commands_parallel(commands)
+
+    if lint_files and "case_lint" in report["commands"]:
+        lint_result = report["commands"]["case_lint"]
+        lint_payload = lint_result.get("payload", {})
+        checked_file_count = lint_payload.get("checked_file_count")
+        lint_result["expected_file_count"] = len(lint_files)
+        if checked_file_count != len(lint_files):
+            lint_result["ok"] = False
+            lint_result["validation_error"] = (
+                f"case lint checked {checked_file_count} files; expected {len(lint_files)}"
+            )
 
     command_ok = all(item.get("ok") for item in report["commands"].values())
     cases_ok = all(
