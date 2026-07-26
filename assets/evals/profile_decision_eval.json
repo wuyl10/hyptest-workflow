@@ -14,6 +14,27 @@
     ]
   },
   {
+    "id": "nhv5_1_ap_vmodule_error_inject_contract",
+    "profile": "nhv5_1_ap",
+    "expected_facts": {
+      "vmodule_interrupt_injection": "vmodule_capable_ap_it_special_run_only",
+      "vmodule_requires_compile_flag": "VMODULE=1",
+      "vmodule_spike_gate_applicable": "false",
+      "vmodule_current_linknan_gate_applicable": "false"
+    },
+    "expected_terms": [
+      "RXDAT DERR",
+      "RXDAT NDERR",
+      "RRESP SLVERR",
+      "RRESP DECERR",
+      "vm_reg_14.BRESP` 只用于原始 AXI write-response",
+      "DataCheck 必须报 unsupported",
+      "捕获并记录 address 不等于",
+      "active filelist/hierarchy",
+      "isolated exact-bin VDB delta"
+    ]
+  },
+  {
     "id": "template_has_placeholders",
     "profile": "template",
     "expected_terms": [

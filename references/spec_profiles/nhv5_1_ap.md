@@ -51,7 +51,8 @@ vmodule_current_linknan_gate_applicable: false
 - Smrnmi/RNMI case 需要按平台能力分层：CSR/`mnret` 基础语义在 runner 明确启用 Smrnmi 时可作为 default candidate；外部 RNMI 源、RNMI vector 注入、unexpected-trap timing、与 breakpoint/interrupt 同窗交叉通常需要 LinkNan/RTL 或 special-run 证据。
 - double trap 不再和 NMI 混为“范围外”判断；只有在 Smdbltrp/Ssdbltrp、RNMI 入口和 runner oracle 都确认后才进入对应分层，否则保持 manual/compile-only/blocked。
 - project/custom CSR 或 custom instruction 若 official Spike 不支持，按 official Spike model gap 处理；是否属于项目验证范围由测试点/项目需求决定，不自动等同于范围外。
-- 自定义 CSR `sfetchctl @ 0x9e0` 的 `PE[0]` 控制 ICache parity check enable，复位值为 0。ICache tag/data ECC/parity 注错（`SCEIC` source=0/1）consume 到 `SCEC/NMI43` 的正向用例必须先置 `PE=1`，并在结束时恢复原值。`sfetchctl` 与 `scacheop` 共用 CSR 地址；执行 cache operation 前后必须保存/恢复 `sfetchctl`，避免 `PE` 被覆盖。
+- 自定义 CSR `sfetchctl @ 0x9e0` 的 `PE[0]` 控制 ICache parity check enable，复位值为 0。ICache tag/data ECC/parity 注错（`SCEIC` source=0/1）consume 到 `SCEC/NMI43` 的正向用例必须先置 `PE=1`，并在结束时恢复原值。`PE=0` 时，匹配的 ICache tag/data injection 允许进入流水线、被 consume 并清除 `SCEIC.INJ_EN`，但不得发布 `SCEC` 或触发 NMI43；软件和 testcase 不得要求该 injection 必须 retain 到 `PE=1`。`sfetchctl` 与 `scacheop` 共用 CSR 地址；执行 cache operation 前后必须保存/恢复 `sfetchctl`，避免 `PE` 被覆盖。
+- `SCEIC/SCEC` cache-error injection 属于 custom RTL/平台错误注入路径，不属于 official Spike 可建模行为；其中 L2Cache tag/data ECC 注错（`SCEIC` source=4/5）的 consume 路径在当前 NHV5.1AP profile 下不实现。相关 case 不得要求 `SCEIC.INJ_EN` 清零、`SCEC` 精确记录 L2Cache tag/data source/EPA，或由该 L2Cache 注错触发 NMI/RNMI 作为普通 pass oracle；若保留，只能作为 future/manual placeholder，标 `D-MANUAL-NANHU-NOT-IMPL`。
 - 自定义 CSR `srnctl @ 0x5c4` 按当前 release RTL 口径为调度功能控制：`FE[0]` 为 fusion decoder enable、`WE[2]` 为 WFI instruction enable，二者复位值均为 1；`STUCK_BIT[7:3]` 复位值为 `0x10`，用于 ROB stuck 阈值，不按 WPRI 处理。写 `srnctl` 必须 read-modify-write 保存未测字段并在 case 结束恢复；WFI case 若需要真实 WFI/halt 路径，必须确认 `WE=1` 且提供 pending/wakeup source，若临时清 `WE` 防卡死，不能把结果当作真实 WFI 等待路径。
 - WFI 可能导致模拟器卡死；优先测试权限与控制位语义，不强制执行真实等待路径。
 - 当前 NHV5.1AP / LinkNan simv 不支持运行时动态更新 `misa` 扩展位；写 `misa` 后不要假设 `C` 等扩展位可以被临时清除/打开并立即改变执行语义。
@@ -90,8 +91,15 @@ VModule 写 case 时的硬要求：
 - `vm_reg_8 @ 0x1028`：VModule 到 core 顶层前的 delay count，不代表 handler 零延迟。
 - `vm_reg_9 @ 0x1030`：直接 force NMI；`bit0=nmi_31`，`bit1=nmi_43`。
 - `vm_reg_12 @ 0x1048`：force debug interrupt。
-- `vm_reg_13 @ 0x1050`：CHI error inject，通过正常 error path 触发 NMI。
-- `vm_reg_14 @ 0x1060`：AXI error inject。
+- `vm_reg_13 @ 0x1050`：one-shot CHI response error inject；支持 RXDAT/RXRSP 的 DERR/NDERR，RXDAT DataCheck 在当前生成 RTL 中无端口、明确不支持。
+- `vm_reg_14 @ 0x1060`：one-shot AXI response error inject；支持 RRESP/BRESP 的 SLVERR/DECERR。
+
+`vm_reg_13/14` error inject 合同：
+
+- 命令摘要：`vm_reg_13` 的 `0x1/0x9/0x3/0xb` 分别表示 RXDAT DERR、RXDAT NDERR、RXRSP DERR、RXRSP NDERR；`0x5` DataCheck 必须报 unsupported。`vm_reg_14` 的 `0x1/0x9/0x3/0xb` 分别表示 RRESP SLVERR、RRESP DECERR、BRESP SLVERR、BRESP DECERR。完整 bitfield、timeout 和清除语义以 `docs/interrupt-vmodule-support/VModule模块说明.md` 为准。
+- 当前协议映射中，CHI RXDAT DERR 形成 TL `corrupt=1, denied=0`，RXDAT NDERR 形成 TL `corrupt=1, denied=1`；DDR AXI read SLVERR/DECERR 经 AxiBridge 转成对应 CHI DERR/NDERR。Uncache/MMIO write 的 CHI RXRSP DERR/NDERR 只形成 TL `denied`，不得用它声称命中 read-side `corrupt`。当前 AxiBridge 未将 AXI BRESP 映射到 CHI RespErr，因此 `vm_reg_14.BRESP` 只用于原始 AXI write-response 注入与握手观测，不得据此期待 TL `denied`、CHI RespErr 或 NMI。
+- one-shot injector 捕获 arm 后下一笔真实 CHI TXREQ 或 AXI AR/AW，再按 TxnID/ID 约束响应；捕获并记录 address 不等于 arm 前已按 PTW/ICache/Uncache owner 或 address 定向。目标 case 必须隔离无关流量，并用 FSDB 证明 request、error response 和 consumer 属于同一 transaction。
+- `VMODULE=1` 只证明 whole-ELF/harness 选择，不证明当前 simv 已编入对应 VModule/AxiBridge 实现。升级 testcase-ready 前必须确认 active filelist/hierarchy 和 owner 批准的 injector，并保留关闭注入的负向对照、isolated exact-bin VDB delta、architectural selfcheck、eventual completion 与非目标错误检查；不得用 PMP fault、timeout/no-response、SCEIC SRAM error 或结果层 hierarchical force 替代目标协议错误。
 
 ## 3. PMP 粒度约定
 
@@ -386,6 +394,7 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
 - project/custom CSR、custom instruction 等 selected runner 不支持的路径。
 - Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、以及 double-trap 交叉场景只有在 runner/testbench oracle 明确时才可作为 default gate；否则走 manual/LinkNan/RTL 或 compile-only。
 - VModule / AP-IT 注入的普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等场景不走 official Spike default gate。Spike 不会通过 VModule 寄存器真实拉高 RTL/testbench 注入信号；即使指令流在 Spike 上执行，也只能作为编译或普通 ISA smoke。VModule 选点优先级与自检 oracle 见 §2.1。
+- `SCEIC/SCEC` cache-error injection、cache ECC/parity 注错 consume、NMI/RNMI 记录等平台错误注入路径不走 official Spike default gate；其中 L2Cache tag/data `SCEIC` source=4/5 正向 consume 在当前 NHV5.1AP profile 下属于 Nanhu 未实现路径，不应作为普通 selfcheck/default oracle。
 - Debug trigger: `mcontrol6` chain 闭合后 AMO 的 breakpoint 语义在 Spike 不建模——chain mismatch 抑制路径在 Spike 上可观测（符合 spec），但 chain 闭合后 spec 要求的 BP 在 Spike 不抛（详见 `test_point/Manual_Reference.md#C7`）。
 
 **Nanhu NHV5.1AP Debug trigger 实现约束**（Nanhu 侧的裁剪，超出部分 **测试点本身不应设计**）：
@@ -457,6 +466,13 @@ LinkNan responder/source evidence（NHV5.1AP 当前项目专属）：
     "category": "Custom CSR / instruction",
     "keywords": ["custom_csr", "custom_instruction", "sfetchctl", "scacheop", "icache_parity_enable", "icache_ecc", "icache_sceic", "srnctl", "fusion_enable", "wfi_enable", "stuck_bit", "rob_stuck", "wfi_halt"],
     "module_hints": ["csr", "rob", "trap"]
+  },
+  {
+    "category": "L2Cache SCEIC ECC injection",
+    "keywords": ["l2cache_ecc", "l2cache_sceic", "l2cache_tag", "l2cache_data", "l2cacheinjectconsumed", "L2CACHE_TAG", "L2CACHE_DATA"],
+    "module_hints": ["csr", "l2cache", "memblock"],
+    "classification": "nanhu_not_impl",
+    "note": "Current NHV5.1AP does not implement/support the L2Cache tag/data SCEIC ECC injection consume path for source=4/5. Cases must not require SCEIC.INJ_EN clear, exact SCEC source/EPA record, or NMI/RNMI for L2Cache tag/data unless a future dedicated RTL build confirms support. Reason code: D-MANUAL-NANHU-NOT-IMPL."
   },
   {
     "category": "Smrnmi/RNMI source and timing",
@@ -567,6 +583,7 @@ Spike 结果使用口径：
 - custom CSR/instruction 等 selected runner 不支持的路径。
 - Smrnmi/RNMI 外部源、RNMI vector 注入、unexpected-trap timing、double-trap 交叉等缺少 runner/testbench oracle 的路径。
 - VModule / AP-IT 注入普通 interrupt、NMI、debug interrupt、WDT、CHI/AXI error inject 等 RTL/testbench-only 场景。
+- SCEIC/SCEC cache-error injection 等平台错误注入路径；其中 L2Cache tag/data source=4/5 正向 consume 当前不实现，只能作为 future/manual placeholder。
 
 ## 8. Spike 不一致时的 NHV5.1AP 处理流程
 
@@ -590,4 +607,5 @@ Spike 结果使用口径：
 - LR/SC reservation timeout、同 PA 不同 VA alias 的 DCache hit / set index 条件、或其它实现特定 reservation 策略：优先 `D-MANUAL-NONGATE`。
 - Smrnmi/RNMI：NHV5.1AP 支持。CSR/`mnret` 基础语义在 runner 明确启用 Smrnmi 时可走 default candidate；RNMI 外部源/vector/timing、unexpected trap 以及 double-trap 交叉优先 `D-MANUAL-NONGATE` 或 special-run，缺少注入/观测路径时转 `compile-only` / `blocked`。
 - VModule / AP-IT 注入：通常用 `D-MANUAL-NONGATE`，因为注入源来自 AP-IT/VModule-capable RTL testbench，不是 official Spike 可建模行为，且当前普通 LinkNan runner 不运行 VModule 注入链路；若 case 的主要 oracle 必须依赖 RTL 内部信号/波形才能观察，可用 `D-MANUAL-RTL-ONLY`。若只有编译环境、没有已确认的 `VMODULE=1` special-run 环境，则 `compile-only`；若当前 testbench 不支持对应 `vm_reg` 或注入源无响应，则 `blocked`。不要因该分层把 VModule 场景替换成 CSR pending default baseline，也不要把当前 LinkNan/Spike run 当作 VModule gate。
+- L2Cache tag/data `SCEIC` source=4/5 ECC 注错正向 consume：当前 NHV5.1AP profile 不实现；若显式保留为未来支持后的占位 case，用 `D-MANUAL-NANHU-NOT-IMPL`，并保持 commented/manual/compile-only，不进入普通 selfcheck/default gate。
 - project/custom CSR 或 custom instruction 且 official Spike 不支持：先按 official Spike model gap 归因；是否保留为 manual/compile-only 取决于测试点/项目需求。
