@@ -76,6 +76,7 @@ VModule 相关 case 的默认口径：
 
 VModule 写 case 时的硬要求：
 
+- **命名/编译路由**：实际使用 VModule（`vm_reg`、VModule helper 或 error/interrupt injector）的 case 名必须含独立 `vmodule` 字段；AI case 统一以 `ai_vmodule_` 开头。不能只在文件名、注释或测试点中标记 VModule；改名时同步函数、`test_register.c` 和测试点引用，以保证 `compile_elf.py` 自动选择 `VMODULE=1`。
 - 优先复用仓库已有 VModule helper；没有 helper 时再封装 `vm_reg` 写接口，不要在每个 case 中散落裸 magic。
 - VModule 命令序列需要按文档使用 address command / data command；中断注入相关序列保留 `fence.i`，避免后续触发不稳定。
 - `vm_reg_8` 只控制 VModule 注入到 core 顶层前的额外 delay；core 顶层到后端/ROB/trap handler 的延迟不可预测。selfcheck 不得断言固定第 N 条指令、固定 cycle 或固定单拍先后。
